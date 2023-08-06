@@ -37,7 +37,7 @@ def pFailWithShardSize(n, s, m, h):
 
 # Compute values for 10000 total parties , 30% corruption , and 60 bit security
 n = 10000
-s = 3000
+s = 250
 k = 60
 
 # corruption threshold percentages we are interested in
