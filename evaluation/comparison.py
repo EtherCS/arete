@@ -51,6 +51,8 @@ print("RapidChain\t 33.3%\t 49%\t 49%\t", minCSize(n, n*Fraction(1, 3), Fraction
 print("AHL\t\t 30%\t 49%\t 49%\t", minCSize(n, n*Fraction(3, 10), Fraction(49, 100), k), "\t", "1-2^("+str(k)+")")
 print("Pyramid\t\t 12.5%\t 33.3%\t 33.3%\t", minCSize(n, n*Fraction(1, 8), Fraction(1, 3), k), "\t", "1-2^("+str(k)+")")
 print("RIVET\t\t 33.3%\t 49%\t 49%\t", minCSize(n, n*Fraction(1, 3), Fraction(49, 100), k), "\t", "1-2^("+str(k)+")")
+m_min=minCSize(n, n*Fraction(1, 3), Fraction(66, 100), k)
+print("CoChain\t\t 33.3%\t 66%\t 66%\t", m_min, "\t", float(1-pFailWithShardSize(n, n*Fraction(33, 100), m_min, int(m_min*Fraction(100-33, 100)))))
 
 # GEARBOX
 crps = range(0 , 34 , 1)
