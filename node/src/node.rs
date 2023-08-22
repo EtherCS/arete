@@ -10,6 +10,7 @@ use tokio::sync::mpsc::{channel, Receiver};
 /// The default channel capacity for this module.
 pub const CHANNEL_CAPACITY: usize = 1_000;
 
+// Node is the replica in the ordering shard
 pub struct Node {
     pub commit: Receiver<Block>,
 }
