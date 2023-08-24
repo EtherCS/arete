@@ -1,4 +1,5 @@
 ## 1. Reconstruct the network connections
+> Network TODO
 > Nodes are replicas of the ordering shard; Executors are replicas of the execution shards.
 
 Codes are in *./node/src*. From ***client->node*** to: 
@@ -9,6 +10,7 @@ Codes are in *./node/src*. From ***client->node*** to:
 
 
 ## 2. Implement blocks' structures
+> Block TODO
 Create three blocks:
 - Execution blocks:
 - Certificate blocks:
@@ -16,3 +18,8 @@ Create three blocks:
 
 
 ## 3. Support transaction execution
+> Execution TODO
+> Current: rockDB key-value is used to store blocks rather than accounts, i.e., <key, value> = <block_digest, block>
+
+Maybe
+- Modify block structure: *./consensus/src/messages.rs*, replace **payload** with new type **transactions**
