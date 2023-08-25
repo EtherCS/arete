@@ -34,6 +34,17 @@ class CommandMaker:
         return (f'./node {v} run --keys {keys} --committee {committee} '
                 f'--store {store} --parameters {parameters}')
 
+    # Config TODO
+    @staticmethod   
+    def run_executor(keys, committee, store, parameters, debug=False):
+        assert isinstance(keys, str)
+        assert isinstance(committee, str)
+        assert isinstance(parameters, str)
+        assert isinstance(debug, bool)
+        v = '-vvv' if debug else '-vv'
+        return (f'./executor {v} run --keys {keys} --committee {committee} '
+                f'--store {store} --parameters {parameters}')
+    
     @staticmethod
     def run_client(address, size, rate, timeout, nodes=[]):
         assert isinstance(address, str)
