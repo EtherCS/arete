@@ -114,7 +114,31 @@ class NodeParameters:
         assert isinstance(filename, str)
         with open(filename, 'w') as f:
             dump(self.json, f, indent=4, sort_keys=True)
+# Config TODO: support multiple execution shards
+class ExecutorParameters:
+    def __init__(self, json):
+        inputs = []
+        try:
+            inputs += [json['certify']['certify_timeout_delay']]
+            inputs += [json['certify']['certify_sync_retry_delay']]
+            inputs += [json['executor_mempool']['certify_gc_depth']]
+            inputs += [json['executor_mempool']['certify_sync_retry_delay']]
+            inputs += [json['executor_mempool']['certify_sync_retry_nodes']]
+            inputs += [json['executor_mempool']['certify_batch_size']]
+            inputs += [json['executor_mempool']['certify_max_batch_delay']]
+        except KeyError as e:
+            raise ConfigError(f'Malformed parameters: missing key {e}')
 
+        if not all(isinstance(x, int) for x in inputs):
+            raise ConfigError('Invalid parameters type')
+
+        self.certify_timeout_delay = json['certify']['certify_timeout_delay']
+        self.json = json
+
+    def print(self, filename):
+        assert isinstance(filename, str)
+        with open(filename, 'w') as f:
+            dump(self.json, f, indent=4, sort_keys=True)
 
 class BenchParameters:
     def __init__(self, json):
@@ -135,6 +159,14 @@ class BenchParameters:
             self.faults = int(json['faults'])
             self.duration = int(json['duration'])
             self.runs = int(json['runs']) if 'runs' in json else 1
+            # Config
+            self.shard_num = int(json['shard_num'])
+            shard_sizes = json['shard_sizes']
+            shard_sizes = shard_sizes if isinstance(shard_sizes, list) else [shard_sizes]
+            if not shard_sizes or any(x <= 1 for x in shard_sizes):
+                raise ConfigError('Missing or invalid shard size')
+            self.shard_sizes = [int(x) for x in shard_sizes]
+            
         except KeyError as e:
             raise ConfigError(f'Malformed bench parameters: missing key {e}')
 

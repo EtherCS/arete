@@ -17,6 +17,8 @@ def local(ctx):
         'rate': 1_000,
         'tx_size': 512,
         'duration': 20,
+        'shard_num': 1,
+        'shard_sizes': 4, # could be different shard size [4, 8, ...]
     }
     node_params = {
         'consensus': {
@@ -31,8 +33,22 @@ def local(ctx):
             'max_batch_delay': 10
         }
     }
+    # Config TODO: support multiple execution shards
+    executor_params = {
+        'certify': {
+            'certify_timeout_delay': 1_000,
+            'certify_sync_retry_delay': 10_000,
+        },
+        'executor_mempool': {
+            'certify_gc_depth': 50,
+            'certify_sync_retry_delay': 5_000,
+            'certify_sync_retry_nodes': 3,
+            'certify_batch_size': 15_000,
+            'certify_max_batch_delay': 10
+        }
+    }
     try:
-        ret = LocalBench(bench_params, node_params).run(debug=True).result()
+        ret = LocalBench(bench_params, node_params, executor_params).run(debug=True).result()
         print(ret)
     except BenchError as e:
         Print.error(e)
