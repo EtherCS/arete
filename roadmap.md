@@ -16,8 +16,13 @@ Create three blocks:
 - Certificate blocks:
 - Ordering blocks:
 
+## 3. Configs extension
+- Modified fabric scripts: done
+- TODO: 
+  - run executors
+  - support multiple execution shards
 
-## 3. Support transaction execution
+## 4. Support transaction execution
 > Execution TODO
 > Current: rockDB key-value is used to store blocks rather than accounts, i.e., <key, value> = <block_digest, block>
 
