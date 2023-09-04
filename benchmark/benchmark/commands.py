@@ -13,7 +13,7 @@ class CommandMaker:
 
     @staticmethod
     def clean_logs():
-        return f'rm -r {PathMaker.logs_path()} ; mkdir -p {PathMaker.logs_path()}'
+        return f'rm -rf {PathMaker.logs_path()} ; mkdir -p {PathMaker.logs_path()}'
 
     @staticmethod
     def compile():
@@ -23,6 +23,11 @@ class CommandMaker:
     def generate_key(filename):
         assert isinstance(filename, str)
         return f'./node keys --filename {filename}'
+    
+    @staticmethod
+    def generate_executor_key(filename):
+        assert isinstance(filename, str)
+        return f'./executor keys --filename {filename}'
 
     @staticmethod
     def run_node(keys, committee, store, parameters, debug=False):

@@ -17,19 +17,36 @@ class PathMaker:
     @staticmethod
     def node_crate_path():
         return join('..', 'node')
+    
+    @staticmethod
+    def executor_crate_path():
+        return join('..', 'executor')
 
     @staticmethod
     def committee_file():
         return '.committee.json'
+    
+    @staticmethod
+    def shard_committee_file():
+        return '.shard_committee.json'
 
     @staticmethod
     def parameters_file():
         return '.parameters.json'
+    
+    @staticmethod
+    def shard_parameters_file():
+        return '.shard_parameters.json'
 
     @staticmethod
     def key_file(i):
         assert isinstance(i, int) and i >= 0
         return f'.node-{i}.json'
+    
+    @staticmethod
+    def executor_key_file(i):
+        assert isinstance(i, int) and i >= 0
+        return f'.executor-{i}.json'
 
     @staticmethod
     def db_path(i):
@@ -37,8 +54,16 @@ class PathMaker:
         return f'.db-{i}'
 
     @staticmethod
+    def executor_db_path(i):
+        assert isinstance(i, int) and i >= 0
+        return f'.executor_db-{i}'
+    
+    @staticmethod
     def logs_path():
         return 'logs'
+    
+    def logs_shard_path(i):
+        return f'shard-{i}'
 
     @staticmethod
     def node_log_file(i):
@@ -49,6 +74,16 @@ class PathMaker:
     def client_log_file(i):
         assert isinstance(i, int) and i >= 0
         return join(PathMaker.logs_path(), f'client-{i}.log')
+    
+    @staticmethod
+    def shard_client_log_file(i, j):    # i: client id; j: shard id
+        assert isinstance(i, int) and i >= 0
+        return join(PathMaker.logs_shard_path(j), f'client-{i}.log')
+    
+    @staticmethod
+    def shard_executor_log_file(i, j):
+        assert isinstance(i, int) and i >= 0
+        return join(PathMaker.logs_shard_path(j), f'executor-{i}.log')
 
     @staticmethod
     def results_path():
