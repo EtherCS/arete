@@ -1,6 +1,7 @@
 from fabric import task
 
 from benchmark.local import LocalBench
+from benchmark.local_shard import LocalBenchShard
 from benchmark.logs import ParseError, LogParser
 from benchmark.utils import Print
 from benchmark.plot import Ploter, PlotError
@@ -53,6 +54,51 @@ def local(ctx):
     except BenchError as e:
         Print.error(e)
 
+@task
+def local_shard(ctx):
+    ''' Run benchmarks on localhost '''
+    bench_params = {
+        'faults': 0,
+        'nodes': 4,
+        'rate': 1_000,
+        'tx_size': 512,
+        'duration': 20,
+        'shard_num': 1,
+        'shard_sizes': 4, # could be different shard size [4, 8, ...]
+    }
+    node_params = {
+        'consensus': {
+            'timeout_delay': 1_000,
+            'sync_retry_delay': 10_000,
+        },
+        'mempool': {
+            'gc_depth': 50,
+            'sync_retry_delay': 5_000,
+            'sync_retry_nodes': 3,
+            'batch_size': 15_000,
+            'max_batch_delay': 10
+        }
+    }
+    # Config TODO: support multiple execution shards
+    executor_params = {
+        'certify': {
+            'certify_timeout_delay': 1_000,
+            'certify_sync_retry_delay': 10_000,
+        },
+        'executor_mempool': {
+            'certify_gc_depth': 50,
+            'certify_sync_retry_delay': 5_000,
+            'certify_sync_retry_nodes': 3,
+            'certify_batch_size': 15_000,
+            'certify_max_batch_delay': 10
+        }
+    }
+    try:
+        ret = LocalBenchShard(bench_params, executor_params).run(debug=True).result()
+        print(ret)
+    except BenchError as e:
+        Print.error(e)
+        
 
 @task
 def create(ctx, nodes=2):
