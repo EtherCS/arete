@@ -119,20 +119,20 @@ class ExecutorParameters:
     def __init__(self, json):
         inputs = []
         try:
-            inputs += [json['certify']['certify_timeout_delay']]
-            inputs += [json['certify']['certify_sync_retry_delay']]
-            inputs += [json['executor_mempool']['certify_gc_depth']]
-            inputs += [json['executor_mempool']['certify_sync_retry_delay']]
-            inputs += [json['executor_mempool']['certify_sync_retry_nodes']]
-            inputs += [json['executor_mempool']['certify_batch_size']]
-            inputs += [json['executor_mempool']['certify_max_batch_delay']]
+            inputs += [json['consensus']['certify_timeout_delay']]
+            inputs += [json['consensus']['certify_sync_retry_delay']]
+            inputs += [json['mempool']['certify_gc_depth']]
+            inputs += [json['mempool']['certify_sync_retry_delay']]
+            inputs += [json['mempool']['certify_sync_retry_nodes']]
+            inputs += [json['mempool']['certify_batch_size']]
+            inputs += [json['mempool']['certify_max_batch_delay']]
         except KeyError as e:
             raise ConfigError(f'Malformed parameters: missing key {e}')
 
         if not all(isinstance(x, int) for x in inputs):
             raise ConfigError('Invalid parameters type')
 
-        self.certify_timeout_delay = json['certify']['certify_timeout_delay']
+        self.certify_timeout_delay = json['consensus']['certify_timeout_delay']
         self.json = json
 
     def print(self, filename):

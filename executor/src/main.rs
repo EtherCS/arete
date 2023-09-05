@@ -5,11 +5,11 @@ use crate::config::Export as _;
 use crate::config::{Committee, Secret};
 use crate::executor::Executor;
 use clap::{Parser, Subcommand};
-use consensus::Committee as ConsensusCommittee;
+use certify::ExecutionCommittee as ConsensusCommittee;
 use env_logger::Env;
 use futures::future::join_all;
 use log::error;
-use mempool::Committee as MempoolCommittee;
+use execpool::ExecutionCommittee as MempoolCommittee;
 use std::fs;
 use tokio::task::JoinHandle;
 

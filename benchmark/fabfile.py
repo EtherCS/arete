@@ -36,11 +36,11 @@ def local(ctx):
     }
     # Config TODO: support multiple execution shards
     executor_params = {
-        'certify': {
+        'consensus': {
             'certify_timeout_delay': 1_000,
             'certify_sync_retry_delay': 10_000,
         },
-        'executor_mempool': {
+        'mempool': {
             'certify_gc_depth': 50,
             'certify_sync_retry_delay': 5_000,
             'certify_sync_retry_nodes': 3,
@@ -55,7 +55,7 @@ def local(ctx):
         Print.error(e)
 
 @task
-def local_shard(ctx):
+def localShard(ctx):
     ''' Run benchmarks on localhost '''
     bench_params = {
         'faults': 0,
@@ -66,26 +66,13 @@ def local_shard(ctx):
         'shard_num': 1,
         'shard_sizes': 4, # could be different shard size [4, 8, ...]
     }
-    node_params = {
-        'consensus': {
-            'timeout_delay': 1_000,
-            'sync_retry_delay': 10_000,
-        },
-        'mempool': {
-            'gc_depth': 50,
-            'sync_retry_delay': 5_000,
-            'sync_retry_nodes': 3,
-            'batch_size': 15_000,
-            'max_batch_delay': 10
-        }
-    }
     # Config TODO: support multiple execution shards
     executor_params = {
-        'certify': {
+        'consensus': {
             'certify_timeout_delay': 1_000,
             'certify_sync_retry_delay': 10_000,
         },
-        'executor_mempool': {
+        'mempool': {
             'certify_gc_depth': 50,
             'certify_sync_retry_delay': 5_000,
             'certify_sync_retry_nodes': 3,

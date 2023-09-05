@@ -22,13 +22,16 @@ anyhow = "1.0.38"
 
 crypto = { path = "../crypto" }
 store = { path = "../store" }
-consensus = { path = "../consensus" }
-mempool = { path = "../mempool" }
+# consensus = { path = "../consensus" }
+# mempool = { path = "../mempool" }
+certify = { path = "../certify" }
+execpool = { path = "../execpool" }
 
 [features]
-benchmark = ["consensus/benchmark", "mempool/benchmark"]
+# benchmark = ["consensus/benchmark", "mempool/benchmark"]
+benchmark = ["certify/benchmark", "execpool/benchmark"]
 
-# [[bin]]         
-# name = "client"   
-# path = "src/client.rs" 
-# required-features = ["benchmark"] 
+[[bin]]         
+name = "client"   
+path = "src/client.rs" 
+required-features = ["benchmark"] 

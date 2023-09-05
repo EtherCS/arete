@@ -8,7 +8,7 @@ class CommandMaker:
     @staticmethod
     def cleanup():
         return (
-            f'rm -r .db-* ; rm .*.json ; mkdir -p {PathMaker.results_path()}'
+            f'rm -r .db-* ; rm -r .*db-* ; rm .*.json ; mkdir -p {PathMaker.results_path()}'
         )
 
     @staticmethod
@@ -70,3 +70,9 @@ class CommandMaker:
         assert isinstance(origin, str)
         node, client = join(origin, 'node'), join(origin, 'client')
         return f'rm node ; rm client ; ln -s {node} . ; ln -s {client} .'
+    
+    @staticmethod
+    def alias_shard_executor_binaries(origin):
+        assert isinstance(origin, str)
+        executor, client = join(origin, 'executor'), join(origin, 'client')
+        return f'rm executor ; rm client ; ln -s {executor} . ; ln -s {client} .'

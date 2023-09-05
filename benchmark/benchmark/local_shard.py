@@ -4,8 +4,8 @@ from os.path import basename, splitext
 from time import sleep
 
 from benchmark.commands import CommandMaker
-from benchmark.config import Key, LocalCommittee, NodeParameters, ExecutorParameters, BenchParameters, ConfigError
-from benchmark.logs import LogParser, ParseError
+from benchmark.config import Key, LocalCommittee, ExecutorParameters, BenchParameters, ConfigError
+from benchmark.logs import LogParser, ParseError, ShardLogParser
 from benchmark.utils import Print, BenchError, PathMaker
 
 
@@ -46,7 +46,7 @@ class LocalBenchShard:
 
     def run(self, debug=False):
         assert isinstance(debug, bool)
-        Print.heading('Starting local benchmark')
+        Print.heading('Starting local shard benchmark')
 
         # Kill any previous testbed.
         self._kill_executors()
@@ -66,12 +66,12 @@ class LocalBenchShard:
             subprocess.run(cmd, check=True, cwd=PathMaker.executor_crate_path())
 
             # Create alias for the client and executors binary.
-            cmd = CommandMaker.alias_binaries(PathMaker.binary_path())
+            cmd = CommandMaker.alias_shard_executor_binaries(PathMaker.binary_path())
             subprocess.run([cmd], shell=True)
 
             # Generate configuration files.
             keys = []
-            key_files = [PathMaker.executor_key_file(i) for i in range(executors)]
+            key_files = [PathMaker.shard_executor_key_file(self.SHARD_ID, i) for i in range(executors)]
             for filename in key_files:
                 cmd = CommandMaker.generate_executor_key(filename).split()
                 subprocess.run(cmd, check=True)
@@ -87,11 +87,11 @@ class LocalBenchShard:
             executors = executors - self.faults
 
             # Run the clients (they will wait for the executors to be ready).
-            # TODO: shard_client_log_file(i, self.SHARD_ID): self.SHARD_ID -> shard id
+            # TODO: shard_client_log_file(self.SHARD_ID, i): self.SHARD_ID -> shard id
             addresses = committee.front
             rate_share = ceil(rate / executors)
             timeout = self.executor_parameters.certify_timeout_delay
-            client_logs = [PathMaker.shard_client_log_file(i, self.SHARD_ID) for i in range(executors)]
+            client_logs = [PathMaker.shard_client_log_file(self.SHARD_ID, i) for i in range(executors)]
             for addr, log_file in zip(addresses, client_logs):
                 cmd = CommandMaker.run_client(
                     addr,
@@ -103,9 +103,9 @@ class LocalBenchShard:
                 self._background_run(cmd, log_file)
 
             # Run the executors.
-            # TODO: shard_executor_log_file(i, self.SHARD_ID): self.SHARD_ID -> shard id
+            # TODO: shard_executor_log_file(self.SHARD_ID, i): self.SHARD_ID -> shard id
             dbs = [PathMaker.executor_db_path(i) for i in range(executors)]
-            executor_logs = [PathMaker.shard_executor_log_file(i, self.SHARD_ID) for i in range(executors)]
+            executor_logs = [PathMaker.shard_executor_log_file(self.SHARD_ID, i) for i in range(executors)]
             for key_file, db, log_file in zip(key_files, dbs, executor_logs):
                 cmd = CommandMaker.run_executor(
                     key_file,
@@ -128,8 +128,9 @@ class LocalBenchShard:
             self._kill_executors()
 
             # Parse logs and return the parser.
+            # TODO: support to parse multiple shards
             Print.info('Parsing logs...')
-            return LogParser.process('./logs', faults=self.faults)
+            return ShardLogParser.process_shard(f'./logs', faults=self.faults)
 
         except (subprocess.SubprocessError, ParseError) as e:
             self._kill_executors()
