@@ -1,4 +1,4 @@
-## 1. Reconstruct the network connections
+## 1. Reconstruct the network connections (Zhongtang)
 > Network TODO
 > Nodes are replicas of the ordering shard; Executors are replicas of the execution shards.
 
@@ -10,18 +10,20 @@ Codes are in *./node/src*. From ***client->node*** to:
 
 
 ## 2. Implement blocks' structures
-> Block TODO
-Create three blocks:
-- Execution blocks:
-- Certificate blocks:
-- Ordering blocks:
+- Done
+  - Execution blocks (EBlock): done in *./certify/messages.rs*
+  - Certificate blocks (CBlock): done in *./certify/messages.rs*
+  - Ordering blocks (OBlock): done in *./consensus/messages.rs*
+- TODO:
+  - extend fields of EBlock and CBlock
+  - replace EBlock with CBlock in **analyze_block** function, and send CBlock to the ordering shard
 
-## 3. Configs extension
-- Modified fabric scripts: done
-- create 1) execpool (rf. mempool); 2) certify (rf. consensus): done
-- Parse single shard result *./benchmark/benchmark/logs.py* with *ShardLogParser*: done
+## 3. Configs extension (Jianting)
+- Done
+  - create 1) execpool (rf. mempool); 2) certify (rf. consensus): done
+  - Parse single shard result *./benchmark/benchmark/logs.py* with *ShardLogParser*: done
+  - run executors: done
 - TODO: 
-  - run executors
   - support multiple execution shards
   - Parse log *./benchmark/benchmark/logs.py*: after adding more attributes to executor parameters
 
