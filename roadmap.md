@@ -19,6 +19,7 @@ Create three blocks:
 ## 3. Configs extension
 - Modified fabric scripts: done
 - create 1) execpool (rf. mempool); 2) certify (rf. consensus): done
+- Parse single shard result *./benchmark/benchmark/logs.py* with *ShardLogParser*: done
 - TODO: 
   - run executors
   - support multiple execution shards

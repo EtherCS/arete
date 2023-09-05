@@ -4,7 +4,7 @@ use crate::error::ConsensusError;
 use crate::helper::Helper;
 use crate::leader::LeaderElector;
 use crate::mempool::MempoolDriver;
-use crate::messages::{Block, Timeout, Vote, TC};
+use crate::messages::{OBlock, Timeout, Vote, TC};
 use crate::proposer::Proposer;
 use crate::synchronizer::Synchronizer;
 use async_trait::async_trait;
@@ -31,7 +31,7 @@ pub type Round = u64;
 
 #[derive(Serialize, Deserialize, Debug)]
 pub enum ConsensusMessage {
-    Propose(Block),
+    Propose(OBlock),
     Vote(Vote),
     Timeout(Timeout),
     TC(TC),
@@ -50,7 +50,7 @@ impl Consensus {
         store: Store,
         rx_mempool: Receiver<Digest>,
         tx_mempool: Sender<ConsensusMempoolMessage>,
-        tx_commit: Sender<Block>,
+        tx_commit: Sender<OBlock>,
     ) {
         // NOTE: This log entry is used to compute performance.
         parameters.log();

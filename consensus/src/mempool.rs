@@ -1,6 +1,6 @@
 use crate::consensus::{Round, CHANNEL_CAPACITY};
 use crate::error::{ConsensusError, ConsensusResult};
-use crate::messages::Block;
+use crate::messages::OBlock;
 use crypto::Digest;
 use crypto::Hash as _;
 use futures::future::try_join_all;
@@ -22,7 +22,7 @@ impl MempoolDriver {
     pub fn new(
         store: Store,
         tx_mempool: Sender<ConsensusMempoolMessage>,
-        tx_loopback: Sender<Block>,
+        tx_loopback: Sender<OBlock>,
     ) -> Self {
         let (tx_payload_waiter, rx_payload_waiter) = channel(CHANNEL_CAPACITY);
 
@@ -37,7 +37,7 @@ impl MempoolDriver {
         }
     }
 
-    pub async fn verify(&mut self, block: Block) -> ConsensusResult<bool> {
+    pub async fn verify(&mut self, block: OBlock) -> ConsensusResult<bool> {
         let mut missing = Vec::new();
         for x in &block.payload {
             if self.store.read(x.to_vec()).await?.is_none() {
@@ -80,21 +80,21 @@ impl MempoolDriver {
 
 #[derive(Debug)]
 enum PayloadWaiterMessage {
-    Wait(Vec<Digest>, Box<Block>),
+    Wait(Vec<Digest>, Box<OBlock>),
     Cleanup(Round),
 }
 
 struct PayloadWaiter {
     store: Store,
     rx_message: Receiver<PayloadWaiterMessage>,
-    tx_loopback: Sender<Block>,
+    tx_loopback: Sender<OBlock>,
 }
 
 impl PayloadWaiter {
     pub fn spawn(
         store: Store,
         rx_message: Receiver<PayloadWaiterMessage>,
-        tx_loopback: Sender<Block>,
+        tx_loopback: Sender<OBlock>,
     ) {
         tokio::spawn(async move {
             Self {
@@ -109,9 +109,9 @@ impl PayloadWaiter {
 
     async fn waiter(
         mut missing: Vec<(Digest, Store)>,
-        deliver: Box<Block>,
+        deliver: Box<OBlock>,
         mut handler: Receiver<()>,
-    ) -> ConsensusResult<Option<Box<Block>>> {
+    ) -> ConsensusResult<Option<Box<OBlock>>> {
         let waiting: Vec<_> = missing
             .iter_mut()
             .map(|(x, y)| y.notify_read(x.to_vec()))

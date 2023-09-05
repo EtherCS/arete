@@ -1,6 +1,6 @@
 use crate::config::Export as _;
 use crate::config::{Committee, ConfigError, Parameters, Secret};
-use consensus::{Block, Consensus};
+use consensus::{OBlock, Consensus};
 use crypto::SignatureService;
 use log::info;
 use mempool::Mempool;
@@ -12,7 +12,7 @@ pub const CHANNEL_CAPACITY: usize = 1_000;
 
 // Node is the replica in the ordering shard
 pub struct Node {
-    pub commit: Receiver<Block>,
+    pub commit: Receiver<OBlock>,
 }
 
 impl Node {

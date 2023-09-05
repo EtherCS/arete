@@ -1,7 +1,7 @@
 use crate::config::ExecutionCommittee;
 use crate::consensus::{ConsensusMessage, CHANNEL_CAPACITY};
 use crate::error::ConsensusResult;
-use crate::messages::{Block, QC};
+use crate::messages::{EBlock, QC};
 use bytes::Bytes;
 use crypto::Hash as _;
 use crypto::{Digest, PublicKey};
@@ -23,7 +23,7 @@ const TIMER_ACCURACY: u64 = 5_000;
 
 pub struct Synchronizer {
     store: Store,
-    inner_channel: Sender<Block>,
+    inner_channel: Sender<EBlock>,
 }
 
 impl Synchronizer {
@@ -31,11 +31,11 @@ impl Synchronizer {
         name: PublicKey,
         committee: ExecutionCommittee,
         store: Store,
-        tx_loopback: Sender<Block>,
+        tx_loopback: Sender<EBlock>,
         sync_retry_delay: u64,
     ) -> Self {
         let mut network = SimpleSender::new();
-        let (tx_inner, mut rx_inner): (_, Receiver<Block>) = channel(CHANNEL_CAPACITY);
+        let (tx_inner, mut rx_inner): (_, Receiver<EBlock>) = channel(CHANNEL_CAPACITY);
 
         let store_copy = store.clone();
         tokio::spawn(async move {
@@ -112,14 +112,14 @@ impl Synchronizer {
         }
     }
 
-    async fn waiter(mut store: Store, wait_on: Digest, deliver: Block) -> ConsensusResult<Block> {
+    async fn waiter(mut store: Store, wait_on: Digest, deliver: EBlock) -> ConsensusResult<EBlock> {
         let _ = store.notify_read(wait_on.to_vec()).await?;
         Ok(deliver)
     }
 
-    pub async fn get_parent_block(&mut self, block: &Block) -> ConsensusResult<Option<Block>> {
+    pub async fn get_parent_block(&mut self, block: &EBlock) -> ConsensusResult<Option<EBlock>> {
         if block.qc == QC::genesis() {
-            return Ok(Some(Block::genesis()));
+            return Ok(Some(EBlock::genesis()));
         }
         let parent = block.parent();
         match self.store.read(parent.to_vec()).await? {
@@ -135,8 +135,8 @@ impl Synchronizer {
 
     pub async fn get_ancestors(
         &mut self,
-        block: &Block,
-    ) -> ConsensusResult<Option<(Block, Block)>> {
+        block: &EBlock,
+    ) -> ConsensusResult<Option<(EBlock, EBlock)>> {
         let b1 = match self.get_parent_block(block).await? {
             Some(b) => b,
             None => return Ok(None),

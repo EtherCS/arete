@@ -11,7 +11,7 @@ fn spawn_nodes(
     keys: Vec<(PublicKey, SecretKey)>,
     committee: ExecutionCommittee,
     store_path: &str,
-) -> Vec<JoinHandle<Block>> {
+) -> Vec<JoinHandle<EBlock>> {
     keys.into_iter()
         .enumerate()
         .map(|(i, (name, secret))| {

@@ -1,6 +1,6 @@
 use crate::config::ExecutionCommittee;
 use crate::consensus::Round;
-use crate::messages::{Block, Timeout, Vote, QC};
+use crate::messages::{EBlock, Timeout, Vote, QC};
 use bytes::Bytes;
 use crypto::Hash as _;
 use crypto::{generate_keypair, Digest, PublicKey, SecretKey, Signature};
@@ -45,7 +45,7 @@ pub fn committee_with_base_port(base_port: u16) -> ExecutionCommittee {
     committee
 }
 
-impl Block {
+impl EBlock {
     pub fn new_from_key(
         qc: QC,
         author: PublicKey,
@@ -53,7 +53,7 @@ impl Block {
         payload: Vec<Digest>,
         secret: &SecretKey,
     ) -> Self {
-        let block = Block {
+        let block = EBlock {
             qc,
             tc: None,
             author,
@@ -66,7 +66,7 @@ impl Block {
     }
 }
 
-impl PartialEq for Block {
+impl PartialEq for EBlock {
     fn eq(&self, other: &Self) -> bool {
         self.digest() == other.digest()
     }
@@ -114,9 +114,9 @@ impl PartialEq for Timeout {
 }
 
 // Fixture.
-pub fn block() -> Block {
+pub fn block() -> EBlock {
     let (public_key, secret_key) = keys().pop().unwrap();
-    Block::new_from_key(QC::genesis(), public_key, 1, Vec::new(), &secret_key)
+    EBlock::new_from_key(QC::genesis(), public_key, 1, Vec::new(), &secret_key)
 }
 
 // Fixture.
@@ -144,14 +144,14 @@ pub fn qc() -> QC {
 }
 
 // Fixture.
-pub fn chain(keys: Vec<(PublicKey, SecretKey)>) -> Vec<Block> {
+pub fn chain(keys: Vec<(PublicKey, SecretKey)>) -> Vec<EBlock> {
     let mut latest_qc = QC::genesis();
     keys.iter()
         .enumerate()
         .map(|(i, key)| {
             // Make a block.
             let (public_key, secret_key) = key;
-            let block = Block::new_from_key(
+            let block = EBlock::new_from_key(
                 latest_qc.clone(),
                 *public_key,
                 1 + i as Round,

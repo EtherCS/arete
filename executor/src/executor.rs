@@ -1,6 +1,6 @@
 use crate::config::Export as _;
 use crate::config::{Committee, ConfigError, Parameters, Secret};
-use certify::{Block, Consensus};
+use certify::{EBlock, Consensus};
 use crypto::SignatureService;
 use log::info;
 use execpool::Mempool;
@@ -12,7 +12,7 @@ pub const CHANNEL_CAPACITY: usize = 1_000;
 
 // Executor is the replica in the ordering shard
 pub struct Executor {
-    pub commit: Receiver<Block>,
+    pub commit: Receiver<EBlock>,
 }
 
 impl Executor {

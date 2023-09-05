@@ -13,202 +13,6 @@ use std::fmt;
 #[path = "tests/messages_tests.rs"]
 pub mod messages_tests;
 
-// Execution block
-#[derive(Serialize, Deserialize, Default, Clone)]
-pub struct Block {  // Block TODO, Block -> EBlock
-    pub qc: QC, // Block TODO, Remove
-    pub tc: Option<TC>, // Block TODO, Remove
-    pub author: PublicKey,
-    pub round: Round,
-    pub payload: Vec<Digest>,
-    pub signature: Signature,
-}
-
-
-impl Block {
-    pub async fn new(
-        qc: QC,
-        tc: Option<TC>, 
-        author: PublicKey,
-        round: Round,
-        payload: Vec<Digest>,
-        mut signature_service: SignatureService,
-    ) -> Self {
-        let block = Self {
-            qc,
-            tc,
-            author,
-            round,
-            payload,
-            signature: Signature::default(),
-        };
-        let signature = signature_service.request_signature(block.digest()).await;
-        Self { signature, ..block }
-    }
-
-    pub fn genesis() -> Self {
-        Block::default()
-    }
-
-    pub fn parent(&self) -> &Digest {
-        &self.qc.hash
-    }
-
-    pub fn verify(&self, committee: &Committee) -> ConsensusResult<()> {
-        // Ensure the authority has voting rights.
-        let voting_rights = committee.stake(&self.author);
-        ensure!(
-            voting_rights > 0,
-            ConsensusError::UnknownAuthority(self.author)
-        );
-
-        // Check the signature.
-        self.signature.verify(&self.digest(), &self.author)?;
-
-        // Check the embedded QC.
-        if self.qc != QC::genesis() {
-            self.qc.verify(committee)?;
-        }
-
-        // Check the TC embedded in the block (if any).
-        if let Some(ref tc) = self.tc {
-            tc.verify(committee)?;
-        }
-        Ok(())
-    }
-}
-
-impl Hash for Block {
-    fn digest(&self) -> Digest {
-        let mut hasher = Sha512::new();
-        hasher.update(self.author.0);
-        hasher.update(self.round.to_le_bytes());
-        for x in &self.payload {
-            hasher.update(x);
-        }
-        hasher.update(&self.qc.hash);
-        Digest(hasher.finalize().as_slice()[..32].try_into().unwrap())
-    }
-}
-
-impl fmt::Debug for Block {
-    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        write!(
-            f,
-            "{}: B({}, {}, {:?}, {})",
-            self.digest(),
-            self.author,
-            self.round,
-            self.qc,
-            self.payload.iter().map(|x| x.size()).sum::<usize>(),
-        )
-    }
-}
-
-impl fmt::Display for Block {
-    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        write!(f, "B{}", self.round)
-    }
-}
-
-// Certificate block
-#[derive(Serialize, Deserialize, Default, Clone)]
-pub struct CBlock {
-    pub qc: QC, 
-    pub tc: Option<TC>,
-    pub author: PublicKey,
-    pub round: Round,
-    pub payload: Vec<Digest>,
-    pub signature: Signature,
-    // Execution TODO: map[ctx_hash]=ok(),fail()
-}
-
-impl CBlock {
-    pub async fn new(
-        qc: QC,
-        tc: Option<TC>, 
-        author: PublicKey,
-        round: Round,
-        payload: Vec<Digest>,
-        mut signature_service: SignatureService,
-    ) -> Self {
-        let block = Self {
-            qc,
-            tc,
-            author,
-            round,
-            payload,
-            signature: Signature::default(),
-        };
-        let signature = signature_service.request_signature(block.digest()).await;
-        Self { signature, ..block }
-    }
-
-    pub fn genesis() -> Self {
-        CBlock::default()
-    }
-
-    pub fn parent(&self) -> &Digest {
-        &self.qc.hash
-    }
-
-    pub fn verify(&self, committee: &Committee) -> ConsensusResult<()> {
-        // Ensure the authority has voting rights.
-        let voting_rights = committee.stake(&self.author);
-        ensure!(
-            voting_rights > 0,
-            ConsensusError::UnknownAuthority(self.author)
-        );
-
-        // Check the signature.
-        self.signature.verify(&self.digest(), &self.author)?;
-
-        // Check the embedded QC.
-        if self.qc != QC::genesis() {
-            self.qc.verify(committee)?;
-        }
-
-        // Check the TC embedded in the block (if any).
-        if let Some(ref tc) = self.tc {
-            tc.verify(committee)?;
-        }
-        Ok(())
-    }
-}
-
-impl Hash for CBlock {
-    fn digest(&self) -> Digest {
-        let mut hasher = Sha512::new();
-        hasher.update(self.author.0);
-        hasher.update(self.round.to_le_bytes());
-        for x in &self.payload {
-            hasher.update(x);
-        }
-        hasher.update(&self.qc.hash);
-        Digest(hasher.finalize().as_slice()[..32].try_into().unwrap())
-    }
-}
-
-impl fmt::Debug for CBlock {
-    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        write!(
-            f,
-            "{}: CB({}, {}, {:?}, {})",
-            self.digest(),
-            self.author,
-            self.round,
-            self.qc,
-            self.payload.iter().map(|x| x.size()).sum::<usize>(),
-        )
-    }
-}
-
-impl fmt::Display for CBlock {
-    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        write!(f, "CB{}", self.round)
-    }
-}
-
 // Ordering block
 #[derive(Serialize, Deserialize, Default, Clone)]
 pub struct OBlock {
@@ -291,7 +95,7 @@ impl fmt::Debug for OBlock {
     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         write!(
             f,
-            "{}: OB({}, {}, {:?}, {})",
+            "{}: B({}, {}, {:?}, {})",
             self.digest(),
             self.author,
             self.round,
@@ -303,9 +107,10 @@ impl fmt::Debug for OBlock {
 
 impl fmt::Display for OBlock {
     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        write!(f, "OB{}", self.round)
+        write!(f, "B{}", self.round)
     }
 }
+
 
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Vote {
@@ -317,7 +122,7 @@ pub struct Vote {
 
 impl Vote {
     pub async fn new(
-        block: &Block,
+        block: &OBlock,
         author: PublicKey,
         mut signature_service: SignatureService,
     ) -> Self {

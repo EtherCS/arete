@@ -4,7 +4,7 @@ use crate::consensus::{ConsensusMessage, Round};
 use crate::error::{ConsensusError, ConsensusResult};
 use crate::leader::LeaderElector;
 use crate::mempool::MempoolDriver;
-use crate::messages::{Block, Timeout, Vote, QC, TC};
+use crate::messages::{EBlock, Timeout, Vote, QC, TC};
 use crate::proposer::ProposerMessage;
 use crate::synchronizer::Synchronizer;
 use crate::timer::Timer;
@@ -32,9 +32,9 @@ pub struct Core {
     mempool_driver: MempoolDriver,
     synchronizer: Synchronizer,
     rx_message: Receiver<ConsensusMessage>,
-    rx_loopback: Receiver<Block>,
+    rx_loopback: Receiver<EBlock>,
     tx_proposer: Sender<ProposerMessage>,
-    tx_commit: Sender<Block>,
+    tx_commit: Sender<EBlock>,
     round: Round,
     last_voted_round: Round,
     last_committed_round: Round,
@@ -56,9 +56,9 @@ impl Core {
         synchronizer: Synchronizer,
         timeout_delay: u64,
         rx_message: Receiver<ConsensusMessage>,
-        rx_loopback: Receiver<Block>,
+        rx_loopback: Receiver<EBlock>,
         tx_proposer: Sender<ProposerMessage>,
-        tx_commit: Sender<Block>,
+        tx_commit: Sender<EBlock>,
     ) {
         tokio::spawn(async move {
             Self {
@@ -86,7 +86,7 @@ impl Core {
         });
     }
 
-    async fn store_block(&mut self, block: &Block) {
+    async fn store_block(&mut self, block: &EBlock) {
         let key = block.digest().to_vec();
         let value = bincode::serialize(block).expect("Failed to serialize block");
         self.store.write(key, value).await;
@@ -96,7 +96,7 @@ impl Core {
         self.last_voted_round = max(self.last_voted_round, target);
     }
 
-    async fn make_vote(&mut self, block: &Block) -> Option<Vote> {
+    async fn make_vote(&mut self, block: &EBlock) -> Option<Vote> {
         // Check if we can vote for this block.
         let safety_rule_1 = block.round > self.last_voted_round;
         let mut safety_rule_2 = block.qc.round + 1 == block.round;
@@ -115,7 +115,7 @@ impl Core {
         Some(Vote::new(block, self.name, self.signature_service.clone()).await)
     }
 
-    async fn commit(&mut self, block: Block) -> ConsensusResult<()> {
+    async fn commit(&mut self, block: EBlock) -> ConsensusResult<()> {
         if self.last_committed_round >= block.round {
             return Ok(());
         }
@@ -287,7 +287,7 @@ impl Core {
             .expect("Failed to send message to proposer");
     }
 
-    async fn cleanup_proposer(&mut self, b0: &Block, b1: &Block, block: &Block) {
+    async fn cleanup_proposer(&mut self, b0: &EBlock, b1: &EBlock, block: &EBlock) {
         let digests = b0
             .payload
             .iter()
@@ -307,7 +307,7 @@ impl Core {
     }
 
     #[async_recursion]
-    async fn process_block(&mut self, block: &Block) -> ConsensusResult<()> {
+    async fn process_block(&mut self, block: &EBlock) -> ConsensusResult<()> {
         debug!("Processing {:?}", block);
 
         // Let's see if we have the last three ancestors of the block, that is:
@@ -362,7 +362,7 @@ impl Core {
         Ok(())
     }
 
-    async fn handle_proposal(&mut self, block: &Block) -> ConsensusResult<()> {
+    async fn handle_proposal(&mut self, block: &EBlock) -> ConsensusResult<()> {
         let digest = block.digest();
 
         // Ensure the block proposer is the right leader for the round.

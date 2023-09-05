@@ -1,6 +1,6 @@
 use crate::config::{ExecutionCommittee, Stake};
 use crate::consensus::{ConsensusMessage, Round};
-use crate::messages::{Block, QC, TC};
+use crate::messages::{EBlock, QC, TC};
 use bytes::Bytes;
 use crypto::{Digest, PublicKey, SignatureService};
 use futures::stream::futures_unordered::FuturesUnordered;
@@ -22,7 +22,7 @@ pub struct Proposer {
     signature_service: SignatureService,
     rx_mempool: Receiver<Digest>,
     rx_message: Receiver<ProposerMessage>,
-    tx_loopback: Sender<Block>,
+    tx_loopback: Sender<EBlock>,
     buffer: HashSet<Digest>,
     network: ReliableSender,
 }
@@ -34,7 +34,7 @@ impl Proposer {
         signature_service: SignatureService,
         rx_mempool: Receiver<Digest>,
         rx_message: Receiver<ProposerMessage>,
-        tx_loopback: Sender<Block>,
+        tx_loopback: Sender<EBlock>,
     ) {
         tokio::spawn(async move {
             Self {
@@ -60,7 +60,7 @@ impl Proposer {
 
     async fn make_block(&mut self, round: Round, qc: QC, tc: Option<TC>) {
         // Generate a new block.
-        let block = Block::new(
+        let block = EBlock::new(
             qc,
             tc,
             self.name,

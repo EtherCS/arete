@@ -13,7 +13,7 @@ fn core(
 ) -> (
     Sender<ConsensusMessage>,
     Receiver<ProposerMessage>,
-    Receiver<Block>,
+    Receiver<OBlock>,
 ) {
     let (tx_core, rx_core) = channel(1);
     let (tx_loopback, rx_loopback) = channel(1);
@@ -100,7 +100,7 @@ async fn generate_proposal() {
     let (next_leader, next_leader_key) = leader_keys(2);
 
     // Make a block, votes, and QC.
-    let block = Block::new_from_key(QC::genesis(), leader, 1, Vec::new(), &leader_key);
+    let block = OBlock::new_from_key(QC::genesis(), leader, 1, Vec::new(), &leader_key);
     let hash = block.digest();
     let votes: Vec<_> = keys()
         .iter()
