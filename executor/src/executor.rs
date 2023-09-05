@@ -2,7 +2,7 @@ use crate::config::Export as _;
 use crate::config::{Committee, ConfigError, Parameters, Secret};
 use certify::{EBlock, Consensus};
 use crypto::SignatureService;
-use log::info;
+use log::{debug, info};
 use execpool::Mempool;
 use store::Store;
 use tokio::sync::mpsc::{channel, Receiver};
@@ -77,6 +77,8 @@ impl Executor {
     pub async fn analyze_block(&mut self) {
         while let Some(_block) = self.commit.recv().await {
             // This is where we can further process committed block.
+            // Jianting: we send certificate block to the ordering shard here
+            debug!("Executor commits block {:?} successfully", _block); // {:?} means: display based on the Debug function
         }
     }
 }

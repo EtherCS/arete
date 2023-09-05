@@ -89,7 +89,17 @@ class LocalCommittee(Committee):
         mempool = [f'127.0.0.1:{port + i + 2*size}' for i in range(size)]
         super().__init__(names, consensus, front, mempool)
 
-
+class LocalExecutionCommittee(Committee):
+    def __init__(self, names, port):
+        assert isinstance(names, list) and all(
+            isinstance(x, str) for x in names)
+        assert isinstance(port, int)
+        size = len(names)
+        consensus = [f'127.0.0.1:{port + i}' for i in range(size)]
+        front = [f'127.0.0.1:{port + i + size}' for i in range(size)]
+        mempool = [f'127.0.0.1:{port + i + 2*size}' for i in range(size)]
+        super().__init__(names, consensus, front, mempool)
+        
 class NodeParameters:
     def __init__(self, json):
         inputs = []

@@ -4,13 +4,14 @@ from os.path import basename, splitext
 from time import sleep
 
 from benchmark.commands import CommandMaker
-from benchmark.config import Key, LocalCommittee, ExecutorParameters, BenchParameters, ConfigError
+from benchmark.config import Key, LocalCommittee, LocalExecutionCommittee, ExecutorParameters, BenchParameters, ConfigError
 from benchmark.logs import LogParser, ParseError, ShardLogParser
 from benchmark.utils import Print, BenchError, PathMaker
 
 
 class LocalBenchShard:
     BASE_PORT = 9000
+    BASE_SHARD_PORT = 10000
     SHARD_ID = 0
 
     # def __init__(self, bench_parameters_dict, node_parameters_dict):
@@ -78,7 +79,7 @@ class LocalBenchShard:
                 keys += [Key.from_file(filename)]
 
             names = [x.name for x in keys]
-            committee = LocalCommittee(names, self.BASE_PORT)
+            committee = LocalExecutionCommittee(names, self.BASE_SHARD_PORT)
             committee.print(PathMaker.shard_committee_file())
 
             self.executor_parameters.print(PathMaker.shard_parameters_file())
