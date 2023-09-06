@@ -489,6 +489,7 @@ class ShardLogParser:
             f' End-to-end TPS: {round(end_to_end_tps):,} tx/s\n'
             f' End-to-end BPS: {round(end_to_end_bps):,} B/s\n'
             f' End-to-end latency: {round(end_to_end_latency):,} ms\n'
+            '\n'
             f' Block interval (TODO): {round(block_interval):,} ms\n'
             f' intra-shard latency (TODO): e2e latency + block_interval ms\n'
             f' cross-shard latency (TODO): e2e latency + 2*block_interval ms\n'
