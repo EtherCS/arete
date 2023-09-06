@@ -27,6 +27,7 @@ Codes are in *./node/src*. From ***client->node*** to:
   - Parse log *./benchmark/benchmark/logs.py*: after adding more attributes to executor parameters
 - TODO
   - fix timeout problem when there are multiple shards: using multi-thread to start? or increase timeout_delay
+  - label Anchor block to compute block interval
 
 ## 4. Support transaction execution
 > Execution TODO

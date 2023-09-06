@@ -76,6 +76,7 @@ impl Executor {
 
     pub async fn analyze_block(&mut self) {
         while let Some(_block) = self.commit.recv().await {
+            // debug!("Finish commit block {:?}", _block);
             // This is where we can further process committed block.
             // Jianting: we send certificate block to the ordering shard here
             debug!("Executor commits block {:?} successfully", _block); // {:?} means: display based on the Debug function

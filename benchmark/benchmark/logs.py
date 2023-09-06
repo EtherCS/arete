@@ -291,10 +291,11 @@ class ShardLogParser:
                 results = p.map(self._parse_executors, executors)
         except (ValueError, IndexError) as e:
             raise ParseError(f'Failed to parse executor logs: {e}')
-        proposals, commits, sizes, self.received_samples, timeouts, self.configs \
+        proposals, commits, sizes, self.received_samples, timeouts, self.configs, block_intervals \
             = zip(*results)
         self.proposals = self._merge_results([x.items() for x in proposals])
         self.commits = self._merge_results([x.items() for x in commits])
+        self.block_intervals = self._merge_results([x.items() for x in block_intervals])
         self.sizes = {
             k: v for x in sizes for k, v in x.items() if k in self.commits
         }
@@ -348,6 +349,11 @@ class ShardLogParser:
         tmp = findall(r'\[(.*Z) .* Committed B\d+ -> ([^ ]+=)', log)
         tmp = [(d, self._to_posix(t)) for t, d in tmp]
         commits = self._merge_results([tmp])
+        
+        # TODO: get the interval between Anchor block
+        tmp = findall(r'\[(.*Z) .* Finish commit block B\d+ -> ([^ ]+=)', log)
+        tmp = [(d, self._to_posix(t)) for t, d in tmp]
+        block_intervals = self._merge_results([tmp])
 
         tmp = findall(r'Batch ([^ ]+) contains (\d+) B', log)
         sizes = {d: int(s) for d, s in tmp}
@@ -388,7 +394,7 @@ class ShardLogParser:
             }
         }
 
-        return proposals, commits, sizes, samples, timeouts, configs
+        return proposals, commits, sizes, samples, timeouts, configs, block_intervals
 
     def _to_posix(self, string):
         x = datetime.fromisoformat(string.replace('Z', '+00:00'))
@@ -408,6 +414,16 @@ class ShardLogParser:
         latency = [c - self.proposals[d] for d, c in self.commits.items()]
         return mean(latency) if latency else 0
 
+    def _block_interval(self):
+        interval = []
+        last = 0.0
+        for _, c in self.block_intervals.items():
+            interval += [c-last]
+            last = c
+        if interval:
+            interval.pop(0)
+        return mean(interval) if interval else 0
+        
     def _end_to_end_throughput(self):
         if not self.commits:
             return 0, 0, 0
@@ -434,6 +450,7 @@ class ShardLogParser:
         consensus_tps, consensus_bps, _ = self._consensus_throughput()
         end_to_end_tps, end_to_end_bps, duration = self._end_to_end_throughput()
         end_to_end_latency = self._end_to_end_latency() * 1000
+        block_interval = self._block_interval() * 1000
 
         consensus_timeout_delay = self.configs[0]['consensus']['certify_timeout_delay']
         consensus_sync_retry_delay = self.configs[0]['consensus']['certify_sync_retry_delay']
@@ -472,6 +489,9 @@ class ShardLogParser:
             f' End-to-end TPS: {round(end_to_end_tps):,} tx/s\n'
             f' End-to-end BPS: {round(end_to_end_bps):,} B/s\n'
             f' End-to-end latency: {round(end_to_end_latency):,} ms\n'
+            f' Block interval (TODO): {round(block_interval):,} ms\n'
+            f' intra-shard latency (TODO): e2e latency + block_interval ms\n'
+            f' cross-shard latency (TODO): e2e latency + 2*block_interval ms\n'
             '-----------------------------------------\n'
         )
 
