@@ -261,13 +261,15 @@ class LogParser:
 
 
 class ShardLogParser:
-    def __init__(self, clients, executors, faults):
+    def __init__(self, clients, executors, faults, shardNum):
         inputs = [clients, executors]
         assert all(isinstance(x, list) for x in inputs)
         assert all(isinstance(x, str) for y in inputs for x in y)
         assert all(x for x in inputs)
 
         self.faults = faults
+        # Jianting: shard number
+        self.shard_num = shardNum
         if isinstance(faults, int):
             self.committee_size = len(executors) + int(faults)
         else:
@@ -447,8 +449,9 @@ class ShardLogParser:
             ' SUMMARY:\n'
             '-----------------------------------------\n'
             ' + CONFIG:\n'
+            f' Shard number: {self.shard_num} shards\n'
             f' Faults: {self.faults} nodes\n'
-            f' Committee size: {self.committee_size} nodes\n'
+            f' Committee size: {int(self.committee_size/self.shard_num)} nodes\n'
             f' Input rate: {sum(self.rate):,} tx/s\n'
             f' Transaction size: {self.size[0]:,} B\n'
             f' Execution time: {round(duration):,} s\n'
@@ -493,16 +496,16 @@ class ShardLogParser:
         return cls(clients, nodes, faults)
     
     @classmethod
-    def process_shard(cls, directory, faults):
+    def process_shard(cls, directory, faults, shardNum):
         assert isinstance(directory, str)
 
         clients = []
-        for filename in sorted(glob(join(directory, 'client-*.log'))):
+        for filename in sorted(glob(join(directory, '*client-*.log'))):
             with open(filename, 'r') as f:
                 clients += [f.read()]
         executors = []
-        for filename in sorted(glob(join(directory, 'executor-*.log'))):
+        for filename in sorted(glob(join(directory, '*executor-*.log'))):
             with open(filename, 'r') as f:
                 executors += [f.read()]
 
-        return cls(clients, executors, faults)
+        return cls(clients, executors, faults, shardNum)

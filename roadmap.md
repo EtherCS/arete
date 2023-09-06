@@ -23,9 +23,10 @@ Codes are in *./node/src*. From ***client->node*** to:
   - create 1) execpool (rf. mempool); 2) certify (rf. consensus): done
   - Parse single shard result *./benchmark/benchmark/logs.py* with *ShardLogParser*: done
   - run executors: done
-- TODO: 
   - support multiple execution shards
   - Parse log *./benchmark/benchmark/logs.py*: after adding more attributes to executor parameters
+- TODO
+  - fix timeout problem when there are multiple shards: using multi-thread to start? or increase timeout_delay
 
 ## 4. Support transaction execution
 > Execution TODO
