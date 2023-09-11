@@ -12,6 +12,7 @@ use log::error;
 use execpool::ExecutionCommittee as MempoolCommittee;
 use std::fs;
 use tokio::task::JoinHandle;
+use std::net::SocketAddr;
 
 #[derive(Parser)]
 #[clap(author, version, about, long_about = None)]
@@ -46,6 +47,9 @@ enum Command {
         /// The path where to create the data store.
         #[clap(short, long, value_parser, value_name = "PATH")]
         store: String,
+        /// The network address of the node where to send txs.
+        #[clap(short, long, value_parser, value_name = "ADDR")]
+        target: Option<SocketAddr>,
     },
     /// Deploy a local testbed with the specified number of executors.
     Deploy {
@@ -81,7 +85,8 @@ async fn main() {
             committee,
             parameters,
             store,
-        } => match Executor::new(&committee, &keys, &store, parameters).await {
+            target
+        } => match Executor::new(&committee, &keys, &store, parameters, target).await {
             Ok(mut executor) => {
                 tokio::spawn(async move {
                     executor.analyze_block().await;
@@ -130,7 +135,9 @@ fn deploy_testbed(executors: u16) -> Result<Vec<JoinHandle<()>>, Box<dyn std::er
             .collect(),
         epoch,
     );
+    // TODO: change the committee name
     let committee_file = "committee.json";
+    // let committee_file = format!("shard-{}_committee.json", shardId);
     let _ = fs::remove_file(committee_file);
     Committee {
         mempool: mempool_committee,
@@ -138,6 +145,7 @@ fn deploy_testbed(executors: u16) -> Result<Vec<JoinHandle<()>>, Box<dyn std::er
     }
     .write(committee_file)?;
 
+    // TODO: change the json name
     // Write the key files and spawn all executors.
     keys.iter()
         .enumerate()
@@ -150,7 +158,7 @@ fn deploy_testbed(executors: u16) -> Result<Vec<JoinHandle<()>>, Box<dyn std::er
             let _ = fs::remove_dir_all(&store_path);
 
             Ok(tokio::spawn(async move {
-                match Executor::new(committee_file, &key_file, &store_path, None).await {
+                match Executor::new(committee_file, &key_file, &store_path, None, None).await {
                     Ok(mut executor) => {
                         // Sink the commit channel.
                         while executor.commit.recv().await.is_some() {}

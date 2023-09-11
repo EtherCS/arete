@@ -5,6 +5,7 @@ use crypto::SignatureService;
 use log::{debug, info};
 use execpool::Mempool;
 use store::Store;
+use std::net::{SocketAddr, IpAddr, Ipv4Addr};
 use tokio::sync::mpsc::{channel, Receiver};
 
 /// The default channel capacity for this module.
@@ -13,6 +14,7 @@ pub const CHANNEL_CAPACITY: usize = 1_000;
 // Executor is the replica in the ordering shard
 pub struct Executor {
     pub commit: Receiver<EBlock>,
+    pub ordering_addr: SocketAddr,
 }
 
 impl Executor {
@@ -21,6 +23,7 @@ impl Executor {
         key_file: &str,
         store_path: &str,
         parameters: Option<String>,
+        target: Option<SocketAddr>,
     ) -> Result<Self, ConfigError> {
         let (tx_commit, rx_commit) = channel(CHANNEL_CAPACITY);
         let (tx_consensus_to_mempool, rx_consensus_to_mempool) = channel(CHANNEL_CAPACITY);
@@ -36,6 +39,11 @@ impl Executor {
         let parameters = match parameters {
             Some(filename) => Parameters::read(&filename)?,
             None => Parameters::default(),
+        };
+
+        let target: SocketAddr = match target {
+            Some(addr) => addr,
+            None => SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 9000),
         };
 
         // Make the data store.
@@ -67,7 +75,8 @@ impl Executor {
         );
 
         info!("Executor {} successfully booted", name);
-        Ok(Self { commit: rx_commit })
+        // info!("Executor connects nodes with address {}", target);
+        Ok(Self { commit: rx_commit, ordering_addr: target })
     }
 
     pub fn print_key_file(filename: &str) -> Result<(), ConfigError> {
@@ -76,7 +85,7 @@ impl Executor {
 
     pub async fn analyze_block(&mut self) {
         while let Some(_block) = self.commit.recv().await {
-            // debug!("Finish commit block {:?}", _block);
+            debug!("Ordering node addr is {}", self.ordering_addr);
             // This is where we can further process committed block.
             // Jianting: we send certificate block to the ordering shard here
             debug!("Executor commits block {:?} successfully", _block); // {:?} means: display based on the Debug function
