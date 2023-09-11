@@ -66,6 +66,19 @@ def localShard(ctx):
         'shard_num': 3,
         'shard_sizes': 4, # could be different shard size [4, 8, ...]
     }
+    node_params = {
+        'consensus': {
+            'timeout_delay': 1_000,
+            'sync_retry_delay': 10_000,
+        },
+        'mempool': {
+            'gc_depth': 50,
+            'sync_retry_delay': 5_000,
+            'sync_retry_nodes': 3,
+            'batch_size': 15_000,
+            'max_batch_delay': 10
+        }
+    }
     # Config TODO: support multiple execution shards
     executor_params = {
         'consensus': {
@@ -81,7 +94,7 @@ def localShard(ctx):
         }
     }
     try:
-        ret = LocalBenchShard(bench_params, executor_params).run(debug=True).result()
+        ret = LocalBenchShard(bench_params, node_params, executor_params).run(debug=True).result()
         print(ret)
     except BenchError as e:
         Print.error(e)

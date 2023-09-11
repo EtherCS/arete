@@ -24,7 +24,7 @@ class PathMaker:
 
     @staticmethod
     def committee_file():
-        return '.committee.json'
+        return '.ordering-committee.json'
     
     @staticmethod
     def shard_committee_file(shard):
@@ -32,7 +32,7 @@ class PathMaker:
 
     @staticmethod
     def parameters_file():
-        return '.parameters.json'
+        return '.ordering-parameters.json'
     
     @staticmethod
     def shard_parameters_file(shard):
@@ -41,7 +41,7 @@ class PathMaker:
     @staticmethod
     def key_file(i):
         assert isinstance(i, int) and i >= 0
-        return f'.node-{i}.json'
+        return f'.ordering-node-{i}.json'
     
     @staticmethod
     def shard_executor_key_file(shard, i):
@@ -52,7 +52,7 @@ class PathMaker:
     @staticmethod
     def db_path(i):
         assert isinstance(i, int) and i >= 0
-        return f'.db-{i}'
+        return f'.ordering-db-{i}'
 
     @staticmethod
     def shard_executor_db_path(shard, i):
@@ -70,7 +70,7 @@ class PathMaker:
     @staticmethod
     def node_log_file(i):
         assert isinstance(i, int) and i >= 0
-        return join(PathMaker.logs_path(), f'node-{i}.log')
+        return join(PathMaker.logs_path(), f'ordering-node-{i}.log')
 
     @staticmethod
     def client_log_file(i):

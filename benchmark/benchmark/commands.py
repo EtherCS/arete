@@ -41,14 +41,15 @@ class CommandMaker:
 
     # Config TODO
     @staticmethod   
-    def run_executor(keys, committee, store, parameters, debug=False):
+    def run_executor(keys, committee, store, parameters, address, debug=False):
         assert isinstance(keys, str)
         assert isinstance(committee, str)
         assert isinstance(parameters, str)
+        assert isinstance(address, str)
         assert isinstance(debug, bool)
         v = '-vvv' if debug else '-vv'
         return (f'./executor {v} run --keys {keys} --committee {committee} '
-                f'--store {store} --parameters {parameters}')
+                f'--store {store} --parameters {parameters} --target {address}')
     
     @staticmethod
     def run_client(address, size, rate, timeout, nodes=[]):
@@ -72,7 +73,7 @@ class CommandMaker:
         return f'rm node ; rm client ; ln -s {node} . ; ln -s {client} .'
     
     @staticmethod
-    def alias_shard_executor_binaries(origin):
+    def alias_shard_binaries(origin):
         assert isinstance(origin, str)
-        executor, client = join(origin, 'executor'), join(origin, 'client')
-        return f'rm executor ; rm client ; ln -s {executor} . ; ln -s {client} .'
+        executor, client, node = join(origin, 'executor'), join(origin, 'client'), join(origin, 'node')
+        return f'rm executor ; rm client ; rm node ; ln -s {executor} . ; ln -s {client} . ; ln -s {node} .'

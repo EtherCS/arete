@@ -4,14 +4,14 @@ from os.path import basename, splitext
 from time import sleep
 
 from benchmark.commands import CommandMaker
-from benchmark.config import Key, LocalCommittee, LocalExecutionCommittee, ExecutorParameters, BenchParameters, ConfigError
+from benchmark.config import Key, LocalCommittee, LocalExecutionCommittee, ExecutorParameters, NodeParameters, BenchParameters, ConfigError
 from benchmark.logs import LogParser, ParseError, ShardLogParser
 from benchmark.utils import Print, BenchError, PathMaker
 
 
 class LocalBenchShard:
-    BASE_PORT = 9000
-    BASE_SHARD_PORT = 10000
+    BASE_NODE_PORT = 9000   # for the ordering shard
+    BASE_SHARD_PORT = 10000 # for the execution shard
     SHARD_ID = 0
 
     # def __init__(self, bench_parameters_dict, node_parameters_dict):
@@ -22,9 +22,10 @@ class LocalBenchShard:
     #         raise BenchError('Invalid nodes or bench parameters', e)
     
     # Config TODO
-    def __init__(self, bench_parameters_dict, executor_parameters_dict):
+    def __init__(self, bench_parameters_dict, node_params_dict, executor_parameters_dict):
         try:
             self.bench_parameters = BenchParameters(bench_parameters_dict)
+            self.node_parameters = NodeParameters(node_params_dict)
             self.executor_parameters = ExecutorParameters(executor_parameters_dict)
             # Config TODO: support multiple execution shards
         except ConfigError as e:
@@ -45,8 +46,11 @@ class LocalBenchShard:
         except subprocess.SubprocessError as e:
             raise BenchError('Failed to kill testbed', e)
 
-    def _get_base_port(self, shardId): # shard0: 10000; shard1: 10100; shard2: 10200
+    def _get_shard_port(self, shardId): # shard0: 10000; shard1: 10100; shard2: 10200
         return self.BASE_SHARD_PORT + 100*shardId
+    
+    def _get_node_port(self): # the base port of the ordering shard
+        return self.BASE_NODE_PORT
     
     def run(self, debug=False):
         assert isinstance(debug, bool)
@@ -57,7 +61,8 @@ class LocalBenchShard:
 
         try:
             Print.info('Setting up testbed...')
-            executors, rate = self.nodes[0], self.rate[0]
+            nodes = self.nodes[0]
+            executors, rate = self.shard_sizes[0], self.rate[0]
             # shardSizes = self.shard_sizes[0]
             shardNum = self.shard_num
 
@@ -66,17 +71,48 @@ class LocalBenchShard:
             subprocess.run([cmd], shell=True, stderr=subprocess.DEVNULL)
             sleep(0.5)  # Removing the store may take time.
 
-            # Recompile the latest code.
+            # Recompile the latest code for executor and client.
             cmd = CommandMaker.compile().split()
             subprocess.run(cmd, check=True, cwd=PathMaker.executor_crate_path())
-
-            # Create alias for the client and executors binary.
-            cmd = CommandMaker.alias_shard_executor_binaries(PathMaker.binary_path())
+            
+            # Recompile the latest code for node.
+            cmd = CommandMaker.compile().split()
+            subprocess.run(cmd, check=True, cwd=PathMaker.node_crate_path())
+            
+            # Create alias for the client, node, and executors binary.
+            cmd = CommandMaker.alias_shard_binaries(PathMaker.binary_path())
             subprocess.run([cmd], shell=True)
+            
+            # Generate configuration files for nodes.
+            node_keys = []
+            node_key_files = [PathMaker.key_file(i) for i in range(nodes)]
+            for node_filename in node_key_files:
+                cmd = CommandMaker.generate_key(node_filename).split()
+                subprocess.run(cmd, check=True)
+                node_keys += [Key.from_file(node_filename)]
+            node_names = [x.name for x in node_keys]
+            ordering_committee = LocalCommittee(node_names, self._get_node_port())
+            ordering_committee.print(PathMaker.committee_file())
+
+            self.node_parameters.print(PathMaker.parameters_file())            
+            nodes = nodes - self.faults
+            
+            # Run the nodes
+            node_dbs = [PathMaker.db_path(i) for i in range(nodes)]
+            node_logs = [PathMaker.node_log_file(i) for i in range(nodes)]
+            for node_key_file, node_db, node_log_file in zip(node_key_files, node_dbs, node_logs):
+                cmd = CommandMaker.run_node(
+                    node_key_file,
+                    PathMaker.committee_file(),
+                    node_db,
+                    PathMaker.parameters_file(),
+                    debug=debug
+                )
+                self._background_run(cmd, node_log_file)
 
             for shardId in range(shardNum):
                 print(f"add shards: shard {shardId} \n")
-                # Generate configuration files.
+                # Generate configuration files for executors.
                 keys = []
                 key_files = [PathMaker.shard_executor_key_file(shardId, i) for i in range(executors)]
                 for filename in key_files:
@@ -85,7 +121,7 @@ class LocalBenchShard:
                     keys += [Key.from_file(filename)]
 
                 names = [x.name for x in keys]
-                committee = LocalExecutionCommittee(names, self._get_base_port(shardId))
+                committee = LocalExecutionCommittee(names, self._get_shard_port(shardId), shardId)
                 committee.print(PathMaker.shard_committee_file(shardId))
 
                 self.executor_parameters.print(PathMaker.shard_parameters_file(shardId))
@@ -94,7 +130,6 @@ class LocalBenchShard:
                 executors = executors - self.faults
 
                 # Run the clients (they will wait for the executors to be ready).
-                # TODO: shard_client_log_file(self.SHARD_ID, i): self.SHARD_ID -> shard id
                 addresses = committee.front
                 rate_share = ceil(rate / executors)
                 timeout = self.executor_parameters.certify_timeout_delay
@@ -110,15 +145,16 @@ class LocalBenchShard:
                     self._background_run(cmd, log_file)
 
                 # Run the executors.
-                # TODO: shard_executor_log_file(self.SHARD_ID, i): self.SHARD_ID -> shard id
+                order_addresses = ordering_committee.front
                 dbs = [PathMaker.shard_executor_db_path(shardId, i) for i in range(executors)]
                 executor_logs = [PathMaker.shard_executor_log_file(shardId, i) for i in range(executors)]
-                for key_file, db, log_file in zip(key_files, dbs, executor_logs):
+                for key_file, db, log_file, addr in zip(key_files, dbs, executor_logs, order_addresses):
                     cmd = CommandMaker.run_executor(
                         key_file,
                         PathMaker.shard_committee_file(shardId),
                         db,
                         PathMaker.shard_parameters_file(shardId),
+                        addr,
                         debug=debug
                     )
                     self._background_run(cmd, log_file)
