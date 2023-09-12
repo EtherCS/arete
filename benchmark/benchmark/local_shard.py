@@ -91,7 +91,7 @@ class LocalBenchShard:
                 subprocess.run(cmd, check=True)
                 node_keys += [Key.from_file(node_filename)]
             node_names = [x.name for x in node_keys]
-            ordering_committee = LocalCommittee(node_names, self._get_node_port())
+            ordering_committee = LocalCommittee(node_names, self._get_node_port(), shardNum, -1)
             ordering_committee.print(PathMaker.committee_file())
 
             self.node_parameters.print(PathMaker.parameters_file())            
@@ -121,7 +121,7 @@ class LocalBenchShard:
                     keys += [Key.from_file(filename)]
 
                 names = [x.name for x in keys]
-                committee = LocalExecutionCommittee(names, self._get_shard_port(shardId), shardId)
+                committee = LocalExecutionCommittee(names, self._get_shard_port(shardId), shardNum, shardId)
                 committee.print(PathMaker.shard_committee_file(shardId))
 
                 self.executor_parameters.print(PathMaker.shard_parameters_file(shardId))

@@ -19,7 +19,7 @@ class Key:
 
 
 class Committee:
-    def __init__(self, names, consensus_addr, transactions_addr, mempool_addr):
+    def __init__(self, names, consensus_addr, transactions_addr, mempool_addr, shardNum, shardId):
         inputs = [names, consensus_addr, transactions_addr, mempool_addr]
         assert all(isinstance(x, list) for x in inputs)
         assert all(isinstance(x, str) for y in inputs for x in y)
@@ -31,10 +31,13 @@ class Committee:
         self.mempool = mempool_addr
 
         self.json = {
+            'shard': self._build_shard_info(shardNum, shardId),
             'consensus': self._build_consensus(),
             'mempool': self._build_mempool()
         }
-
+    def _build_shard_info(self, _shardNum, _shardId):
+        return {'number': _shardNum, 'id': _shardId}
+    
     def _build_consensus(self):
         node = {}
         for a, n in zip(self.consensus, self.names):
@@ -79,7 +82,7 @@ class Committee:
 
 
 class LocalCommittee(Committee):
-    def __init__(self, names, port):
+    def __init__(self, names, port, shardNum, shardId):
         assert isinstance(names, list) and all(
             isinstance(x, str) for x in names)
         assert isinstance(port, int)
@@ -87,10 +90,10 @@ class LocalCommittee(Committee):
         consensus = [f'127.0.0.1:{port + i}' for i in range(size)]
         front = [f'127.0.0.1:{port + i + size}' for i in range(size)]
         mempool = [f'127.0.0.1:{port + i + 2*size}' for i in range(size)]
-        super().__init__(names, consensus, front, mempool)
+        super().__init__(names, consensus, front, mempool, shardNum, shardId)
 
 class ExecutionCommittee:
-    def __init__(self, names, consensus_addr, transactions_addr, mempool_addr, shardId):
+    def __init__(self, names, consensus_addr, transactions_addr, mempool_addr, shardNum, shardId):
         inputs = [names, consensus_addr, transactions_addr, mempool_addr]
         assert all(isinstance(x, list) for x in inputs)
         assert all(isinstance(x, str) for y in inputs for x in y)
@@ -102,12 +105,12 @@ class ExecutionCommittee:
         self.mempool = mempool_addr
 
         self.json = {
-            'shard': self._build_shard_info(shardId),
+            'shard': self._build_shard_info(shardNum, shardId),
             'consensus': self._build_consensus(),
             'mempool': self._build_mempool()
         }
-    def _build_shard_info(self, _shardId):
-        return {'id': _shardId}
+    def _build_shard_info(self, _shardNum, _shardId):
+        return {'number': _shardNum, 'id': _shardId}
         
         
     def _build_consensus(self):
@@ -157,7 +160,7 @@ class ExecutionCommittee:
 
 
 class LocalExecutionCommittee(ExecutionCommittee):
-    def __init__(self, names, port, shardId):
+    def __init__(self, names, port, shardNum, shardId):
         assert isinstance(names, list) and all(
             isinstance(x, str) for x in names)
         assert isinstance(port, int)
@@ -165,7 +168,7 @@ class LocalExecutionCommittee(ExecutionCommittee):
         consensus = [f'127.0.0.1:{port + i}' for i in range(size)]
         front = [f'127.0.0.1:{port + i + size}' for i in range(size)]
         mempool = [f'127.0.0.1:{port + i + 2*size}' for i in range(size)]
-        super().__init__(names, consensus, front, mempool, shardId)
+        super().__init__(names, consensus, front, mempool, shardNum, shardId)
         
 class NodeParameters:
     def __init__(self, json):

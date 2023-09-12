@@ -41,7 +41,8 @@ impl Executor {
             None => Parameters::default(),
         };
 
-        let target: SocketAddr = match target {
+        // Get the connected ordering node address.
+        let target_addr: SocketAddr = match target {
             Some(addr) => addr,
             None => SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 9000),
         };
@@ -76,7 +77,7 @@ impl Executor {
 
         info!("Executor {} successfully booted", name);
         // info!("Executor connects nodes with address {}", target);
-        Ok(Self { commit: rx_commit, ordering_addr: target })
+        Ok(Self { commit: rx_commit, ordering_addr: target_addr })
     }
 
     pub fn print_key_file(filename: &str) -> Result<(), ConfigError> {
@@ -85,7 +86,7 @@ impl Executor {
 
     pub async fn analyze_block(&mut self) {
         while let Some(_block) = self.commit.recv().await {
-            debug!("Ordering node addr is {}", self.ordering_addr);
+            // debug!("Ordering node addr is {}", self.ordering_addr);
             // This is where we can further process committed block.
             // Jianting: we send certificate block to the ordering shard here
             debug!("Executor commits block {:?} successfully", _block); // {:?} means: display based on the Debug function
