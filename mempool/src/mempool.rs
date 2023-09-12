@@ -201,6 +201,10 @@ struct TxReceiverHandler {
 #[async_trait]
 impl MessageHandler for TxReceiverHandler {
     async fn dispatch(&self, _writer: &mut Writer, message: Bytes) -> Result<(), Box<dyn Error>> {
+        // TODO handle certificate block here
+        // wait for at least one from all execution shards
+        // then send to the batch maker
+        info!("node receives msg {:?}", message);
         // Send the transaction to the batch maker.
         self.tx_batch_maker
             .send(message.to_vec())

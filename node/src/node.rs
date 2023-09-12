@@ -77,6 +77,8 @@ impl Node {
     pub async fn analyze_block(&mut self) {
         while let Some(_block) = self.commit.recv().await {
             // This is where we can further process committed block.
+            // TODO: send message to all the execution shards
+            info!("Executor commits block {:?} successfully", _block); // {:?} means: display based on the Debug function
         }
     }
 }

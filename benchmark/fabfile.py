@@ -63,8 +63,8 @@ def localShard(ctx):
         'rate': 1_000,
         'tx_size': 512,
         'duration': 20,
-        'shard_num': 3,
-        'shard_sizes': 4, # could be different shard size [4, 8, ...]
+        'shard_num': 2,
+        'shard_sizes': 3, # could be different shard size [4, 8, ...]
     }
     node_params = {
         'consensus': {

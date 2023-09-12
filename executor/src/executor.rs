@@ -2,19 +2,25 @@ use crate::config::Export as _;
 use crate::config::{Committee, ConfigError, Parameters, Secret};
 use certify::{EBlock, Consensus};
 use crypto::SignatureService;
-use log::{debug, info};
+use log::{debug, info, warn};
 use execpool::Mempool;
 use store::Store;
+use crypto::Hash;
+use tokio::net::TcpStream;
 use std::net::{SocketAddr, IpAddr, Ipv4Addr};
 use tokio::sync::mpsc::{channel, Receiver};
+use tokio_util::codec::{Framed, LengthDelimitedCodec};
+use anyhow::{Context, Result};
+use futures::sink::SinkExt as _;
 
 /// The default channel capacity for this module.
 pub const CHANNEL_CAPACITY: usize = 1_000;
 
 // Executor is the replica in the ordering shard
 pub struct Executor {
-    pub commit: Receiver<EBlock>,
+    pub commit: Receiver<EBlock>,   // TODO: replace tx_commit with rx_processor
     pub ordering_addr: SocketAddr,
+    // pub certificate_send: Framed<TcpStream, LengthDelimitedCodec>
 }
 
 impl Executor {
@@ -75,21 +81,34 @@ impl Executor {
             tx_commit,
         );
 
+        // Connect to the ordering node.
+        // let stream = TcpStream::connect(target_addr)
+        //     .await
+        //     .context(format!("failed to connect to {}", target_addr))?;
+        // let mut transport = Framed::new(stream, LengthDelimitedCodec::new());
+
         info!("Executor {} successfully booted", name);
         // info!("Executor connects nodes with address {}", target);
-        Ok(Self { commit: rx_commit, ordering_addr: target_addr })
+        Ok(Self { commit: rx_commit, ordering_addr: target_addr})
     }
 
     pub fn print_key_file(filename: &str) -> Result<(), ConfigError> {
         Secret::new().write(filename)
     }
 
-    pub async fn analyze_block(&mut self) {
+    pub async fn analyze_block(&mut self) -> Result<()> {
+        let stream = TcpStream::connect(self.ordering_addr)
+            .await
+            .context(format!("failed to connect to {}", self.ordering_addr))?;
+        let mut transport = Framed::new(stream, LengthDelimitedCodec::new());
         while let Some(_block) = self.commit.recv().await {
-            // debug!("Ordering node addr is {}", self.ordering_addr);
-            // This is where we can further process committed block.
-            // Jianting: we send certificate block to the ordering shard here
-            debug!("Executor commits block {:?} successfully", _block); // {:?} means: display based on the Debug function
+            // TODO: only send EBlock with transactions
+            if let Err(e) = transport.send(Into::into(_block.digest().to_vec())).await {
+                warn!("Failed to send block: {}", e);
+                break;
+            }
+            info!("Executor commits block {:?} successfully", _block); // {:?} means: display based on the Debug function
         }
+        Ok(())
     }
 }

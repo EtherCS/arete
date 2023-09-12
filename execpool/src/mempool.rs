@@ -79,6 +79,7 @@ impl Mempool {
         mempool.handle_consensus_messages(rx_consensus);
         mempool.handle_clients_transactions();
         mempool.handle_mempool_messages();
+        mempool.handle_ordering_messages();
 
         info!(
             "Mempool successfully booted on {}",
@@ -189,6 +190,11 @@ impl Mempool {
         );
 
         info!("Mempool listening to mempool messages on {}", address);
+    }
+
+    /// Spawn all tasks responsible to handle messages from the ordering shard.
+    fn handle_ordering_messages(&self) {
+        // TODO: execute, and create a new execution, certificate block
     }
 }
 

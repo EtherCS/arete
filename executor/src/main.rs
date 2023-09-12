@@ -89,7 +89,7 @@ async fn main() {
         } => match Executor::new(&committee, &keys, &store, parameters, target).await {
             Ok(mut executor) => {
                 tokio::spawn(async move {
-                    executor.analyze_block().await;
+                    let _ = executor.analyze_block().await;
                 })
                 .await
                 .expect("Failed to analyze committed blocks");
