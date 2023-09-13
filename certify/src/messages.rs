@@ -15,7 +15,7 @@ pub mod messages_tests;
 
 // Execution block
 #[derive(Serialize, Deserialize, Default, Clone)]
-pub struct EBlock {  // Block TODO, Block -> EBlock
+pub struct EBlock {  
     pub qc: QC, // Block TODO, Remove
     pub tc: Option<TC>, // Block TODO, Remove
     pub author: PublicKey,
@@ -23,7 +23,6 @@ pub struct EBlock {  // Block TODO, Block -> EBlock
     pub payload: Vec<Digest>,
     pub signature: Signature,
 }
-
 
 impl EBlock {
     pub async fn new(
@@ -114,65 +113,33 @@ impl fmt::Display for EBlock {
 // Certificate block
 #[derive(Serialize, Deserialize, Default, Clone)]
 pub struct CBlock {
-    pub qc: QC, 
-    pub tc: Option<TC>,
+    pub shard_id: u32, 
     pub author: PublicKey,
     pub round: Round,
-    pub payload: Vec<Digest>,
+    pub payload: Vec<Digest>,   // TODO: map[ctx, succOrFail]
     pub signature: Signature,
-    // Execution TODO: map[ctx_hash]=ok(),fail()
 }
 
 impl CBlock {
     pub async fn new(
-        qc: QC,
-        tc: Option<TC>, 
+        shard_id: u32,
         author: PublicKey,
         round: Round,
         payload: Vec<Digest>,
-        mut signature_service: SignatureService,
+        signature: Signature,
     ) -> Self {
         let block = Self {
-            qc,
-            tc,
+            shard_id,
             author,
             round,
             payload,
-            signature: Signature::default(),
+            signature,
         };
-        let signature = signature_service.request_signature(block.digest()).await;
-        Self { signature, ..block }
+        Self { ..block }
     }
 
     pub fn genesis() -> Self {
         CBlock::default()
-    }
-
-    pub fn parent(&self) -> &Digest {
-        &self.qc.hash
-    }
-
-    pub fn verify(&self, committee: &ExecutionCommittee) -> ConsensusResult<()> {
-        // Ensure the authority has voting rights.
-        let voting_rights = committee.stake(&self.author);
-        ensure!(
-            voting_rights > 0,
-            ConsensusError::UnknownAuthority(self.author)
-        );
-
-        // Check the signature.
-        self.signature.verify(&self.digest(), &self.author)?;
-
-        // Check the embedded QC.
-        if self.qc != QC::genesis() {
-            self.qc.verify(committee)?;
-        }
-
-        // Check the TC embedded in the block (if any).
-        if let Some(ref tc) = self.tc {
-            tc.verify(committee)?;
-        }
-        Ok(())
     }
 }
 
@@ -184,7 +151,7 @@ impl Hash for CBlock {
         for x in &self.payload {
             hasher.update(x);
         }
-        hasher.update(&self.qc.hash);
+        hasher.update(&self.shard_id.to_le_bytes());
         Digest(hasher.finalize().as_slice()[..32].try_into().unwrap())
     }
 }
@@ -193,11 +160,11 @@ impl fmt::Debug for CBlock {
     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         write!(
             f,
-            "{}: CB({}, {}, {:?}, {})",
+            "{}: CB({}, round {}, shard id {}, {})",
             self.digest(),
             self.author,
             self.round,
-            self.qc,
+            self.shard_id,
             self.payload.iter().map(|x| x.size()).sum::<usize>(),
         )
     }
