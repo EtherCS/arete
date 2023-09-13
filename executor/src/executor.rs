@@ -1,11 +1,10 @@
 use crate::config::Export as _;
 use crate::config::{Committee, ConfigError, Parameters, Secret};
-use certify::{EBlock, Consensus};
+use certify::{EBlock, Consensus, CBlock};
 use crypto::SignatureService;
 use log::{debug, info, warn};
 use execpool::Mempool;
 use store::Store;
-use crypto::Hash;
 use tokio::net::TcpStream;
 use std::net::{SocketAddr, IpAddr, Ipv4Addr};
 use tokio::sync::mpsc::{channel, Receiver};
@@ -20,6 +19,7 @@ pub const CHANNEL_CAPACITY: usize = 1_000;
 pub struct Executor {
     pub commit: Receiver<EBlock>,   // TODO: replace tx_commit with rx_processor
     pub ordering_addr: SocketAddr,
+    pub shard_id: u32,
     // pub certificate_send: Framed<TcpStream, LengthDelimitedCodec>
 }
 
@@ -40,6 +40,7 @@ impl Executor {
         let secret = Secret::read(key_file)?;
         let name = secret.name;
         let secret_key = secret.secret;
+        let shard_id = committee.shard.id;
 
         // Load default parameters if none are specified.
         let parameters = match parameters {
@@ -89,7 +90,7 @@ impl Executor {
 
         info!("Executor {} successfully booted", name);
         // info!("Executor connects nodes with address {}", target);
-        Ok(Self { commit: rx_commit, ordering_addr: target_addr})
+        Ok(Self { commit: rx_commit, ordering_addr: target_addr, shard_id: shard_id})
     }
 
     pub fn print_key_file(filename: &str) -> Result<(), ConfigError> {
@@ -102,11 +103,21 @@ impl Executor {
             .context(format!("failed to connect to {}", self.ordering_addr))?;
         let mut transport = Framed::new(stream, LengthDelimitedCodec::new());
         while let Some(_block) = self.commit.recv().await {
-            // TODO: only send EBlock with transactions
-            if let Err(e) = transport.send(Into::into(_block.digest().to_vec())).await {
+            // TODO1: reliable sender
+            // TODO2: send a certificate block
+            let certify_block = CBlock::new(
+                self.shard_id, 
+                _block.author, 
+                _block.round, 
+                _block.payload.clone(), 
+                _block.signature.clone()).await;
+            let message = bincode::serialize(&certify_block.clone())
+                .expect("fail to serialize the CBlock");
+            if let Err(e) = transport.send(Into::into(message)).await {
                 warn!("Failed to send block: {}", e);
                 break;
             }
+            debug!("send a certificate block {:?} to the ordering shard", certify_block.clone());
             info!("Executor commits block {:?} successfully", _block); // {:?} means: display based on the Debug function
         }
         Ok(())

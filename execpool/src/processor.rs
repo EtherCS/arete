@@ -25,6 +25,7 @@ impl Processor {
         tx_digest: Sender<Digest>,
     ) {
         tokio::spawn(async move {
+            // Receive batch txs after certifying (get f+1 signatures)
             while let Some(batch) = rx_batch.recv().await {
                 // Hash the batch.
                 let digest = Digest(Sha512::digest(&batch).as_slice()[..32].try_into().unwrap());

@@ -14,6 +14,7 @@ use serde::{Deserialize, Serialize};
 use std::error::Error;
 use store::Store;
 use tokio::sync::mpsc::{channel, Receiver, Sender};
+use certify::{CBlock};
 
 #[cfg(test)]
 #[path = "tests/mempool_tests.rs"]
@@ -204,7 +205,9 @@ impl MessageHandler for TxReceiverHandler {
         // TODO handle certificate block here
         // wait for at least one from all execution shards
         // then send to the batch maker
-        info!("node receives msg {:?}", message);
+        let rec_block: CBlock = bincode::deserialize(&message.to_vec())
+            .expect("fail to deserialize the CBlock");
+        info!("node receives msg {:?}, get shard id is {}", rec_block, rec_block.shard_id);
         // Send the transaction to the batch maker.
         self.tx_batch_maker
             .send(message.to_vec())

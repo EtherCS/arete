@@ -59,6 +59,7 @@ impl Proposer {
     }
 
     async fn make_block(&mut self, round: Round, qc: QC, tc: Option<TC>) {
+        info!("The number of transaction hash in a block is {}", self.buffer.capacity());
         // Generate a new block.
         let block = EBlock::new(
             qc,
@@ -129,6 +130,7 @@ impl Proposer {
                         self.buffer.insert(digest);
                     //}
                 },
+                // I am the leader now
                 Some(message) = self.rx_message.recv() => match message {
                     ProposerMessage::Make(round, qc, tc) => self.make_block(round, qc, tc).await,
                     ProposerMessage::Cleanup(digests) => {
