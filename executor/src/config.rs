@@ -1,6 +1,6 @@
 use certify::{ExecutionCommittee as ConsensusCommittee, CertifyParameters as ConsensusParameters};
 use crypto::{generate_keypair, generate_production_keypair, PublicKey, SecretKey};
-use execpool::{ExecutionCommittee as MempoolCommittee, CertifyParameters as MempoolParameters};
+use execpool::{ShardInfo, ExecutionCommittee as MempoolCommittee, CertifyParameters as MempoolParameters};
 use rand::rngs::StdRng;
 use rand::SeedableRng as _;
 use serde::de::DeserializeOwned;
@@ -82,6 +82,7 @@ impl Default for Secret {
 pub struct Committee {
     pub consensus: ConsensusCommittee,
     pub mempool: MempoolCommittee,
+    pub shard: ShardInfo,
 }
 
 impl Export for Committee {}

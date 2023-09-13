@@ -10,5 +10,5 @@ mod synchronizer;
 #[path = "tests/common.rs"]
 mod common;
 
-pub use crate::config::{ExecutionCommittee, CertifyParameters};
+pub use crate::config::{ShardInfo, ExecutionCommittee, CertifyParameters};
 pub use crate::mempool::{ConsensusMempoolMessage, Mempool};

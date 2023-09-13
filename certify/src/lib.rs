@@ -18,4 +18,4 @@ mod common;
 
 pub use crate::config::{ExecutionCommittee, CertifyParameters};
 pub use crate::consensus::Consensus;
-pub use crate::messages::{EBlock, QC, TC};
+pub use crate::messages::{EBlock, QC, TC, CBlock};

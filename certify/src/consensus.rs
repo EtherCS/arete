@@ -48,7 +48,7 @@ impl Consensus {
         parameters: CertifyParameters,
         signature_service: SignatureService,
         store: Store,
-        rx_mempool: Receiver<Digest>,
+        rx_mempool: Receiver<Digest>,   // receive channel from mempool
         tx_mempool: Sender<ConsensusMempoolMessage>,
         tx_commit: Sender<EBlock>,
     ) {
