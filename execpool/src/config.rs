@@ -4,6 +4,29 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::net::SocketAddr;
 
+#[derive(Clone, Deserialize, Serialize)]
+pub struct ShardInfo {
+    pub id: u32,
+    pub number: u32,
+}
+
+impl Default for ShardInfo {
+    fn default() -> Self {
+        Self {
+            id: 0,
+            number: 1,
+        }
+    }
+}
+
+impl ShardInfo {
+    pub fn log(&self) {
+        // NOTE: These log entries are used to compute performance.
+        info!("Shard id is {}", self.id);
+        info!("Shard number is {}", self.number);
+    }
+}
+
 #[derive(Deserialize, Serialize)]
 pub struct CertifyParameters {
     /// The depth of the garbage collection (Denominated in number of rounds).
@@ -86,12 +109,10 @@ impl ExecutionCommittee {
         self.authorities.get(name).map_or_else(|| 0, |x| x.stake)
     }
 
-    /// Returns the stake required to reach a quorum (2f+1).
+    /// Returns the stake required to reach a quorum (f+1) for execution shard.
     pub fn quorum_threshold(&self) -> Stake {
-        // If N = 3f + 1 + k (0 <= k < 3)
-        // then (2 N + 3) / 3 = 2f + 1 + (2k + 2)/3 = 2f + 1 + k = N - f
         let total_votes: Stake = self.authorities.values().map(|x| x.stake).sum();
-        2 * total_votes / 3 + 1
+        total_votes / 2 + 1
     }
 
     /// Returns the address to receive client transactions.

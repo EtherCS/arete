@@ -65,11 +65,10 @@ impl ExecutionCommittee {
         self.authorities.get(name).map_or_else(|| 0, |x| x.stake)
     }
 
+    // ARETE: only need (f+1)
     pub fn quorum_threshold(&self) -> Stake {
-        // If N = 3f + 1 + k (0 <= k < 3)
-        // then (2 N + 3) / 3 = 2f + 1 + (2k + 2)/3 = 2f + 1 + k = N - f
         let total_votes: Stake = self.authorities.values().map(|x| x.stake).sum();
-        2 * total_votes / 3 + 1
+        total_votes / 2 + 1
     }
 
     pub fn address(&self, name: &PublicKey) -> Option<SocketAddr> {
