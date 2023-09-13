@@ -2,15 +2,13 @@ use crate::config::Export as _;
 use crate::config::{Committee, ConfigError, Parameters, Secret};
 use certify::{EBlock, Consensus, CBlock};
 use crypto::SignatureService;
-use log::{debug, info, warn};
+use log::{debug, info};
 use execpool::Mempool;
 use store::Store;
-use tokio::net::TcpStream;
 use std::net::{SocketAddr, IpAddr, Ipv4Addr};
 use tokio::sync::mpsc::{channel, Receiver};
-use tokio_util::codec::{Framed, LengthDelimitedCodec};
-use anyhow::{Context, Result};
-use futures::sink::SinkExt as _;
+use anyhow::Result;
+use network::SimpleSender;
 
 /// The default channel capacity for this module.
 pub const CHANNEL_CAPACITY: usize = 1_000;
@@ -98,13 +96,8 @@ impl Executor {
     }
 
     pub async fn analyze_block(&mut self) -> Result<()> {
-        let stream = TcpStream::connect(self.ordering_addr)
-            .await
-            .context(format!("failed to connect to {}", self.ordering_addr))?;
-        let mut transport = Framed::new(stream, LengthDelimitedCodec::new());
+        let mut sender = SimpleSender::new();
         while let Some(_block) = self.commit.recv().await {
-            // TODO1: reliable sender
-            // TODO2: send a certificate block
             let certify_block = CBlock::new(
                 self.shard_id, 
                 _block.author, 
@@ -113,10 +106,8 @@ impl Executor {
                 _block.signature.clone()).await;
             let message = bincode::serialize(&certify_block.clone())
                 .expect("fail to serialize the CBlock");
-            if let Err(e) = transport.send(Into::into(message)).await {
-                warn!("Failed to send block: {}", e);
-                break;
-            }
+            sender.send(self.ordering_addr, Into::into(message)).await;
+
             debug!("send a certificate block {:?} to the ordering shard", certify_block.clone());
             info!("Executor commits block {:?} successfully", _block); // {:?} means: display based on the Debug function
         }

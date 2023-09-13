@@ -31,7 +31,8 @@ pub fn committee() -> ExecutionCommittee {
                 let stake = 1;
                 let front = format!("127.0.0.1:{}", 100 + i).parse().unwrap();
                 let mempool = format!("127.0.0.1:{}", 100 + i).parse().unwrap();
-                (name, stake, front, mempool)
+                let confirmation = format!("127.0.0.1:{}", 100 + i).parse().unwrap();
+                (name, stake, front, mempool, confirmation)
             })
             .collect(),
         /*  epoch */ 100,

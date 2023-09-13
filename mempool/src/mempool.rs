@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use std::error::Error;
 use store::Store;
 use tokio::sync::mpsc::{channel, Receiver, Sender};
-use certify::{CBlock};
+use certify::CBlock;
 
 #[cfg(test)]
 #[path = "tests/mempool_tests.rs"]

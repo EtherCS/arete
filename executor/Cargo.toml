@@ -26,6 +26,7 @@ store = { path = "../store" }
 # mempool = { path = "../mempool" }
 certify = { path = "../certify" }
 execpool = { path = "../execpool" }
+network = {path = "../network"}
 
 [features]
 # benchmark = ["consensus/benchmark", "mempool/benchmark"]

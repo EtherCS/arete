@@ -78,6 +78,8 @@ pub struct Authority {
     pub transactions_address: SocketAddr,
     /// Address to receive messages from other nodes.
     pub mempool_address: SocketAddr,
+    /// Address to confirmation messages from the ordering shard.
+    pub confirmation_address: SocketAddr,
 }
 
 #[derive(Clone, Deserialize, Serialize)]
@@ -87,15 +89,16 @@ pub struct ExecutionCommittee {
 }
 
 impl ExecutionCommittee {
-    pub fn new(info: Vec<(PublicKey, Stake, SocketAddr, SocketAddr)>, epoch: EpochNumber) -> Self {
+    pub fn new(info: Vec<(PublicKey, Stake, SocketAddr, SocketAddr, SocketAddr)>, epoch: EpochNumber) -> Self {
         Self {
             authorities: info
                 .into_iter()
-                .map(|(name, stake, transactions_address, mempool_address)| {
+                .map(|(name, stake, transactions_address, mempool_address, confirmation_address)| {
                     let authority = Authority {
                         stake,
                         transactions_address,
                         mempool_address,
+                        confirmation_address,
                     };
                     (name, authority)
                 })
@@ -123,6 +126,11 @@ impl ExecutionCommittee {
     /// Returns the mempool addresses of a specific node.
     pub fn mempool_address(&self, name: &PublicKey) -> Option<SocketAddr> {
         self.authorities.get(name).map(|x| x.mempool_address)
+    }
+
+    /// Returns the confirmation addresses of a specific node.
+    pub fn confirmation_address(&self, name: &PublicKey) -> Option<SocketAddr> {
+        self.authorities.get(name).map(|x| x.confirmation_address)
     }
 
     /// Returns the mempool addresses of all nodes except `myself`.

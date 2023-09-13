@@ -89,6 +89,13 @@ impl Mempool {
                 .expect("Our public key is not in the committee")
                 .ip()
         );
+        info!(
+            "Confirmation address is {}",
+            mempool
+                .committee
+                .confirmation_address(&mempool.name)
+                .expect("Our public key is not in the committee")
+        );
     }
 
     /// Spawn all tasks responsible to handle messages from the consensus.
