@@ -2,6 +2,7 @@
 mod error;
 mod aggregator;
 mod config;
+mod confirm_executor;
 mod consensus;
 mod core;
 mod helper;

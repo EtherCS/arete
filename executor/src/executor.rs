@@ -9,7 +9,7 @@ use std::net::{SocketAddr, IpAddr, Ipv4Addr};
 use tokio::sync::mpsc::{channel, Receiver};
 use anyhow::Result;
 use network::SimpleSender;
-use types::ConfirmMessage;
+// use types::ConfirmMessage;
 
 /// The default channel capacity for this module.
 pub const CHANNEL_CAPACITY: usize = 1_000;

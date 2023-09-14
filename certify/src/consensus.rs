@@ -7,6 +7,7 @@ use crate::mempool::MempoolDriver;
 use crate::messages::{EBlock, Timeout, Vote, TC};
 use crate::proposer::Proposer;
 use crate::synchronizer::Synchronizer;
+use crate::confirm_executor::ConfirmExecutor;
 use async_trait::async_trait;
 use bytes::Bytes;
 use crypto::{Digest, PublicKey, SignatureService};
@@ -116,14 +117,18 @@ impl Consensus {
         Proposer::spawn(
             name,
             committee.clone(),
-            signature_service,
+            signature_service.clone(),
             rx_mempool,
             /* rx_message */ rx_proposer,
             tx_loopback,
         );
 
         // Spawn the confirm executor.
-        
+        ConfirmExecutor::spawn(
+            name, 
+            committee.clone(), 
+            rx_confim, 
+        );
 
         // Spawn the helper module.
         Helper::spawn(committee, store, /* rx_requests */ rx_helper);

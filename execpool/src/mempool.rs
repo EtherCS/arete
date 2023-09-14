@@ -53,6 +53,8 @@ pub struct Mempool {
     store: Store,
     /// Send messages to consensus.
     tx_consensus: Sender<Digest>,
+    /// Send confirmation messages to consensus
+    tx_confirm: Sender<ConfirmMessage>,
 }
 
 impl Mempool {
@@ -75,6 +77,7 @@ impl Mempool {
             parameters,
             store,
             tx_consensus,
+            tx_confirm,
         };
 
         // Spawn all mempool tasks.
@@ -202,10 +205,17 @@ impl Mempool {
         info!("Mempool listening to mempool messages on {}", address);
     }
 
-    /// Spawn all tasks responsible to handle messages from the ordering shard.
+    /// Spawn all tasks responsible to handle confirmation messages from the ordering shard.
     fn handle_ordering_messages(&self) {
-        // TODO: execute, and create a new execution, certificate block
-
+        // Receive incoming messages from the ordering shard.
+        let address = self
+            .committee
+            .confirmation_address(&self.name)
+            .expect("Our public key is not in the committee");
+        NetworkReceiver::spawn(
+            address, 
+            /* handler */ ConfirmationMsgReceiverHandler{tx_confirm: self.tx_confirm.clone()},
+        );
     }
 }
 
@@ -223,6 +233,29 @@ impl MessageHandler for TxReceiverHandler {
             .send(message.to_vec())
             .await
             .expect("Failed to send transaction");
+
+        // Give the change to schedule other tasks.
+        tokio::task::yield_now().await;
+        Ok(())
+    }
+}
+
+/// Defines how the network receiver handles incoming confirmation messages.
+#[derive(Clone)]
+struct ConfirmationMsgReceiverHandler {
+    tx_confirm: Sender<ConfirmMessage>,
+}
+
+#[async_trait]
+impl MessageHandler for ConfirmationMsgReceiverHandler {
+    async fn dispatch(&self, _writer: &mut Writer, message: Bytes) -> Result<(), Box<dyn Error>> {
+        // Send the transaction to the batch maker.
+        let confirm_msg = bincode::deserialize(&message)
+            .expect("Failed to deserialize confirmation message");
+        self.tx_confirm
+            .send(confirm_msg)
+            .await
+            .expect("Failed to send confirmation message");
 
         // Give the change to schedule other tasks.
         tokio::task::yield_now().await;
