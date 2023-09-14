@@ -27,6 +27,7 @@ fn spawn_nodes(
             let (tx_consensus_to_mempool, mut rx_consensus_to_mempool) = channel(10);
             let (_tx_mempool_to_consensus, rx_mempool_to_consensus) = channel(1);
             let (tx_commit, mut rx_commit) = channel(1);
+            let (_tx_confirm_mempool_to_consensus, rx_confirm_mempool_to_consensus) = channel(1);
 
             // Sink the mempool channel.
             tokio::spawn(async move {
@@ -46,6 +47,7 @@ fn spawn_nodes(
                     rx_mempool_to_consensus,
                     tx_consensus_to_mempool,
                     tx_commit,
+                    rx_confirm_mempool_to_consensus,
                 );
 
                 rx_commit.recv().await.unwrap()

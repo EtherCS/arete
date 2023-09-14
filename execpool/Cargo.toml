@@ -17,6 +17,7 @@ async-trait = "0.1.50"
 crypto = { path = "../crypto" }
 store = { path = "../store" }
 network = { path = "../network" }
+types = { path = "../types"}
 
 [dev-dependencies]
 tokio-util = { version = "0.7.3", features= ["codec"] }

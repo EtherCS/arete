@@ -18,6 +18,7 @@ use serde::{Deserialize, Serialize};
 use std::error::Error;
 use store::Store;
 use tokio::sync::mpsc::{channel, Receiver, Sender};
+use types::ConfirmMessage;
 
 #[cfg(test)]
 #[path = "tests/consensus_tests.rs"]
@@ -36,6 +37,7 @@ pub enum ConsensusMessage {
     Timeout(Timeout),
     TC(TC),
     SyncRequest(Digest, PublicKey),
+    ConfirmMsg(ConfirmMessage),
 }
 
 pub struct Consensus;
@@ -51,6 +53,7 @@ impl Consensus {
         rx_mempool: Receiver<Digest>,   // receive channel from mempool
         tx_mempool: Sender<ConsensusMempoolMessage>,
         tx_commit: Sender<EBlock>,
+        rx_confim: Receiver<ConfirmMessage>,
     ) {
         // NOTE: This log entry is used to compute performance.
         parameters.log();
@@ -118,6 +121,9 @@ impl Consensus {
             /* rx_message */ rx_proposer,
             tx_loopback,
         );
+
+        // Spawn the confirm executor.
+        
 
         // Spawn the helper module.
         Helper::spawn(committee, store, /* rx_requests */ rx_helper);

@@ -20,6 +20,7 @@ async fn handle_clients_transactions() {
     // Spawn a `Mempool` instance.
     let (_tx_consensus_to_mempool, rx_consensus_to_mempool) = channel(1);
     let (tx_mempool_to_consensus, mut rx_mempool_to_consensus) = channel(1);
+    let (tx_confirm_mempool_to_consensus, mut rx_confirm_mempool_to_consensus) = channel(1);
     Mempool::spawn(
         name,
         committee.clone(),
@@ -27,6 +28,7 @@ async fn handle_clients_transactions() {
         store,
         rx_consensus_to_mempool,
         tx_mempool_to_consensus,
+        tx_confirm_mempool_to_consensus,
     );
 
     // Spawn enough mempools' listeners to acknowledge our batches.

@@ -18,6 +18,7 @@ use std::cmp::max;
 use std::collections::VecDeque;
 use store::Store;
 use tokio::sync::mpsc::{Receiver, Sender};
+use types::ConfirmMessage;
 
 #[cfg(test)]
 #[path = "tests/core_tests.rs"]
@@ -409,6 +410,11 @@ impl Core {
         Ok(())
     }
 
+    async fn handle_confirmation_message(&mut self, confirm_msg: ConfirmMessage) -> ConsensusResult<()> {
+        // TODO: 1) print round for calculating performance; 2) update valid round
+        Ok(())
+    }
+
     pub async fn run(&mut self) {
         // Upon booting, generate the very first block (if we are the leader).
         // Also, schedule a timer in case we don't hear from the leader.
@@ -426,6 +432,7 @@ impl Core {
                     ConsensusMessage::Vote(vote) => self.handle_vote(&vote).await,
                     ConsensusMessage::Timeout(timeout) => self.handle_timeout(&timeout).await,
                     ConsensusMessage::TC(tc) => self.handle_tc(tc).await,
+                    ConsensusMessage::ConfirmMsg(confirm_message) => self.handle_confirmation_message(confirm_message).await,
                     _ => panic!("Unexpected protocol message")
                 },
                 Some(block) = self.rx_loopback.recv() => self.process_block(&block).await,

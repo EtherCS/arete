@@ -14,6 +14,7 @@ use serde::{Deserialize, Serialize};
 use std::error::Error;
 use store::Store;
 use tokio::sync::mpsc::{channel, Receiver, Sender};
+use types::ConfirmMessage;
 
 #[cfg(test)]
 #[path = "tests/mempool_tests.rs"]
@@ -62,6 +63,7 @@ impl Mempool {
         store: Store,
         rx_consensus: Receiver<ConsensusMempoolMessage>,
         tx_consensus: Sender<Digest>,
+        tx_confirm: Sender<ConfirmMessage>,
     ) {
         // NOTE: This log entry is used to compute performance.
         parameters.log();
@@ -203,6 +205,7 @@ impl Mempool {
     /// Spawn all tasks responsible to handle messages from the ordering shard.
     fn handle_ordering_messages(&self) {
         // TODO: execute, and create a new execution, certificate block
+
     }
 }
 

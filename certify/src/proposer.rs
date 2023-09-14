@@ -103,7 +103,7 @@ impl Proposer {
             .await
             .expect("Failed to send block");
 
-        // Control system: Wait for 2f+1 nodes to acknowledge our block before continuing.
+        // Control system: Wait for f+1 nodes to acknowledge our block before continuing.
         let mut wait_for_quorum: FuturesUnordered<_> = names
             .into_iter()
             .zip(handles.into_iter())

@@ -9,6 +9,7 @@ use std::net::{SocketAddr, IpAddr, Ipv4Addr};
 use tokio::sync::mpsc::{channel, Receiver};
 use anyhow::Result;
 use network::SimpleSender;
+use types::ConfirmMessage;
 
 /// The default channel capacity for this module.
 pub const CHANNEL_CAPACITY: usize = 1_000;
@@ -32,6 +33,7 @@ impl Executor {
         let (tx_commit, rx_commit) = channel(CHANNEL_CAPACITY);
         let (tx_consensus_to_mempool, rx_consensus_to_mempool) = channel(CHANNEL_CAPACITY);
         let (tx_mempool_to_consensus, rx_mempool_to_consensus) = channel(CHANNEL_CAPACITY);
+        let (tx_confirm_mempool_to_consensus, rx_confirm_mempool_to_consensus) = channel(CHANNEL_CAPACITY);
 
         // Read the committee and secret key from file.
         let committee = Committee::read(committee_file)?;
@@ -66,6 +68,7 @@ impl Executor {
             store.clone(),
             rx_consensus_to_mempool,
             tx_mempool_to_consensus,
+            tx_confirm_mempool_to_consensus,
         );
 
         // Run the consensus core.
@@ -78,6 +81,7 @@ impl Executor {
             rx_mempool_to_consensus,
             tx_consensus_to_mempool,
             tx_commit,
+            rx_confirm_mempool_to_consensus,
         );
 
         // Connect to the ordering node.
