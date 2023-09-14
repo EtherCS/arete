@@ -56,28 +56,35 @@ impl ConfirmExecutor {
             .network
             .broadcast(addresses, Bytes::from(message))
             .await;
-        // Control system: Wait for f+1 nodes to acknowledge our confirmation message before continuing.
-        let mut wait_for_quorum: FuturesUnordered<_> = names
-            .into_iter()
-            .zip(handles.into_iter())
-            .map(|(name, handler)| {
-                let stake = self.committee.stake(&name);
-                Self::waiter(handler, stake)
-            })
-            .collect();
+        // TODO: Control system: Wait for f+1 nodes to acknowledge our confirmation message before continuing.
+        // let mut wait_for_quorum: FuturesUnordered<_> = names
+        //     .into_iter()
+        //     .zip(handles.into_iter())
+        //     .map(|(name, handler)| {
+        //         let stake = self.committee.stake(&name);
+        //         Self::waiter(handler, stake)
+        //     })
+        //     .collect();
 
-        let mut total_stake = self.committee.stake(&self.name);
-        while let Some(stake) = wait_for_quorum.next().await {
-            total_stake += stake;
-            if total_stake >= self.committee.quorum_threshold() {
-                break;
-            }
-        }
+        // let mut total_stake = self.committee.stake(&self.name);
+        // while let Some(stake) = wait_for_quorum.next().await {
+        //     total_stake += stake;
+        //     if total_stake >= self.committee.quorum_threshold() {
+        //         break;
+        //     }
+        // }
     }
 
     async fn run(&mut self) {
-        while let Some(message) = self.rx_confirm_message.recv().await {
-            self.broadcast_confirm_msg(message).await;
+        loop{
+            tokio::select!{
+                Some(message) = self.rx_confirm_message.recv() => {
+                    self.broadcast_confirm_msg(message).await;
+                },
+            }
+            // while let Some(message) = self.rx_confirm_message.recv().await {
+            //     self.broadcast_confirm_msg(message).await;
+            // }
         }
     }
 }

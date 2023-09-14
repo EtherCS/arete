@@ -1,4 +1,4 @@
-use crypto::{Digest, Hash, Signature, SignatureService};
+use crypto::{Digest, Hash, Signature};
 use ed25519_dalek::Digest as _;
 use ed25519_dalek::Sha512;
 use serde::{Deserialize, Serialize};
@@ -6,7 +6,8 @@ use std::convert::TryInto;
 use std::fmt;
 
 #[derive(Serialize, Deserialize, Default, Clone)]
-pub struct ConfirmMessage {  
+pub struct ConfirmMessage {
+    pub shard_id: u32,  
     pub block_hash: Digest,
     pub round: u64,     // consensus round in the ordering shard
     pub payload: Vec<Digest>,   // new cross-shard transactions
@@ -15,19 +16,22 @@ pub struct ConfirmMessage {
 
 impl ConfirmMessage {
     pub async fn new(
+        shard_id: u32,
         block_hash: Digest,
         round: u64,
         payload: Vec<Digest>,
-        mut signature_service: SignatureService,
+        signature: Signature,
     ) -> Self {
         let confirm_message = Self {
+            shard_id,
             block_hash,
             round,
             payload,
-            signature: Signature::default(),
+            signature,
         };
-        let signature = signature_service.request_signature(confirm_message.digest()).await;
-        Self { signature, ..confirm_message }
+        confirm_message
+        // let signature = signature_service.request_signature(confirm_message.digest()).await;
+        // Self { confirm_message }
     }
 
 }
@@ -40,6 +44,7 @@ impl Hash for ConfirmMessage {
         for x in &self.payload {
             hasher.update(x);
         }
+        hasher.update(&self.shard_id.to_le_bytes());
         Digest(hasher.finalize().as_slice()[..32].try_into().unwrap())
     }
 }
@@ -54,5 +59,11 @@ impl fmt::Debug for ConfirmMessage {
             self.round,
             self.payload.iter().map(|x| x.size()).sum::<usize>(),
         )
+    }
+}
+
+impl fmt::Display for ConfirmMessage {
+    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        write!(f, "ConfirmMsg{}", self.round)
     }
 }

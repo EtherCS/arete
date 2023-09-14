@@ -1,11 +1,14 @@
 use crate::config::Export as _;
 use crate::config::{Committee, ConfigError, Parameters, Secret};
 use consensus::{OBlock, Consensus};
-use crypto::SignatureService;
-use log::info;
+use crypto::{Hash, SignatureService};
+use log::{info, debug};
 use mempool::Mempool;
 use store::Store;
 use tokio::sync::mpsc::{channel, Receiver};
+use types::ConfirmMessage;
+use std::net::{SocketAddr, IpAddr, Ipv4Addr};
+use network::SimpleSender;
 
 /// The default channel capacity for this module.
 pub const CHANNEL_CAPACITY: usize = 1_000;
@@ -75,9 +78,23 @@ impl Node {
     }
 
     pub async fn analyze_block(&mut self) {
+        let mut sender = SimpleSender::new();
+        // TODO replace confirm_addr
+        let confirm_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 10011);
         while let Some(_block) = self.commit.recv().await {
-            // This is where we can further process committed block.
-            // TODO: send message to all the execution shards
+            // TODO: send this msg to each shard with a specific shard_id
+            let confim_msg = ConfirmMessage::new(
+                0,
+                _block.digest(), 
+                _block.round, 
+                _block.payload.clone(), 
+                _block.signature.clone()).await;
+
+            let message = bincode::serialize(&confim_msg.clone())
+                .expect("fail to serialize the ConfirmMessage");
+            sender.send(confirm_addr, Into::into(message)).await;
+
+            debug!("send a confirm message {:?} to the execution shard", confim_msg.clone());
             info!("Executor commits block {:?} successfully", _block); // {:?} means: display based on the Debug function
         }
     }

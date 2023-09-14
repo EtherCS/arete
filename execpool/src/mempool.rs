@@ -8,7 +8,7 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use crypto::{Digest, PublicKey};
 use futures::sink::SinkExt as _;
-use log::{info, warn};
+use log::{info, warn, debug};
 use network::{MessageHandler, Receiver as NetworkReceiver, Writer};
 use serde::{Deserialize, Serialize};
 use std::error::Error;
@@ -212,6 +212,7 @@ impl Mempool {
             .committee
             .confirmation_address(&self.name)
             .expect("Our public key is not in the committee");
+        debug!("Executor listen confirmation address {:?}", address);
         NetworkReceiver::spawn(
             address, 
             /* handler */ ConfirmationMsgReceiverHandler{tx_confirm: self.tx_confirm.clone()},
@@ -250,13 +251,14 @@ struct ConfirmationMsgReceiverHandler {
 impl MessageHandler for ConfirmationMsgReceiverHandler {
     async fn dispatch(&self, _writer: &mut Writer, message: Bytes) -> Result<(), Box<dyn Error>> {
         // Send the transaction to the batch maker.
-        let confirm_msg = bincode::deserialize(&message)
+        let confirm_msg: ConfirmMessage = bincode::deserialize(&message)
             .expect("Failed to deserialize confirmation message");
         self.tx_confirm
-            .send(confirm_msg)
+            .send(confirm_msg.clone())
             .await
             .expect("Failed to send confirmation message");
 
+        info!("executor receives confirm msg {:?}", confirm_msg);
         // Give the change to schedule other tasks.
         tokio::task::yield_now().await;
         Ok(())

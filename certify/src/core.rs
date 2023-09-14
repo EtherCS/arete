@@ -412,6 +412,7 @@ impl Core {
 
     async fn handle_confirmation_message(&mut self, confirm_msg: ConfirmMessage) -> ConsensusResult<()> {
         // TODO: 1) print round for calculating performance; 2) update valid round
+        debug!("receive a confirm message from peer {:?}", confirm_msg);
         Ok(())
     }
 
