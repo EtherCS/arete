@@ -1,13 +1,13 @@
-use crate::{config::{ExecutionCommittee, Stake}, consensus::ConsensusMessage};
+use crate::{config::ExecutionCommittee, consensus::ConsensusMessage};
 use bytes::Bytes;
 use crypto::PublicKey;
 use types::ConfirmMessage;
-use network::{CancelHandler, ReliableSender};
+use network::ReliableSender;
 use tokio::sync::mpsc::Receiver;
 use log::debug;
 use std::net::SocketAddr;
-use futures::stream::futures_unordered::FuturesUnordered;
-use futures::stream::StreamExt as _;
+// use futures::stream::futures_unordered::FuturesUnordered;
+// use futures::stream::StreamExt as _;
 
 
 pub struct ConfirmExecutor {
@@ -36,15 +36,15 @@ impl ConfirmExecutor {
     }
 
     /// Helper function. It waits for a future to complete and then delivers a value.
-    async fn waiter(wait_for: CancelHandler, deliver: Stake) -> Stake {
-        let _ = wait_for.await;
-        deliver
-    }
+    // async fn waiter(wait_for: CancelHandler, deliver: Stake) -> Stake {
+    //     let _ = wait_for.await;
+    //     deliver
+    // }
 
     /// Broadcast the confirmation message to other executors.
     async fn broadcast_confirm_msg(&mut self, confirm_msg: ConfirmMessage) {
         debug!("Broadcasting confirmation msg {:?}", confirm_msg);
-        let (names, addresses): (Vec<_>, Vec<SocketAddr>) = self
+        let (_names, addresses): (Vec<_>, Vec<SocketAddr>) = self
             .committee
             .broadcast_addresses(&self.name)
             .iter()
@@ -52,7 +52,7 @@ impl ConfirmExecutor {
             .unzip();
         let message = bincode::serialize(&ConsensusMessage::ConfirmMsg(confirm_msg.clone()))
             .expect("Failed to serialize confirmation latency");
-        let handles = self
+        let _handles = self
             .network
             .broadcast(addresses, Bytes::from(message))
             .await;
