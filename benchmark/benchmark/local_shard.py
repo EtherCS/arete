@@ -21,13 +21,11 @@ class LocalBenchShard:
     #     except ConfigError as e:
     #         raise BenchError('Invalid nodes or bench parameters', e)
     
-    # Config TODO
     def __init__(self, bench_parameters_dict, node_params_dict, executor_parameters_dict):
         try:
             self.bench_parameters = BenchParameters(bench_parameters_dict)
             self.node_parameters = NodeParameters(node_params_dict)
             self.executor_parameters = ExecutorParameters(executor_parameters_dict)
-            # Config TODO: support multiple execution shards
         except ConfigError as e:
             raise BenchError('Invalid nodes or bench parameters', e)
 
@@ -158,8 +156,6 @@ class LocalBenchShard:
                         debug=debug
                     )
                     self._background_run(cmd, log_file)
-
-                # Config TODO: support multiple execution shards
                 
                 # Wait for the nodes to synchronize
                 Print.info('Waiting for the nodes to synchronize...')
@@ -171,7 +167,6 @@ class LocalBenchShard:
             self._kill_executors()
 
             # Parse logs and return the parser.
-            # TODO: support to parse multiple shards
             Print.info('Parsing logs...')
             return ShardLogParser.process_shard(f'./logs', faults=self.faults, shardNum=self.shard_num)
 

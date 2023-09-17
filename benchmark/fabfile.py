@@ -34,7 +34,6 @@ def local(ctx):
             'max_batch_delay': 10
         }
     }
-    # Config TODO: support multiple execution shards
     executor_params = {
         'consensus': {
             'certify_timeout_delay': 1_000,
@@ -79,7 +78,6 @@ def localShard(ctx):
             'max_batch_delay': 10
         }
     }
-    # Config TODO: support multiple execution shards
     executor_params = {
         'consensus': {
             'certify_timeout_delay': 1_000,
