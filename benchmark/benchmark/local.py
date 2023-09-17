@@ -19,12 +19,10 @@ class LocalBench:
     #     except ConfigError as e:
     #         raise BenchError('Invalid nodes or bench parameters', e)
     
-    # Config TODO
     def __init__(self, bench_parameters_dict, node_parameters_dict, executor_parameters_dict):
         try:
             self.bench_parameters = BenchParameters(bench_parameters_dict)
             self.node_parameters = NodeParameters(node_parameters_dict)
-            # Config TODO: support multiple execution shards
             self.executor_parameters = ExecutorParameters(executor_parameters_dict)
         except ConfigError as e:
             raise BenchError('Invalid nodes or bench parameters', e)
@@ -113,8 +111,6 @@ class LocalBench:
                     debug=debug
                 )
                 self._background_run(cmd, log_file)
-
-            # Config TODO: support multiple execution shards
             
             # Wait for the nodes to synchronize
             Print.info('Waiting for the nodes to synchronize...')

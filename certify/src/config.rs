@@ -36,7 +36,6 @@ pub struct Authority {
     pub address: SocketAddr,
 }
 
-// TODO: change consensus to certify
 #[derive(Clone, Serialize, Deserialize)]
 pub struct ExecutionCommittee {
     pub authorities: HashMap<PublicKey, Authority>,

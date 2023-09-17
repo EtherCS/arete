@@ -198,7 +198,7 @@ class NodeParameters:
         assert isinstance(filename, str)
         with open(filename, 'w') as f:
             dump(self.json, f, indent=4, sort_keys=True)
-# Config TODO: support multiple execution shards
+
 class ExecutorParameters:
     def __init__(self, json):
         inputs = []
