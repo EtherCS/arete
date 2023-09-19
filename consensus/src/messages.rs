@@ -20,7 +20,7 @@ pub struct OBlock {
     pub tc: Option<TC>,
     pub author: PublicKey,
     pub round: Round,
-    pub payload: Vec<Digest>,   // Block TODO: block hashes
+    pub payload: Vec<Digest>,  
     pub signature: Signature,
     // Execution TODO: Aggregator[ctx_hash]=ok(),fail()
 }
