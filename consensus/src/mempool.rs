@@ -13,37 +13,39 @@ use store::Store;
 use tokio::sync::mpsc::{channel, Receiver, Sender};
 
 pub struct MempoolDriver {
-    store: Store,
+    _store: Store,
     tx_mempool: Sender<ConsensusMempoolMessage>,
     tx_payload_waiter: Sender<PayloadWaiterMessage>,
 }
 
 impl MempoolDriver {
     pub fn new(
-        store: Store,
+        _store: Store,
         tx_mempool: Sender<ConsensusMempoolMessage>,
         tx_loopback: Sender<OBlock>,
     ) -> Self {
         let (tx_payload_waiter, rx_payload_waiter) = channel(CHANNEL_CAPACITY);
 
         // Spawn the payload waiter.
-        PayloadWaiter::spawn(store.clone(), rx_payload_waiter, tx_loopback);
+        PayloadWaiter::spawn(_store.clone(), rx_payload_waiter, tx_loopback);
 
         // Returns the mempool driver.
         Self {
-            store,
+            _store,
             tx_mempool,
             tx_payload_waiter,
         }
     }
 
     pub async fn verify(&mut self, block: OBlock) -> ConsensusResult<bool> {
-        let mut missing = Vec::new();
-        for x in &block.payload {
-            if self.store.read(x.to_vec()).await?.is_none() {
-                missing.push(x.clone());
-            }
-        }
+        // ARETE TODO: add verify 
+        // let mut missing = Vec::new();
+        // for x in &block.payload {
+        //     if self.store.read(x.to_vec()).await?.is_none() {
+        //         missing.push(x.clone());
+        //     }
+        // }
+        let missing = Vec::new();
 
         if missing.is_empty() {
             return Ok(true);

@@ -87,7 +87,7 @@ impl Node {
                 0,
                 _block.digest(), 
                 _block.round, 
-                _block.payload.clone(), 
+                _block.get_digests(), 
                 _block.signature.clone()).await;
 
             let message = bincode::serialize(&confim_msg.clone())

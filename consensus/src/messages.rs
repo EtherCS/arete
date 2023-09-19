@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::convert::TryInto;
 use std::fmt;
+use types::CBlockMeta;
 
 #[cfg(test)]
 #[path = "tests/messages_tests.rs"]
@@ -20,7 +21,8 @@ pub struct OBlock {
     pub tc: Option<TC>,
     pub author: PublicKey,
     pub round: Round,
-    pub payload: Vec<Digest>,  
+    // pub payload: Vec<Digest>,  
+    pub payload: Vec<CBlockMeta>,   // replace Digest with CBlockMeta for consensus
     pub signature: Signature,
     // Execution TODO: Aggregator[ctx_hash]=ok(),fail()
 }
@@ -31,7 +33,7 @@ impl OBlock {
         tc: Option<TC>, 
         author: PublicKey,
         round: Round,
-        payload: Vec<Digest>,
+        payload: Vec<CBlockMeta>,
         mut signature_service: SignatureService,
     ) -> Self {
         let block = Self {
@@ -76,6 +78,15 @@ impl OBlock {
         }
         Ok(())
     }
+
+    pub fn get_digests(&self) -> Vec<Digest> {
+        let mut digests = Vec::new();
+        for x in self.payload.clone() {
+            digests.push(x.hash);
+        }
+        digests
+    }
+
 }
 
 impl Hash for OBlock {
@@ -84,7 +95,7 @@ impl Hash for OBlock {
         hasher.update(self.author.0);
         hasher.update(self.round.to_le_bytes());
         for x in &self.payload {
-            hasher.update(x);
+            hasher.update(x.digest());
         }
         hasher.update(&self.qc.hash);
         Digest(hasher.finalize().as_slice()[..32].try_into().unwrap())

@@ -135,3 +135,57 @@ impl fmt::Display for CBlock {
         write!(f, "CB{}", self.round)
     }
 }
+
+// used for consensus in Ordering shard
+#[derive(Hash, PartialEq, Default, Eq, Clone, Deserialize, Serialize, Ord, PartialOrd)]
+pub struct CBlockMeta {
+    pub shard_id: u32, 
+    pub round: Round,
+    pub hash: Digest,
+}
+
+impl CBlockMeta {
+    pub async fn new(
+        shard_id: u32,
+        round: u64,
+        hash: Digest,
+    ) -> Self {
+        let cblockmeta = Self {
+            shard_id,
+            round,
+            hash,
+        };
+        Self {..cblockmeta}
+    }
+    pub fn size(&self) -> usize {
+        self.hash.size()
+    }
+}
+
+impl Hash for CBlockMeta {
+    fn digest(&self) -> Digest {
+        let mut hasher = Sha512::new();
+        hasher.update(self.round.to_le_bytes());
+        hasher.update(&self.hash);
+        hasher.update(&self.shard_id.to_le_bytes());
+        Digest(hasher.finalize().as_slice()[..32].try_into().unwrap())
+    }
+}
+
+impl fmt::Debug for CBlockMeta {
+    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        write!(
+            f,
+            "{}: CBMeta(round {}, shard id {})",
+            self.digest(),
+            self.round,
+            self.shard_id,
+        )
+    }
+}
+
+impl fmt::Display for CBlockMeta {
+    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        write!(f, "CBMeta (round {}, shard id {})", self.round, self.shard_id)
+    }
+}
