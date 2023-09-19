@@ -12,6 +12,7 @@ use std::net::SocketAddr;
 use tokio::net::TcpListener;
 use tokio::task::JoinHandle;
 use tokio_util::codec::{Framed, LengthDelimitedCodec};
+use types::CBlockMeta;
 
 // Fixture.
 pub fn keys() -> Vec<(PublicKey, SecretKey)> {
@@ -50,7 +51,7 @@ impl OBlock {
         qc: QC,
         author: PublicKey,
         round: Round,
-        payload: Vec<Digest>,
+        payload: Vec<CBlockMeta>,
         secret: &SecretKey,
     ) -> Self {
         let block = OBlock {

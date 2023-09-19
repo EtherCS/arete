@@ -2,19 +2,20 @@ use crate::config::{Committee, Stake};
 use crate::consensus::{ConsensusMessage, Round};
 use crate::messages::{OBlock, QC, TC};
 use bytes::Bytes;
-use crypto::{Digest, PublicKey, SignatureService};
+use crypto::{PublicKey, SignatureService};
 use futures::stream::futures_unordered::FuturesUnordered;
 use futures::stream::StreamExt as _;
 use log::{debug, info};
 use network::{CancelHandler, ReliableSender};
-use types::CBlock;
+use types::{CBlock, CBlockMeta};
 use std::collections::HashSet;
 use tokio::sync::mpsc::{Receiver, Sender};
 
 #[derive(Debug)]
 pub enum ProposerMessage {
     Make(Round, QC, Option<TC>),
-    Cleanup(Vec<Digest>),
+    // Cleanup(Vec<Digest>),
+    Cleanup(Vec<CBlockMeta>),
 }
 
 pub struct Proposer {
@@ -25,7 +26,8 @@ pub struct Proposer {
     rx_cblock: Receiver<CBlock>,
     rx_message: Receiver<ProposerMessage>,
     tx_loopback: Sender<OBlock>,
-    buffer: HashSet<Digest>,
+    // buffer: HashSet<Digest>,
+    shard_rounds: HashSet<CBlockMeta>,  // maintain a map recording [execution_shard_id, max_received_round]
     network: ReliableSender,
 }
 
@@ -47,7 +49,7 @@ impl Proposer {
                 rx_cblock,
                 rx_message,
                 tx_loopback,
-                buffer: HashSet::new(),
+                shard_rounds: HashSet::new(),
                 network: ReliableSender::new(),
             }
             .run()
@@ -68,7 +70,7 @@ impl Proposer {
             tc,
             self.name,
             round,
-            /* payload */ self.buffer.drain().collect(),
+            /* payload */ self.shard_rounds.drain().collect(),
             self.signature_service.clone(),
         )
         .await;
@@ -132,7 +134,8 @@ impl Proposer {
                 //         self.buffer.insert(digest);
                 //     //}
                 // },
-
+                
+                // ARETE: here, every node receive the transaction (CBlock) due to mempool's broadcast
                 // Update its local Map[shard_id, if_receive_CBlock]
                 Some(cblock) = self.rx_cblock.recv() => {
                     // TODO: update map
@@ -142,9 +145,9 @@ impl Proposer {
                 // Check if receiving at least CBlock from every execution shard
                 Some(message) = self.rx_message.recv() => match message {
                     ProposerMessage::Make(round, qc, tc) => self.make_block(round, qc, tc).await,
-                    ProposerMessage::Cleanup(digests) => {
-                        for x in &digests {
-                            self.buffer.remove(x);
+                    ProposerMessage::Cleanup(cbmetas) => {
+                        for x in &cbmetas {
+                            self.shard_rounds.remove(x);
                         }
                     }
                 }

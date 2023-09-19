@@ -288,7 +288,7 @@ impl Core {
     }
 
     async fn cleanup_proposer(&mut self, b0: &OBlock, b1: &OBlock, block: &OBlock) {
-        let digests = b0
+        let digests: Vec<types::CBlockMeta> = b0
             .payload
             .iter()
             .cloned()
