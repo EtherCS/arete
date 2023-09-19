@@ -6,6 +6,7 @@ use std::net::SocketAddr;
 
 pub type Stake = u32;
 pub type EpochNumber = u128;
+pub type ShardNumber = u32;
 
 #[derive(Serialize, Deserialize)]
 pub struct Parameters {
@@ -40,10 +41,11 @@ pub struct Authority {
 pub struct Committee {
     pub authorities: HashMap<PublicKey, Authority>,
     pub epoch: EpochNumber,
+    pub shard_num: ShardNumber,
 }
 
 impl Committee {
-    pub fn new(info: Vec<(PublicKey, Stake, SocketAddr)>, epoch: EpochNumber) -> Self {
+    pub fn new(info: Vec<(PublicKey, Stake, SocketAddr)>, epoch: EpochNumber, shard_num: ShardNumber) -> Self {
         Self {
             authorities: info
                 .into_iter()
@@ -53,6 +55,7 @@ impl Committee {
                 })
                 .collect(),
             epoch,
+            shard_num,
         }
     }
 

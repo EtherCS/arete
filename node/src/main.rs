@@ -105,6 +105,7 @@ fn deploy_testbed(nodes: u16) -> Result<Vec<JoinHandle<()>>, Box<dyn std::error:
 
     // Print the committee file.
     let epoch = 1;
+    let shard_num = 4;
     let mempool_committee = MempoolCommittee::new(
         keys.iter()
             .enumerate()
@@ -129,6 +130,7 @@ fn deploy_testbed(nodes: u16) -> Result<Vec<JoinHandle<()>>, Box<dyn std::error:
             })
             .collect(),
         epoch,
+        shard_num,
     );
     let committee_file = "committee.json";
     let _ = fs::remove_file(committee_file);

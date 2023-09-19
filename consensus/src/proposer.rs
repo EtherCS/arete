@@ -10,6 +10,7 @@ use network::{CancelHandler, ReliableSender};
 use types::{CBlock, CBlockMeta};
 use std::collections::HashMap;
 use tokio::sync::mpsc::{Receiver, Sender};
+use std::convert::TryFrom;
 
 #[derive(Debug)]
 pub enum ProposerMessage {
@@ -63,6 +64,14 @@ impl Proposer {
     async fn waiter(wait_for: CancelHandler, deliver: Stake) -> Stake {
         let _ = wait_for.await;
         deliver
+    }
+
+    /// Detect if can start order
+    fn is_ready(&self) -> bool {
+        if self.shard_rounds.len() == usize::try_from(self.committee.shard_num).unwrap() {
+            return true
+        }
+        false
     }
 
     async fn make_block(&mut self, round: Round, qc: QC, tc: Option<TC>) {
@@ -158,12 +167,20 @@ impl Proposer {
                 // Receive a proposer message, becoming the leader of this round
                 // Check if receiving at least CBlock from every execution shard
                 Some(message) = self.rx_message.recv() => match message {
-                    ProposerMessage::Make(round, qc, tc) => self.make_block(round, qc, tc).await,
+                    ProposerMessage::Make(round, qc, tc) => { 
+                        if self.is_ready() {
+                            self.make_block(round, qc, tc).await;
+                        } else {
+                            debug!("Not ready for consensus");
+                        }
+                        
+                    },
                     ProposerMessage::Cleanup(_cbmetas) => {
-                        // for x in &cbmetas {
-                        //     self.shard_rounds.remove(x);
-                        // }
-                        self.shard_rounds.clear();
+                        for x in &_cbmetas {
+                            self.shard_rounds.remove(&x.shard_id);
+                        }
+                        debug!("Clean shard CBlockMeta");
+                        // self.shard_rounds.clear();
                     }
                 }
             }
