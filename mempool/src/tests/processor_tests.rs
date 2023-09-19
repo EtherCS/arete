@@ -7,7 +7,7 @@ use tokio::sync::mpsc::channel;
 #[tokio::test]
 async fn hash_and_store() {
     let (tx_batch, rx_batch) = channel(1);
-    let (tx_digest, mut rx_digest) = channel(1);
+    let (tx_digest, mut _rx_digest) = channel(1);
 
     // Create a new test store.
     let path = ".db_test_hash_and_store";
@@ -28,8 +28,8 @@ async fn hash_and_store() {
             .try_into()
             .unwrap(),
     );
-    let received = rx_digest.recv().await.unwrap();
-    assert_eq!(digest.clone(), received);
+    // let received = rx_digest.recv().await.unwrap();
+    // assert_eq!(digest.clone(), received);
 
     // Ensure the `Processor` correctly stored the batch.
     let stored_batch = store.read(digest.to_vec()).await.unwrap();

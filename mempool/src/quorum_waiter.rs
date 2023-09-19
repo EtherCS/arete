@@ -77,6 +77,7 @@ impl QuorumWaiter {
         // while let Some(QuorumWaiterMessage { batch, handlers }) = self.rx_message.recv().await {
         loop {
             tokio::select! {
+                // Receive batch (Vec<Transaction>) from batch_maker
                 Some(QuorumWaiterMessage { batch, handlers }) = self.rx_message.recv() => {
                     let mut wait_for_quorum: FuturesUnordered<_> = handlers
                         .into_iter()

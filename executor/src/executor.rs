@@ -1,6 +1,6 @@
 use crate::config::Export as _;
 use crate::config::{Committee, ConfigError, Parameters, Secret};
-use certify::{EBlock, Consensus, CBlock};
+use certify::{EBlock, Consensus};
 use crypto::SignatureService;
 use log::{debug, info};
 use execpool::Mempool;
@@ -9,7 +9,7 @@ use std::net::{SocketAddr, IpAddr, Ipv4Addr};
 use tokio::sync::mpsc::{channel, Receiver};
 use anyhow::Result;
 use network::SimpleSender;
-// use types::ConfirmMessage;
+use types::CBlock;
 
 /// The default channel capacity for this module.
 pub const CHANNEL_CAPACITY: usize = 1_000;
