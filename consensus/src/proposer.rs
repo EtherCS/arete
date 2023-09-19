@@ -7,6 +7,7 @@ use futures::stream::futures_unordered::FuturesUnordered;
 use futures::stream::StreamExt as _;
 use log::{debug, info};
 use network::{CancelHandler, ReliableSender};
+use types::CBlock;
 use std::collections::HashSet;
 use tokio::sync::mpsc::{Receiver, Sender};
 
@@ -20,7 +21,8 @@ pub struct Proposer {
     name: PublicKey,
     committee: Committee,
     signature_service: SignatureService,
-    rx_mempool: Receiver<Digest>,
+    // rx_mempool: Receiver<Digest>,
+    rx_cblock: Receiver<CBlock>,
     rx_message: Receiver<ProposerMessage>,
     tx_loopback: Sender<OBlock>,
     buffer: HashSet<Digest>,
@@ -32,7 +34,8 @@ impl Proposer {
         name: PublicKey,
         committee: Committee,
         signature_service: SignatureService,
-        rx_mempool: Receiver<Digest>,
+        // rx_mempool: Receiver<Digest>,
+        rx_cblock: Receiver<CBlock>,
         rx_message: Receiver<ProposerMessage>,
         tx_loopback: Sender<OBlock>,
     ) {
@@ -41,7 +44,7 @@ impl Proposer {
                 name,
                 committee,
                 signature_service,
-                rx_mempool,
+                rx_cblock,
                 rx_message,
                 tx_loopback,
                 buffer: HashSet::new(),
@@ -124,11 +127,19 @@ impl Proposer {
     async fn run(&mut self) {
         loop {
             tokio::select! {
-                Some(digest) = self.rx_mempool.recv() => {
-                    //if self.buffer.len() < 155 {
-                        self.buffer.insert(digest);
-                    //}
+                // Some(digest) = self.rx_mempool.recv() => {
+                //     //if self.buffer.len() < 155 {
+                //         self.buffer.insert(digest);
+                //     //}
+                // },
+
+                // Update its local Map[shard_id, if_receive_CBlock]
+                Some(cblock) = self.rx_cblock.recv() => {
+                    // TODO: update map
+                    debug!("Consensus proposer receive CBlock {:?}", cblock);
                 },
+                // Receive a proposer message, becoming the leader of this round
+                // Check if receiving at least CBlock from every execution shard
                 Some(message) = self.rx_message.recv() => match message {
                     ProposerMessage::Make(round, qc, tc) => self.make_block(round, qc, tc).await,
                     ProposerMessage::Cleanup(digests) => {

@@ -18,6 +18,7 @@ use serde::{Deserialize, Serialize};
 use std::error::Error;
 use store::Store;
 use tokio::sync::mpsc::{channel, Receiver, Sender};
+use types::CBlock;
 
 #[cfg(test)]
 #[path = "tests/consensus_tests.rs"]
@@ -48,7 +49,8 @@ impl Consensus {
         parameters: Parameters,
         signature_service: SignatureService,
         store: Store,
-        rx_mempool: Receiver<Digest>,
+        // rx_mempool: Receiver<Digest>,
+        rx_cblock: Receiver<CBlock>,
         tx_mempool: Sender<ConsensusMempoolMessage>,
         tx_commit: Sender<OBlock>,
     ) {
@@ -114,7 +116,7 @@ impl Consensus {
             name,
             committee.clone(),
             signature_service,
-            rx_mempool,
+            rx_cblock,
             /* rx_message */ rx_proposer,
             tx_loopback,
         );

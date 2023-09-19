@@ -9,27 +9,29 @@ use ed25519_dalek::{Digest as _, Sha512};
 #[cfg(feature = "benchmark")]
 use log::info;
 use network::ReliableSender;
+use types::CBlock;
 #[cfg(feature = "benchmark")]
 use std::convert::TryInto as _;
 use std::net::SocketAddr;
 use tokio::sync::mpsc::{Receiver, Sender};
-use tokio::time::{sleep, Duration, Instant};
+use tokio::time::{sleep, Duration};
 
 #[cfg(test)]
 #[path = "tests/batch_maker_tests.rs"]
 pub mod batch_maker_tests;
 
 pub type Transaction = Vec<u8>;
-pub type Batch = Vec<Transaction>;
+pub type Batch = Vec<Transaction>;  
 
 /// Assemble clients transactions into batches.
 pub struct BatchMaker {
     /// The preferred batch size (in bytes).
-    batch_size: usize,
+    _batch_size: usize,
     /// The maximum delay after which to seal the batch (in ms).
     max_batch_delay: u64,
-    /// Channel to receive transactions from the network.
-    rx_transaction: Receiver<Transaction>,
+    /// Channel to receive transactions (cblock) from the network.
+    // rx_transaction: Receiver<Transaction>,
+    rx_transaction: Receiver<CBlock>,
     /// Output channel to deliver sealed batches to the `QuorumWaiter`.
     tx_message: Sender<QuorumWaiterMessage>,
     /// The network addresses of the other mempools.
@@ -44,20 +46,20 @@ pub struct BatchMaker {
 
 impl BatchMaker {
     pub fn spawn(
-        batch_size: usize,
+        _batch_size: usize,
         max_batch_delay: u64,
-        rx_transaction: Receiver<Transaction>,
+        rx_transaction: Receiver<CBlock>,
         tx_message: Sender<QuorumWaiterMessage>,
         mempool_addresses: Vec<(PublicKey, SocketAddr)>,
     ) {
         tokio::spawn(async move {
             Self {
-                batch_size,
+                _batch_size,
                 max_batch_delay,
                 rx_transaction,
                 tx_message,
                 mempool_addresses,
-                current_batch: Batch::with_capacity(batch_size * 2),
+                current_batch: Batch::with_capacity(_batch_size * 2),
                 current_batch_size: 0,
                 network: ReliableSender::new(),
             }
@@ -67,29 +69,38 @@ impl BatchMaker {
     }
 
     /// Main loop receiving incoming transactions and creating batches.
+    /// TODO: replace batch with certificate block hash
     async fn run(&mut self) {
-        let timer = sleep(Duration::from_millis(self.max_batch_delay));
-        tokio::pin!(timer);
+        let _timer = sleep(Duration::from_millis(self.max_batch_delay));
+        tokio::pin!(_timer);
 
         loop {
             tokio::select! {
-                // Assemble client transactions into batches of preset size.
+                // Receive transaction (CBlock).
                 Some(transaction) = self.rx_transaction.recv() => {
-                    self.current_batch_size += transaction.len();
-                    self.current_batch.push(transaction);
-                    if self.current_batch_size >= self.batch_size {
-                        self.seal().await;
-                        timer.as_mut().reset(Instant::now() + Duration::from_millis(self.max_batch_delay));
-                    }
+                    // Broadcast to other peers and send it to consensus for further processing 
+                    #[cfg(feature = "benchmark")]
+                    info!("Successfully receive cblock");
+                    let serialize_cblock = bincode::serialize(&transaction)
+                        .expect("Fail to serialize transaction");
+                    self.current_batch.push(serialize_cblock);
+                    self.seal().await;
+
+                    // self.current_batch_size += transaction.len();
+                    // self.current_batch.push(transaction);
+                    // if self.current_batch_size >= self.batch_size {
+                    //     self.seal().await;
+                    //     timer.as_mut().reset(Instant::now() + Duration::from_millis(self.max_batch_delay));
+                    // }
                 },
 
                 // If the timer triggers, seal the batch even if it contains few transactions.
-                () = &mut timer => {
-                    if !self.current_batch.is_empty() {
-                        self.seal().await;
-                    }
-                    timer.as_mut().reset(Instant::now() + Duration::from_millis(self.max_batch_delay));
-                }
+                // () = &mut timer => {
+                //     if !self.current_batch.is_empty() {
+                //         self.seal().await;
+                //     }
+                //     timer.as_mut().reset(Instant::now() + Duration::from_millis(self.max_batch_delay));
+                // }
             }
 
             // Give the change to schedule other tasks.
@@ -114,7 +125,12 @@ impl BatchMaker {
         // Serialize the batch.
         self.current_batch_size = 0;
         let batch: Vec<_> = self.current_batch.drain(..).collect();
-        let message = MempoolMessage::Batch(batch);
+        // ARETE: replace 'batch' with 'Transaction'
+        // Only send the first transaction of the batch
+        let tx = batch[0].clone();
+        let cblock: CBlock = bincode::deserialize(&tx)
+            .expect("fail to deserialize the CBlock");
+        let message = MempoolMessage::CBlock(cblock);
         let serialized = bincode::serialize(&message).expect("Failed to serialize our own batch");
 
         #[cfg(feature = "benchmark")]
@@ -140,6 +156,7 @@ impl BatchMaker {
         }
 
         // Broadcast the batch through the network.
+        // A batch is a Vec<Transaction>
         let (names, addresses): (Vec<_>, _) = self.mempool_addresses.iter().cloned().unzip();
         let bytes = Bytes::from(serialized.clone());
         let handlers = self.network.broadcast(addresses, bytes).await;
