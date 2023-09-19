@@ -54,7 +54,7 @@ impl Consensus {
         rx_mempool: Receiver<Digest>,   // receive channel from mempool
         tx_mempool: Sender<ConsensusMempoolMessage>,
         tx_commit: Sender<EBlock>,
-        rx_confim: Receiver<ConfirmMessage>,
+        rx_confirm: Receiver<ConfirmMessage>,
     ) {
         // NOTE: This log entry is used to compute performance.
         parameters.log();
@@ -127,7 +127,7 @@ impl Consensus {
         ConfirmExecutor::spawn(
             name, 
             committee.clone(), 
-            rx_confim, 
+            rx_confirm, 
         );
 
         // Spawn the helper module.

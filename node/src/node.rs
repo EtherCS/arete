@@ -1,12 +1,13 @@
 use crate::config::Export as _;
 use crate::config::{Committee, ConfigError, Parameters, Secret};
 use consensus::{OBlock, Consensus};
-use crypto::{Hash, SignatureService};
+use crypto::SignatureService;
 use log::{info, debug};
 use mempool::Mempool;
 use store::Store;
 use tokio::sync::mpsc::{channel, Receiver};
 use types::ConfirmMessage;
+use std::collections::HashMap;
 use std::net::{SocketAddr, IpAddr, Ipv4Addr};
 use network::SimpleSender;
 
@@ -80,21 +81,28 @@ impl Node {
     pub async fn analyze_block(&mut self) {
         let mut sender = SimpleSender::new();
         // TODO replace confirm_addr
-        let confirm_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 10011);
+        let confirm_addr1 = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 10011);
+        let confirm_addr2 = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 10111);
+        let mut confirm_addr: HashMap<u32, SocketAddr> = HashMap::new();
+        confirm_addr.insert(0, confirm_addr1);
+        confirm_addr.insert(1, confirm_addr2);
         while let Some(_block) = self.commit.recv().await {
             // TODO: send this msg to each shard with a specific shard_id
-            let confim_msg = ConfirmMessage::new(
-                0,
-                _block.digest(), 
-                _block.round, 
-                _block.get_digests(), 
-                _block.signature.clone()).await;
-
-            let message = bincode::serialize(&confim_msg.clone())
-                .expect("fail to serialize the ConfirmMessage");
-            sender.send(confirm_addr, Into::into(message)).await;
-
-            debug!("send a confirm message {:?} to the execution shard", confim_msg.clone());
+            for i in _block.payload.clone() {
+                let confim_msg = ConfirmMessage::new(
+                    i.shard_id,
+                    i.hash, 
+                    _block.round, 
+                    _block.get_digests(), 
+                    _block.signature.clone()).await;
+    
+                let message = bincode::serialize(&confim_msg.clone())
+                    .expect("fail to serialize the ConfirmMessage");
+                sender.send(confirm_addr.get(&i.shard_id).copied().unwrap_or(confirm_addr1), Into::into(message)).await;
+    
+                debug!("send a confirm message {:?} to the execution shard {}", confim_msg.clone(), i.shard_id);
+            }
+            
             info!("Executor commits block {:?} successfully", _block); // {:?} means: display based on the Debug function
         }
     }
