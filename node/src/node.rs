@@ -103,7 +103,7 @@ impl Node {
                 debug!("send a confirm message {:?} to the execution shard {}", confim_msg.clone(), i.shard_id);
             }
             
-            info!("Executor commits block {:?} successfully", _block); // {:?} means: display based on the Debug function
+            info!("Node commits block {:?} successfully", _block); // {:?} means: display based on the Debug function
         }
     }
 }
