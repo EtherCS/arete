@@ -10,7 +10,7 @@ pub type Round = u64;
 #[derive(Serialize, Deserialize, Default, Clone)]
 pub struct ConfirmMessage {
     pub shard_id: u32,  
-    pub block_hash: Digest,
+    pub block_hash: Digest, // Corresponding CBlock's hash
     pub round: u64,     // consensus round in the ordering shard
     pub payload: Vec<Digest>,   // new cross-shard transactions
     pub signature: Signature,
