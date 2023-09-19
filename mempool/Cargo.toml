@@ -18,6 +18,7 @@ crypto = { path = "../crypto" }
 store = { path = "../store" }
 network = { path = "../network" }
 certify = { path = "../certify" }
+types = { path = "../types"}
 
 [dev-dependencies]
 tokio-util = { version = "0.7.3", features= ["codec"] }
