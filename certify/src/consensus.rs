@@ -147,11 +147,21 @@ impl MessageHandler for ConsensusReceiverHandler {
     async fn dispatch(&self, writer: &mut Writer, serialized: Bytes) -> Result<(), Box<dyn Error>> {
         // Deserialize and parse the message.
         match bincode::deserialize(&serialized).map_err(ConsensusError::SerializationError)? {
+            // ConsensusMessage::ConfirmMsg(shard_id, )
             ConsensusMessage::SyncRequest(missing, origin) => self
                 .tx_helper
                 .send((missing, origin))
                 .await
                 .expect("Failed to send consensus message"),
+            message @ ConsensusMessage::ConfirmMsg(..) => {
+                // Reply with an ACK.
+                let _ = writer.send(Bytes::from("Ack")).await;
+                
+                self.tx_consensus
+                    .send(message)
+                    .await
+                    .expect("Failed to send confirm message to core")
+            }
             message @ ConsensusMessage::Propose(..) => {
                 // Reply with an ACK.
                 let _ = writer.send(Bytes::from("Ack")).await;
