@@ -1,13 +1,13 @@
-use crate::{config::ExecutionCommittee, consensus::ConsensusMessage};
+use crate::{config::ExecutionCommittee, consensus::ConsensusMessage, config::Stake};
 use bytes::Bytes;
 use crypto::PublicKey;
 use types::ConfirmMessage;
-use network::ReliableSender;
+use network::{CancelHandler, ReliableSender};
 use tokio::sync::mpsc::Receiver;
 use log::debug;
 use std::net::SocketAddr;
-// use futures::stream::futures_unordered::FuturesUnordered;
-// use futures::stream::StreamExt as _;
+use futures::stream::futures_unordered::FuturesUnordered;
+use futures::stream::StreamExt as _;
 
 
 pub struct ConfirmExecutor {
@@ -36,15 +36,15 @@ impl ConfirmExecutor {
     }
 
     /// Helper function. It waits for a future to complete and then delivers a value.
-    // async fn waiter(wait_for: CancelHandler, deliver: Stake) -> Stake {
-    //     let _ = wait_for.await;
-    //     deliver
-    // }
+    async fn waiter(wait_for: CancelHandler, deliver: Stake) -> Stake {
+        let _ = wait_for.await;
+        deliver
+    }
 
     /// Broadcast the confirmation message to other executors.
     async fn broadcast_confirm_msg(&mut self, confirm_msg: ConfirmMessage) {
         debug!("Broadcasting confirmation msg {:?}", confirm_msg);
-        let (_names, addresses): (Vec<_>, Vec<SocketAddr>) = self
+        let (names, addresses): (Vec<_>, Vec<SocketAddr>) = self
             .committee
             .broadcast_addresses(&self.name)
             .iter()
@@ -52,27 +52,27 @@ impl ConfirmExecutor {
             .unzip();
         let message = bincode::serialize(&ConsensusMessage::ConfirmMsg(confirm_msg.clone()))
             .expect("Failed to serialize confirmation latency");
-        let _handles = self
+        let handles = self
             .network
             .broadcast(addresses, Bytes::from(message))
             .await;
         // TODO: Control system: Wait for f+1 nodes to acknowledge our confirmation message before continuing.
-        // let mut wait_for_quorum: FuturesUnordered<_> = names
-        //     .into_iter()
-        //     .zip(handles.into_iter())
-        //     .map(|(name, handler)| {
-        //         let stake = self.committee.stake(&name);
-        //         Self::waiter(handler, stake)
-        //     })
-        //     .collect();
+        let mut wait_for_quorum: FuturesUnordered<_> = names
+            .into_iter()
+            .zip(handles.into_iter())
+            .map(|(name, handler)| {
+                let stake = self.committee.stake(&name);
+                Self::waiter(handler, stake)
+            })
+            .collect();
 
-        // let mut total_stake = self.committee.stake(&self.name);
-        // while let Some(stake) = wait_for_quorum.next().await {
-        //     total_stake += stake;
-        //     if total_stake >= self.committee.quorum_threshold() {
-        //         break;
-        //     }
-        // }
+        let mut total_stake = self.committee.stake(&self.name);
+        while let Some(stake) = wait_for_quorum.next().await {
+            total_stake += stake;
+            if total_stake >= self.committee.quorum_threshold() {
+                break;
+            }
+        }
     }
 
     async fn run(&mut self) {
