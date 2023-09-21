@@ -41,6 +41,7 @@ fn spawn_nodes(
                     name,
                     committee,
                     parameters,
+                    ShardInfo::default(),
                     signature_service,
                     store,
                     rx_mempool_to_consensus,

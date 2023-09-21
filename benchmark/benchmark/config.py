@@ -32,17 +32,17 @@ class Committee:
 
         self.json = {
             'shard': self._build_shard_info(shardNum, shardId),
-            'consensus': self._build_consensus(shardNum),
+            'consensus': self._build_consensus(),
             'mempool': self._build_mempool()
         }
     def _build_shard_info(self, _shardNum, _shardId):
         return {'number': _shardNum, 'id': _shardId}
     
-    def _build_consensus(self, _shardNum):
+    def _build_consensus(self):
         node = {}
         for a, n in zip(self.consensus, self.names):
             node[n] = {'name': n, 'stake': 1, 'address': a}
-        return {'authorities': node, 'epoch': 1, 'shard_num': _shardNum}
+        return {'authorities': node, 'epoch': 1}
 
     def _build_mempool(self):
         node = {}

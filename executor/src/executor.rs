@@ -16,7 +16,7 @@ pub const CHANNEL_CAPACITY: usize = 1_000;
 
 // Executor is the replica in the ordering shard
 pub struct Executor {
-    pub commit: Receiver<EBlock>,   // TODO: replace tx_commit with rx_processor
+    pub commit: Receiver<EBlock>,  
     pub ordering_addr: SocketAddr,
     pub shard_id: u32,
     // pub certificate_send: Framed<TcpStream, LengthDelimitedCodec>
@@ -76,6 +76,7 @@ impl Executor {
             name,
             committee.consensus,
             parameters.consensus,
+            committee.shard,
             signature_service,
             store,
             rx_mempool_to_consensus,

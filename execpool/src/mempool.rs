@@ -260,7 +260,7 @@ impl MessageHandler for ConfirmationMsgReceiverHandler {
         #[cfg(feature = "benchmark")] 
         {
             info!("executor receives confirm msg {:?}", confirm_msg);
-            info!("ARETE commit anchor block for execution round {}", confirm_msg.round);
+            info!("ARETE shard {} commit anchor block for execution round {}", confirm_msg.shard_id, confirm_msg.round);
         }
         // Give the change to schedule other tasks.
         tokio::task::yield_now().await;

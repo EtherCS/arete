@@ -6,7 +6,7 @@ use log::{info, debug};
 use mempool::Mempool;
 use store::Store;
 use tokio::sync::mpsc::{channel, Receiver};
-use types::ConfirmMessage;
+use types::{ConfirmMessage, ShardInfo};
 use std::collections::HashMap;
 use std::net::{SocketAddr, IpAddr, Ipv4Addr};
 use network::SimpleSender;
@@ -17,6 +17,7 @@ pub const CHANNEL_CAPACITY: usize = 1_000;
 // Node is the replica in the ordering shard
 pub struct Node {
     pub commit: Receiver<OBlock>,
+    pub shard_info: ShardInfo,
 }
 
 impl Node {
@@ -63,6 +64,7 @@ impl Node {
             name,
             committee.consensus,
             parameters.consensus,
+            committee.shard.clone(),
             signature_service,
             store,
             rx_mempool_to_consensus,
@@ -71,7 +73,7 @@ impl Node {
         );
 
         info!("Node {} successfully booted", name);
-        Ok(Self { commit: rx_commit })
+        Ok(Self { commit: rx_commit, shard_info: committee.shard })
     }
 
     pub fn print_key_file(filename: &str) -> Result<(), ConfigError> {
@@ -80,14 +82,13 @@ impl Node {
 
     pub async fn analyze_block(&mut self) {
         let mut sender = SimpleSender::new();
-        // TODO replace confirm_addr
+        // ARETE TODO replace confirm_addr
         let confirm_addr1 = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 10011);
         let confirm_addr2 = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 10111);
         let mut confirm_addr: HashMap<u32, SocketAddr> = HashMap::new();
         confirm_addr.insert(0, confirm_addr1);
         confirm_addr.insert(1, confirm_addr2);
         while let Some(_block) = self.commit.recv().await {
-            // TODO: send this msg to each shard with a specific shard_id
             for i in _block.payload.clone() {
                 let confim_msg = ConfirmMessage::new(
                     i.shard_id,

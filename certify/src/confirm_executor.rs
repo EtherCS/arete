@@ -56,7 +56,6 @@ impl ConfirmExecutor {
             .network
             .broadcast(addresses, Bytes::from(message))
             .await;
-        // TODO: Control system: Wait for f+1 nodes to acknowledge our confirmation message before continuing.
         let mut wait_for_quorum: FuturesUnordered<_> = names
             .into_iter()
             .zip(handles.into_iter())

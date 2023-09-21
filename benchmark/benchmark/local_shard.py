@@ -13,6 +13,7 @@ class LocalBenchShard:
     BASE_NODE_PORT = 9000   # for the ordering shard
     BASE_SHARD_PORT = 10000 # for the execution shard
     SHARD_ID = 0
+    ORDERING_SHARD_ID = 10000
 
     # def __init__(self, bench_parameters_dict, node_parameters_dict):
     #     try:
@@ -89,7 +90,7 @@ class LocalBenchShard:
                 subprocess.run(cmd, check=True)
                 node_keys += [Key.from_file(node_filename)]
             node_names = [x.name for x in node_keys]
-            ordering_committee = LocalCommittee(node_names, self._get_node_port(), shardNum, -1)
+            ordering_committee = LocalCommittee(node_names, self._get_node_port(), shardNum, self.ORDERING_SHARD_ID)
             ordering_committee.print(PathMaker.committee_file())
 
             self.node_parameters.print(PathMaker.parameters_file())            
@@ -137,6 +138,7 @@ class LocalBenchShard:
                         addr,
                         self.tx_size,
                         rate_share,
+                        shardId,
                         timeout,
                         #nodes=addresses
                     )

@@ -19,6 +19,7 @@ use tokio_util::codec::{Framed, LengthDelimitedCodec};
     about,
     long_about = "Benchmark client for HotStuff nodes."
 )]
+
 struct Cli {
     /// The network address of the node where to send txs.
     #[clap(value_parser, value_name = "ADDR")]
@@ -32,6 +33,9 @@ struct Cli {
     /// The rate (txs/s) at which to send the transactions.
     #[clap(short, long, value_parser, value_name = "INT")]
     rate: u64,
+    /// The start transaction id.
+    #[clap(short, long, value_parser, value_name = "INT")]
+    shard: u64,
     /// Network addresses that must be reachable before starting the benchmark.
     #[clap(short, long, value_parser, value_name = "[Addr]", multiple = true)]
     nodes: Vec<SocketAddr>,
@@ -52,6 +56,7 @@ async fn main() -> Result<()> {
         target: cli.target,
         size: cli.size,
         rate: cli.rate,
+        shard: cli.shard,
         timeout: cli.timeout,
         nodes: cli.nodes,
     };
@@ -67,6 +72,7 @@ struct Client {
     target: SocketAddr,
     size: usize,
     rate: u64,
+    shard: u64,  // used for differentiating shards, then for log parse
     timeout: u64,
     nodes: Vec<SocketAddr>,
 }
@@ -75,6 +81,7 @@ impl Client {
     pub async fn send(&self) -> Result<()> {
         const PRECISION: u64 = 20; // Sample precision.
         const BURST_DURATION: u64 = 1000 / PRECISION;
+        let start_tx_id: u64 = 1000 * self.shard;
 
         // The transaction size must be at least 16 bytes to ensure all txs are different.
         if self.size < 16 {
@@ -89,8 +96,10 @@ impl Client {
             .context(format!("failed to connect to {}", self.target))?;
 
         // Submit all transactions.
+        // let burst = self.rate / PRECISION;
         let burst = self.rate / PRECISION;
         let mut tx = BytesMut::with_capacity(self.size);
+        // let mut counter = 0;
         let mut counter = 0;
         let mut r = rand::thread_rng().gen();
         let mut transport = Framed::new(stream, LengthDelimitedCodec::new());
@@ -104,13 +113,14 @@ impl Client {
             interval.as_mut().tick().await;
             let now = Instant::now();
 
+            // for x in 0..burst {
             for x in 0..burst {
                 if x == counter % burst {
                     // NOTE: This log entry is used to compute performance.
-                    info!("Sending sample transaction {}", counter);
+                    info!("Sending sample transaction {}", counter+start_tx_id);
 
                     tx.put_u8(0u8); // Sample txs start with 0.
-                    tx.put_u64(counter); // This counter identifies the tx.
+                    tx.put_u64(counter+start_tx_id); // This counter identifies the tx.
                 } else {
                     r += 1;
 

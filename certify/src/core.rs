@@ -18,7 +18,7 @@ use std::cmp::max;
 use std::collections::VecDeque;
 use store::Store;
 use tokio::sync::mpsc::{Receiver, Sender};
-use types::ConfirmMessage;
+use types::{ConfirmMessage, ShardInfo};
 
 #[cfg(test)]
 #[path = "tests/core_tests.rs"]
@@ -27,6 +27,7 @@ pub mod core_tests;
 pub struct Core {
     name: PublicKey,
     committee: ExecutionCommittee,
+    shard_info: ShardInfo,
     store: Store,
     signature_service: SignatureService,
     leader_elector: LeaderElector,
@@ -50,6 +51,7 @@ impl Core {
     pub fn spawn(
         name: PublicKey,
         committee: ExecutionCommittee,
+        shard_info: ShardInfo,
         signature_service: SignatureService,
         store: Store,
         leader_elector: LeaderElector,
@@ -65,6 +67,7 @@ impl Core {
             Self {
                 name,
                 committee: committee.clone(),
+                shard_info: shard_info.clone(),
                 signature_service,
                 store,
                 leader_elector,
@@ -138,6 +141,9 @@ impl Core {
         // Save the last committed block.
         self.last_committed_round = block.round;
 
+        // Get shard id
+        let _s_id = self.shard_info.id;
+
         // Send all the newly committed blocks to the node's application layer.
         while let Some(block) = to_commit.pop_back() {
             if !block.payload.is_empty() {
@@ -148,7 +154,7 @@ impl Core {
                     for x in &block.payload {
                         // NOTE: This log entry is used to compute performance.
                         info!("Committed {} -> {:?}", block, x);
-                        info!("ARETE Committed {} -> {:?} in round {}", block, x, b_round);
+                        info!("ARETE shard {} Committed {} -> {:?} in round {}", _s_id, block, x, b_round);
                     }
                 }
             }
@@ -414,10 +420,9 @@ impl Core {
     }
 
     async fn handle_confirmation_message(&mut self, confirm_msg: ConfirmMessage) -> ConsensusResult<()> {
-        // ARETE TODO: 1) print round for calculating performance; 2) update valid round
         #[cfg(feature = "benchmark")] 
         // {
-        info!("ARETE commit anchor block for execution round {}", confirm_msg.round);
+        info!("ARETE shard {} commit anchor block for execution round {}", confirm_msg.shard_id, confirm_msg.round);
         // }
         debug!("receive a confirm message from peer {:?}", confirm_msg);
         Ok(())

@@ -4,29 +4,6 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::net::SocketAddr;
 
-#[derive(Clone, Deserialize, Serialize)]
-pub struct ShardInfo {
-    pub id: u32,
-    pub number: u32,
-}
-
-impl Default for ShardInfo {
-    fn default() -> Self {
-        Self {
-            id: 0,
-            number: 1,
-        }
-    }
-}
-
-impl ShardInfo {
-    pub fn log(&self) {
-        // NOTE: These log entries are used to compute performance.
-        info!("Shard id is {}", self.id);
-        info!("Shard number is {}", self.number);
-    }
-}
-
 #[derive(Deserialize, Serialize)]
 pub struct CertifyParameters {
     /// The depth of the garbage collection (Denominated in number of rounds).

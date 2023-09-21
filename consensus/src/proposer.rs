@@ -7,7 +7,7 @@ use futures::stream::futures_unordered::FuturesUnordered;
 use futures::stream::StreamExt as _;
 use log::{debug, info};
 use network::{CancelHandler, ReliableSender};
-use types::{CBlock, CBlockMeta};
+use types::{CBlock, CBlockMeta, ShardInfo};
 use std::collections::HashMap;
 use tokio::sync::mpsc::{Receiver, Sender};
 // use std::convert::TryFrom;
@@ -22,6 +22,7 @@ pub enum ProposerMessage {
 pub struct Proposer {
     name: PublicKey,
     committee: Committee,
+    shard_info: ShardInfo,
     signature_service: SignatureService,
     // rx_mempool: Receiver<Digest>,
     rx_cblock: Receiver<CBlock>,
@@ -37,6 +38,7 @@ impl Proposer {
     pub fn spawn(
         name: PublicKey,
         committee: Committee,
+        shard_info: ShardInfo,
         signature_service: SignatureService,
         // rx_mempool: Receiver<Digest>,
         rx_cblock: Receiver<CBlock>,
@@ -47,6 +49,7 @@ impl Proposer {
             Self {
                 name,
                 committee,
+                shard_info,
                 signature_service,
                 rx_cblock,
                 rx_message,
@@ -141,12 +144,12 @@ impl Proposer {
     }
 
     async fn run(&mut self) {
+        debug!("Shard information is: id {}, shard amount {}", self.shard_info.id, self.shard_info.number);
         loop {
             tokio::select! {                
                 // ARETE: here, every node receive the transaction (CBlock) due to mempool's broadcast
                 // Update its local Map[shard_id, if_receive_CBlock]
                 Some(cblock) = self.rx_cblock.recv() => {
-                    // TODO: update map
                     debug!("Consensus proposer receive CBlock {:?}", cblock);
                     if !self.max_shard_rounds.contains_key(&cblock.shard_id)
                     || self.max_shard_rounds.get(&cblock.shard_id).copied().unwrap_or(0) < cblock.round {
