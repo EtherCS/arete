@@ -10,7 +10,7 @@ use network::{CancelHandler, ReliableSender};
 use types::{CBlock, CBlockMeta};
 use std::collections::HashMap;
 use tokio::sync::mpsc::{Receiver, Sender};
-use std::convert::TryFrom;
+// use std::convert::TryFrom;
 
 #[derive(Debug)]
 pub enum ProposerMessage {
@@ -67,11 +67,14 @@ impl Proposer {
     }
 
     /// Detect if can start order
-    fn is_ready(&self) -> bool {
-        if self.shard_rounds.len() == usize::try_from(self.committee.shard_num).unwrap() {
-            return true
-        }
-        false
+    async fn is_ready(&mut self, round: Round, qc: QC, tc: Option<TC>) {
+        // let shard_num = usize::try_from(self.committee.shard_num).unwrap();
+        // while !(self.shard_rounds.len() == shard_num)
+        // && !(self.max_shard_rounds.len() < shard_num) {
+        //     // wait for create block
+        // }
+        self.make_block(round, qc.clone(), tc.clone()).await;
+        debug!("Start making a block");
     }
 
     async fn make_block(&mut self, round: Round, qc: QC, tc: Option<TC>) {
@@ -139,13 +142,7 @@ impl Proposer {
 
     async fn run(&mut self) {
         loop {
-            tokio::select! {
-                // Some(digest) = self.rx_mempool.recv() => {
-                //     //if self.buffer.len() < 155 {
-                //         self.buffer.insert(digest);
-                //     //}
-                // },
-                
+            tokio::select! {                
                 // ARETE: here, every node receive the transaction (CBlock) due to mempool's broadcast
                 // Update its local Map[shard_id, if_receive_CBlock]
                 Some(cblock) = self.rx_cblock.recv() => {
@@ -168,12 +165,7 @@ impl Proposer {
                 // Check if receiving at least CBlock from every execution shard
                 Some(message) = self.rx_message.recv() => match message {
                     ProposerMessage::Make(round, qc, tc) => { 
-                        if self.is_ready() {
-                            self.make_block(round, qc, tc).await;
-                        } else {
-                            debug!("Not ready for consensus");
-                        }
-                        
+                        self.is_ready(round, qc, tc).await;
                     },
                     ProposerMessage::Cleanup(_cbmetas) => {
                         for x in &_cbmetas {

@@ -257,8 +257,11 @@ impl MessageHandler for ConfirmationMsgReceiverHandler {
             .send(confirm_msg.clone())
             .await
             .expect("Failed to send confirmation message");
-
-        info!("executor receives confirm msg {:?}", confirm_msg);
+        #[cfg(feature = "benchmark")] 
+        {
+            info!("executor receives confirm msg {:?}", confirm_msg);
+            info!("ARETE commit anchor block for execution round {}", confirm_msg.round);
+        }
         // Give the change to schedule other tasks.
         tokio::task::yield_now().await;
         Ok(())
