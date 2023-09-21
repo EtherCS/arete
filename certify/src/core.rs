@@ -143,10 +143,13 @@ impl Core {
             if !block.payload.is_empty() {
                 info!("Committed {}", block);
 
-                #[cfg(feature = "benchmark")]
-                for x in &block.payload {
-                    // NOTE: This log entry is used to compute performance.
-                    info!("Committed {} -> {:?}", block, x);
+                #[cfg(feature = "benchmark")] {
+                    let b_round = block.round;
+                    for x in &block.payload {
+                        // NOTE: This log entry is used to compute performance.
+                        info!("Committed {} -> {:?}", block, x);
+                        info!("ARETE Committed {} -> {:?} in round {}", block, x, b_round);
+                    }
                 }
             }
             debug!("Committed {:?}", block);
@@ -412,6 +415,10 @@ impl Core {
 
     async fn handle_confirmation_message(&mut self, confirm_msg: ConfirmMessage) -> ConsensusResult<()> {
         // ARETE TODO: 1) print round for calculating performance; 2) update valid round
+        #[cfg(feature = "benchmark")] 
+        // {
+        info!("ARETE commit anchor block for execution round {}", confirm_msg.round);
+        // }
         debug!("receive a confirm message from peer {:?}", confirm_msg);
         Ok(())
     }

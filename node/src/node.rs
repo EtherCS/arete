@@ -92,15 +92,17 @@ impl Node {
                 let confim_msg = ConfirmMessage::new(
                     i.shard_id,
                     i.hash, 
+                    i.round,    // corresponding execution shard's round
                     _block.round, 
                     _block.get_digests(), 
                     _block.signature.clone()).await;
     
                 let message = bincode::serialize(&confim_msg.clone())
                     .expect("fail to serialize the ConfirmMessage");
-                sender.send(confirm_addr.get(&i.shard_id).copied().unwrap_or(confirm_addr1), Into::into(message)).await;
-    
-                debug!("send a confirm message {:?} to the execution shard {}", confim_msg.clone(), i.shard_id);
+                if let Some(_addr) = confirm_addr.get(&i.shard_id).copied() {
+                    sender.send(_addr, Into::into(message)).await;
+                    debug!("send a confirm message {:?} to the execution shard {}", confim_msg.clone(), i.shard_id);
+                }
             }
             
             info!("Node commits block {:?} successfully", _block); // {:?} means: display based on the Debug function

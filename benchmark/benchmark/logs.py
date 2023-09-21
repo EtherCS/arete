@@ -291,10 +291,17 @@ class ShardLogParser:
                 results = p.map(self._parse_executors, executors)
         except (ValueError, IndexError) as e:
             raise ParseError(f'Failed to parse executor logs: {e}')
-        proposals, commits, sizes, self.received_samples, timeouts, self.configs, block_intervals \
+        proposals, commits, arete_commits_to_round, arete_rounds_to_timestamp, sizes, self.received_samples, timeouts, self.configs, block_intervals \
             = zip(*results)
         self.proposals = self._merge_results([x.items() for x in proposals])
         self.commits = self._merge_results([x.items() for x in commits])
+        # self.arete_commits_to_round -> dict{string: string}
+        self.arete_commits_to_round = self._get_dict_merge_arete_round_results([x.items() for x in arete_commits_to_round])
+        # self.arete_rounds_to_timestamp -> dict{int: string}
+        self.arete_rounds_to_timestamp = {} 
+        temp = self._merge_arete_commit_time_results([x.items() for x in arete_rounds_to_timestamp])
+        self._update_arete_commit_time_results(temp)
+        
         self.block_intervals = self._merge_results([x.items() for x in block_intervals])
         self.sizes = {
             k: v for x in sizes for k, v in x.items() if k in self.commits
@@ -320,7 +327,45 @@ class ShardLogParser:
                 if not k in merged or merged[k] > v:
                     merged[k] = v
         return merged
+    
+    # Get commits_to_round[batch_digest] = executed_batch_round
+    def _merge_arete_round_results(self, input):
+        # Keep the earliest timestamp.
+        merged = {}
+        for x in input:
+            for k, r, v in x:
+                if not k in merged or merged[k] > r:
+                    merged[k] = r
+        return merged
+    
+    # Get dict for _merge_arete_round_results
+    def _get_dict_merge_arete_round_results(self, input):
+        # Keep the earliest timestamp.
+        merged = {}
+        for x in input:
+            for k, r in x:
+                if not k in merged or merged[k] > r:
+                    merged[k] = r
+        return merged
+    
+    # Get arete_commits[executed_batch_round] = committed_timestamp
+    def _merge_arete_commit_time_results(self, input):
+        # Keep the earliest timestamp.
+        merged = {}
+        for x in input:
+            for k, v in x:
+                if not k in merged or merged[k] > v:
+                    merged[k] = v
+        return merged
 
+    # map 'all_execute_round' to 'committed timestamp'
+    def _update_arete_commit_time_results(self, input):
+        last_round = 0
+        for r, t in input.items():
+            for index in range(last_round, int(r)+1):
+                self.arete_rounds_to_timestamp[index] = t
+            last_round = int(r)+1
+            
     def _parse_clients(self, log):
         if search(r'Error', log) is not None:
             raise ParseError('Client(s) panicked')
@@ -354,6 +399,18 @@ class ShardLogParser:
         tmp = findall(r'\[(.*Z) .* Finish commit block B\d+ -> ([^ ]+=)', log)
         tmp = [(d, self._to_posix(t)) for t, d in tmp]
         block_intervals = self._merge_results([tmp])
+        
+        # batch_digest is picked by the ordering shard
+        # arete_commits_to_round[batch_digest] = executed_batch_round
+        tmp = findall(r'\[(.*Z) .* ARETE Committed B\d+ -> ([^ ]+=) in round (\d+)', log)
+        tmp = [(d, r, self._to_posix(t)) for t, d, r in tmp]
+        arete_commits_to_round = self._merge_arete_round_results([tmp])
+        
+        # [{executed_batch_round, committed_timestamp}]
+        # arete_rounds_to_timestamp[executed_batch_round] = committed_timestamp
+        tmp = findall(r'\[(.*Z) .* ARETE commit anchor block for execution round (\d+)', log)
+        tmp = [(r, self._to_posix(t)) for t, r in tmp]
+        arete_rounds_to_timestamp = self._merge_arete_commit_time_results([tmp])    # get map[batch_digest]=earliest_commit_timestamp
 
         tmp = findall(r'Batch ([^ ]+) contains (\d+) B', log)
         sizes = {d: int(s) for d, s in tmp}
@@ -394,7 +451,8 @@ class ShardLogParser:
             }
         }
 
-        return proposals, commits, sizes, samples, timeouts, configs, block_intervals
+        # return proposals, commits, sizes, samples, timeouts, configs, block_intervals
+        return proposals, commits, arete_commits_to_round, arete_rounds_to_timestamp, sizes, samples, timeouts, configs, block_intervals
 
     def _to_posix(self, string):
         x = datetime.fromisoformat(string.replace('Z', '+00:00'))
@@ -444,12 +502,27 @@ class ShardLogParser:
                     end = self.commits[batch_id]
                     latency += [end-start]
         return mean(latency) if latency else 0
+    
+    def _arete_end_to_end_latency(self):
+        latency = []
+        for sent, received in zip(self.sent_samples, self.received_samples):
+            for tx_id, batch_id in received.items():
+                if batch_id in self.arete_commits_to_round: # this batch is picked
+                    exec_round = self.arete_commits_to_round[batch_id] # its execution round
+                    int_exec_round = int(exec_round)
+                    if int_exec_round in self.arete_rounds_to_timestamp:  
+                        start = sent[tx_id]
+                        end = self.arete_rounds_to_timestamp[int_exec_round]    # commit timestamp
+                        latency += [end-start]
+        print("debug: latency is ", latency)
+        return mean(latency) if latency else 0
 
     def result(self):
         consensus_latency = self._consensus_latency() * 1000
         consensus_tps, consensus_bps, _ = self._consensus_throughput()
         end_to_end_tps, end_to_end_bps, duration = self._end_to_end_throughput()
         end_to_end_latency = self._end_to_end_latency() * 1000
+        arete_end_to_end_latency = self._arete_end_to_end_latency() * 1000
         block_interval = self._block_interval() * 1000
 
         consensus_timeout_delay = self.configs[0]['consensus']['certify_timeout_delay']
@@ -489,6 +562,7 @@ class ShardLogParser:
             f' End-to-end TPS: {round(end_to_end_tps):,} tx/s\n'
             f' End-to-end BPS: {round(end_to_end_bps):,} B/s\n'
             f' End-to-end latency: {round(end_to_end_latency):,} ms\n'
+            f' End-to-end arete latency: {round(arete_end_to_end_latency):,} ms\n'
             '\n'
             f' Block interval (TODO): {round(block_interval):,} ms\n'
             f' intra-shard latency (TODO): e2e latency + block_interval ms\n'

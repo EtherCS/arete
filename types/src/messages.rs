@@ -11,7 +11,8 @@ pub type Round = u64;
 pub struct ConfirmMessage {
     pub shard_id: u32,  
     pub block_hash: Digest, // Corresponding CBlock's hash
-    pub round: u64,     // consensus round in the ordering shard
+    pub round: u64,     // corresponding execution shard's round 
+    pub order_round: u64,    // consensus round in the ordering shard
     pub payload: Vec<Digest>,   // new cross-shard transactions
     pub signature: Signature,
 }
@@ -21,6 +22,7 @@ impl ConfirmMessage {
         shard_id: u32,
         block_hash: Digest,
         round: u64,
+        order_round:u64,
         payload: Vec<Digest>,
         signature: Signature,
     ) -> Self {
@@ -28,6 +30,7 @@ impl ConfirmMessage {
             shard_id,
             block_hash,
             round,
+            order_round,
             payload,
             signature,
         };
@@ -43,6 +46,7 @@ impl Hash for ConfirmMessage {
         let mut hasher = Sha512::new();
         hasher.update(&self.block_hash);
         hasher.update(self.round.to_le_bytes());
+        hasher.update(self.order_round.to_le_bytes());
         for x in &self.payload {
             hasher.update(x);
         }
