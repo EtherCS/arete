@@ -5,6 +5,7 @@ use rand::rngs::StdRng;
 use rand::SeedableRng as _;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
+use types::ShardInfo;
 use std::fs::{self, OpenOptions};
 use std::io::BufWriter;
 use std::io::Write as _;
@@ -82,6 +83,7 @@ impl Default for Secret {
 pub struct Committee {
     pub consensus: ConsensusCommittee,
     pub mempool: MempoolCommittee,
+    pub shard: ShardInfo,
 }
 
 impl Export for Committee {}

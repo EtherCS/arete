@@ -19,7 +19,7 @@ use serde::{Deserialize, Serialize};
 use std::error::Error;
 use store::Store;
 use tokio::sync::mpsc::{channel, Receiver, Sender};
-use types::ConfirmMessage;
+use types::{ConfirmMessage, ShardInfo};
 
 #[cfg(test)]
 #[path = "tests/consensus_tests.rs"]
@@ -49,6 +49,7 @@ impl Consensus {
         name: PublicKey,
         committee: ExecutionCommittee,
         parameters: CertifyParameters,
+        shard_info: ShardInfo,
         signature_service: SignatureService,
         store: Store,
         rx_mempool: Receiver<Digest>,   // receive channel from mempool
@@ -101,6 +102,7 @@ impl Consensus {
         Core::spawn(
             name,
             committee.clone(),
+            shard_info.clone(),
             signature_service.clone(),
             store.clone(),
             leader_elector,
@@ -156,7 +158,7 @@ impl MessageHandler for ConsensusReceiverHandler {
             message @ ConsensusMessage::ConfirmMsg(..) => {
                 // Reply with an ACK.
                 let _ = writer.send(Bytes::from("Ack")).await;
-                
+
                 self.tx_consensus
                     .send(message)
                     .await

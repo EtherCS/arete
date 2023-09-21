@@ -24,7 +24,7 @@ pub struct OBlock {
     // pub payload: Vec<Digest>,  
     pub payload: Vec<CBlockMeta>,   // replace Digest with CBlockMeta for consensus
     pub signature: Signature,
-    // Execution TODO: Aggregator[ctx_hash]=ok(),fail()
+    // TODO (Execution): Aggregator[ctx_hash]=ok(),fail()
 }
 
 impl OBlock {

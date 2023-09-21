@@ -80,7 +80,7 @@ pub struct CBlock {
     pub shard_id: u32, 
     pub author: PublicKey,
     pub round: Round,
-    pub payload: Vec<Digest>,   // TODO: map[ctx, succOrFail]
+    pub payload: Vec<Digest>,   // TODO (Execution): map[ctx, succOrFail]
     pub signature: Signature,
 }
 
@@ -191,5 +191,20 @@ impl fmt::Debug for CBlockMeta {
 impl fmt::Display for CBlockMeta {
     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         write!(f, "CBMeta (round {}, shard id {})", self.round, self.shard_id)
+    }
+}
+
+#[derive(Clone, Deserialize, Serialize)]
+pub struct ShardInfo {
+    pub id: u32,
+    pub number: u32,
+}
+
+impl Default for ShardInfo {
+    fn default() -> Self {
+        Self {
+            id: 0,
+            number: 1,
+        }
     }
 }

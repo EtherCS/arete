@@ -18,7 +18,7 @@ use serde::{Deserialize, Serialize};
 use std::error::Error;
 use store::Store;
 use tokio::sync::mpsc::{channel, Receiver, Sender};
-use types::CBlock;
+use types::{CBlock, ShardInfo};
 
 #[cfg(test)]
 #[path = "tests/consensus_tests.rs"]
@@ -47,6 +47,7 @@ impl Consensus {
         name: PublicKey,
         committee: Committee,
         parameters: Parameters,
+        shard_info: ShardInfo,
         signature_service: SignatureService,
         store: Store,
         // rx_mempool: Receiver<Digest>,
@@ -115,6 +116,7 @@ impl Consensus {
         Proposer::spawn(
             name,
             committee.clone(),
+            shard_info.clone(),
             signature_service,
             rx_cblock,
             /* rx_message */ rx_proposer,

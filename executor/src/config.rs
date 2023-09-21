@@ -1,6 +1,6 @@
 use certify::{ExecutionCommittee as ConsensusCommittee, CertifyParameters as ConsensusParameters};
 use crypto::{generate_keypair, generate_production_keypair, PublicKey, SecretKey};
-use execpool::{ShardInfo, ExecutionCommittee as MempoolCommittee, CertifyParameters as MempoolParameters};
+use execpool::{ExecutionCommittee as MempoolCommittee, CertifyParameters as MempoolParameters};
 use rand::rngs::StdRng;
 use rand::SeedableRng as _;
 use serde::de::DeserializeOwned;
@@ -9,6 +9,7 @@ use std::fs::{self, OpenOptions};
 use std::io::BufWriter;
 use std::io::Write as _;
 use thiserror::Error;
+use types::ShardInfo;
 
 #[derive(Error, Debug)]
 pub enum ConfigError {

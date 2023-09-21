@@ -69,7 +69,6 @@ impl BatchMaker {
     }
 
     /// Main loop receiving incoming transactions and creating batches.
-    /// TODO: replace batch with certificate block hash
     async fn run(&mut self) {
         let _timer = sleep(Duration::from_millis(self.max_batch_delay));
         tokio::pin!(_timer);
@@ -85,22 +84,7 @@ impl BatchMaker {
                         .expect("Fail to serialize transaction");
                     self.current_batch.push(serialize_cblock);
                     self.seal().await;
-
-                    // self.current_batch_size += transaction.len();
-                    // self.current_batch.push(transaction);
-                    // if self.current_batch_size >= self.batch_size {
-                    //     self.seal().await;
-                    //     timer.as_mut().reset(Instant::now() + Duration::from_millis(self.max_batch_delay));
-                    // }
                 },
-
-                // If the timer triggers, seal the batch even if it contains few transactions.
-                // () = &mut timer => {
-                //     if !self.current_batch.is_empty() {
-                //         self.seal().await;
-                //     }
-                //     timer.as_mut().reset(Instant::now() + Duration::from_millis(self.max_batch_delay));
-                // }
             }
 
             // Give the change to schedule other tasks.

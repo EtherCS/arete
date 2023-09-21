@@ -10,6 +10,7 @@ use env_logger::Env;
 use futures::future::join_all;
 use log::error;
 use mempool::Committee as MempoolCommittee;
+use types::ShardInfo;
 use std::fs;
 use tokio::task::JoinHandle;
 
@@ -105,7 +106,7 @@ fn deploy_testbed(nodes: u16) -> Result<Vec<JoinHandle<()>>, Box<dyn std::error:
 
     // Print the committee file.
     let epoch = 1;
-    let shard_num = 4;
+    // let shard_num = 4;
     let mempool_committee = MempoolCommittee::new(
         keys.iter()
             .enumerate()
@@ -130,13 +131,13 @@ fn deploy_testbed(nodes: u16) -> Result<Vec<JoinHandle<()>>, Box<dyn std::error:
             })
             .collect(),
         epoch,
-        shard_num,
     );
     let committee_file = "committee.json";
     let _ = fs::remove_file(committee_file);
     Committee {
         mempool: mempool_committee,
         consensus: consensus_committee,
+        shard: ShardInfo::default(),
     }
     .write(committee_file)?;
 

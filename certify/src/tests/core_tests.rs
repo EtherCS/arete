@@ -43,6 +43,7 @@ fn core(
     Core::spawn(
         name,
         committee,
+        ShardInfo::default(),
         signature_service,
         store,
         leader_elector,

@@ -9,10 +9,11 @@ use certify::ExecutionCommittee as ConsensusCommittee;
 use env_logger::Env;
 use futures::future::join_all;
 use log::error;
-use execpool::{ShardInfo, ExecutionCommittee as MempoolCommittee};
+use execpool::ExecutionCommittee as MempoolCommittee;
 use std::fs;
 use tokio::task::JoinHandle;
 use std::net::SocketAddr;
+use types::ShardInfo;
 
 #[derive(Parser)]
 #[clap(author, version, about, long_about = None)]
@@ -136,7 +137,7 @@ fn deploy_testbed(executors: u16) -> Result<Vec<JoinHandle<()>>, Box<dyn std::er
             .collect(),
         epoch,
     );
-    // TODO: change the committee name
+
     let committee_file = "committee.json";
     // let committee_file = format!("shard-{}_committee.json", shardId);
     let _ = fs::remove_file(committee_file);
@@ -148,7 +149,6 @@ fn deploy_testbed(executors: u16) -> Result<Vec<JoinHandle<()>>, Box<dyn std::er
     }
     .write(committee_file)?;
 
-    // TODO: change the json name
     // Write the key files and spawn all executors.
     keys.iter()
         .enumerate()
