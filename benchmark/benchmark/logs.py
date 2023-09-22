@@ -4,6 +4,7 @@ from multiprocessing import Pool
 from os.path import join
 from re import findall, search
 from statistics import mean
+import copy
 
 from benchmark.utils import Print
 
@@ -303,13 +304,11 @@ class ShardLogParser:
         # self.arete_consensus_rounds_to_ts -> dict{int: string}
         # This records consensus round with its timestamp (used for calculating cross-shard latency)
         temp = self._update_merge_arete_commit_time_results([x.items() for x in arete_rounds_to_timestamp])
-        self.arete_consensus_rounds_to_ts = temp.copy()
-        # print("debug: self.arete_consensus_rounds_to_ts is", self.arete_consensus_rounds_to_ts)
+        sorted_temp = sorted(temp.items())
+        self.arete_consensus_rounds_to_ts = self._update_arete_consensus_time_results(dict(sorted_temp))
         
         # self.arete_rounds_to_timestamp -> dict{int: string}
-        self.arete_rounds_to_timestamp = {} 
-        # temp = self._update_merge_arete_commit_time_results([x.items() for x in arete_rounds_to_timestamp])
-        self._update_arete_commit_time_results(temp.copy())
+        self.arete_rounds_to_timestamp = self._update_arete_commit_time_results()
         
         self.sizes = {
             k: v for x in sizes for k, v in x.items() if k in self.commits
@@ -341,11 +340,14 @@ class ShardLogParser:
     def _merge_arete_round_results(self, input):
         # Keep the earliest timestamp.
         merged = {}
+        digest_to_time = {}
         for x in input:
-            for s, k, r, _ in x:
+            for s, d, r, t in x:
                 if int(s) == 0:
-                    if not k in merged or merged[k] > r:
-                        merged[k] = r
+                    if not d in digest_to_time or digest_to_time[d] > t:
+                    # if not k in merged or merged[k] > r:
+                        digest_to_time[d] = t
+                        merged[d] = r
         return merged
     
     # Get dict for _merge_arete_round_results
@@ -363,30 +365,49 @@ class ShardLogParser:
         # Keep the earliest timestamp.
         merged = {}
         for x in input:
-            for s, k, v in x:
+            for s, d, t in x:
                 if int(s) == 0:
-                    if not k in merged or merged[k] > v:
-                        merged[k] = v
+                    if not d in merged or merged[d] > t:
+                        merged[d] = t
         return merged
     
-    # Get arete_commits[executed_batch_round] = committed_timestamp
+    # Get arete_commits[(int)executed_batch_round] = committed_timestamp
     def _update_merge_arete_commit_time_results(self, input):
         # Keep the earliest timestamp.
         merged = {}
         for x in input:
             for k, v in x:
-                if not k in merged or merged[k] > v:
-                    merged[k] = v
+                int_k = int(k)
+                if not int_k in merged or merged[int_k] > v:
+                    merged[int_k] = v
         return merged
 
+    # Execution shard may receive ts[round_A]>ts[round_B], where round_A < round_B
+    # This func is used for correcting this issue
+    def _update_arete_consensus_time_results(self, input):
+        merged = {}
+        for r, ts in input.items():
+            merged[int(r)] = ts
+        reversed_items = list(input.items())[::-1]
+        for list_r, list_ts in reversed_items:
+            for r, ts in input.items():
+                if int(r) > int(list_r):
+                    break
+                if merged[int(r)] > list_ts:
+                    merged[int(r)] = list_ts
+        return merged
+    
     # map 'all_execute_round' to 'committed timestamp'
-    def _update_arete_commit_time_results(self, input):
-        last_round = 0
-        for r, t in input.items():
-            for index in range(last_round, int(r)):
-                self.arete_rounds_to_timestamp[index] = t
+    def _update_arete_commit_time_results(self):
+        merged = {}
+        last_round = int(0)
+        # print("debug: committed round ts is ", input)
+        for r, t in self.arete_consensus_rounds_to_ts.items():
+            for index in range(last_round, int(r)+1):
+                merged[index] = t
             last_round = int(r)+1
-            
+        return merged
+    
     def _parse_clients(self, log):
         if search(r'Error', log) is not None:
             raise ParseError('Client(s) panicked')
@@ -530,11 +551,12 @@ class ShardLogParser:
                         start = sent[tx_id]
                         end = self.arete_rounds_to_timestamp[int_exec_round]    # commit timestamp
                         latency += [end-start]
-        # ARETE TODO: get unexpected intra-shard latency
-        return mean(latency[int(len(latency)/4):int(len(latency)*3/4)]) if latency else 0
+        # since cross latency doesn't cover the last samples, remove them
+        return mean(latency[:int(3*len(latency)/4)]) if latency else 0
     
     def _arete_end_to_end_cross_latency(self):
         latency = []
+        intra_latency = []
         for sent, received in zip(self.sent_samples, self.received_samples):
             for tx_id, batch_id in received.items():
                 if batch_id in self.arete_commits_to_round: # this batch is picked
@@ -542,17 +564,20 @@ class ShardLogParser:
                     int_exec_round = int(exec_round)
                     if int_exec_round in self.arete_rounds_to_timestamp:  
                         start = sent[tx_id]
-                        flag = 0
+                        intra_latency += [self.arete_rounds_to_timestamp[int_exec_round]-start]
+                        flag = int(0)
                         for consensus_round, ts in self.arete_consensus_rounds_to_ts.items():
                             if flag == 1:   # now, it is the timestamp of next round
                                 end = ts
-                                # TODO: sometimes get negative values?
-                                if end-start > 0: 
-                                    latency += [end-start]
+                                latency += [end-start]
+                                if intra_latency[-1] > latency[-1]:
+                                    print(f"Debug: find intra {intra_latency[-1]} is larger than {latency[-1]} in round {int_exec_round} \n")
+                                    print(f"self.arete_rounds_to_timestamp[{int_exec_round}] is {self.arete_rounds_to_timestamp[int_exec_round]}\n")
+                                    print(f"self.arete_rounds_to_timestamp[{int(consensus_round)}] is {self.arete_rounds_to_timestamp[int(consensus_round)]}, self.arete_consensus_rounds_to_ts[{int(consensus_round)}] is {ts} \n")
                                 break
                             if int_exec_round <= int(consensus_round):
                                 flag = 1
-        return mean(latency[int(len(latency)/4):int(len(latency)*3/4)]) if latency else 0
+        return mean(latency) if latency else 0
 
     def result(self):
         arete_consensus_latenct = self._avg_consensus_interval() * 1000
