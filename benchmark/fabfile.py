@@ -167,19 +167,32 @@ def remote(ctx):
     }
     node_params = {
         'consensus': {
-            'timeout_delay': 5_000,
-            'sync_retry_delay': 5_000,
+            'timeout_delay': 1_000,
+            'sync_retry_delay': 10_000,
         },
         'mempool': {
             'gc_depth': 50,
             'sync_retry_delay': 5_000,
             'sync_retry_nodes': 3,
-            'batch_size': 500_000,
-            'max_batch_delay': 100
+            'batch_size': 15_000,
+            'max_batch_delay': 10
+        }
+    }
+    executor_params = {
+        'consensus': {
+            'certify_timeout_delay': 1_000,
+            'certify_sync_retry_delay': 10_000,
+        },
+        'mempool': {
+            'certify_gc_depth': 50,
+            'certify_sync_retry_delay': 5_000,
+            'certify_sync_retry_nodes': 3,
+            'certify_batch_size': 15_000,
+            'certify_max_batch_delay': 10
         }
     }
     try:
-        Bench(ctx).run(bench_params, node_params, debug=False)
+        Bench(ctx).run(bench_params, node_params, executor_params, debug=False)
     except BenchError as e:
         Print.error(e)
 
