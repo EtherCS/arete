@@ -178,13 +178,7 @@ class ExecutionCommittee:
         return len(self.json["consensus"]["authorities"])
 
     def shard_id(self):
-        return self.json["shard"]["id"]
-
-    def get_confirm_addresses(self):
-        confirm_addrs = {}
-        for n, c in zip(self.names, self.confirmation):
-            confirm_addrs[n] = c
-        return confirm_addrs
+        return self.json['shard']['id']
 
     @classmethod
     def load(cls, filename):
