@@ -5,9 +5,11 @@ use rand::rngs::StdRng;
 use rand::SeedableRng as _;
 use serde::de::DeserializeOwned;
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::fs::{self, OpenOptions};
 use std::io::BufWriter;
 use std::io::Write as _;
+use std::net::SocketAddr;
 use thiserror::Error;
 use types::ShardInfo;
 
@@ -84,6 +86,7 @@ pub struct Committee {
     pub consensus: ConsensusCommittee,
     pub mempool: MempoolCommittee,
     pub shard: ShardInfo,
+    pub order_transaction_addresses: HashMap<PublicKey, SocketAddr>,
 }
 
 impl Export for Committee {}
