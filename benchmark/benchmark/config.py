@@ -114,6 +114,7 @@ class LocalCommittee(Committee):
         )
 
 
+
 class ExecutionCommittee:
     def __init__(
         self,
@@ -293,7 +294,9 @@ class BenchParameters:
             self.runs = int(json["runs"]) if "runs" in json else 1
             # Config
             shard_num = json["shard_num"]
-            shard_num = shard_num if isinstance(shard_num, list) else [shard_num]
+            shard_num = (
+                shard_num if isinstance(shard_num, list) else [shard_num]
+            )
 
             if not shard_num or any(x <= 1 for x in shard_num):
                 raise ConfigError("Missing or invalid shard size")
@@ -316,9 +319,7 @@ class BenchParameters:
             )
             self.node_instances = [int(x) for x in node_instances]
             executor_instances = (
-                json["executor_instances"]
-                if "executor_instances" in json
-                else self.shard_num
+                json["executor_instances"] if "executor_instances" in json else self.shard_num
             )
             executor_instances = (
                 executor_instances
@@ -327,9 +328,7 @@ class BenchParameters:
             )
             self.executor_instances = [int(x) for x in executor_instances]
 
-            if len(self.node_instances) < len(self.nodes) or len(
-                self.executor_instances
-            ) < len(self.nodes):
+            if len(self.node_instances) < len(self.nodes) or len(self.executor_instances) < len(self.nodes):
                 raise ConfigError("Missing or invalid instance size")
 
         except KeyError as e:
