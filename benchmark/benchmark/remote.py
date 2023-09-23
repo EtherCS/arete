@@ -96,8 +96,13 @@ class Bench:
         except GroupException as e:
             raise BenchError("Failed to kill nodes", FabricError(e))
 
-    def _select_hosts(self, bench_parameters):
-        nodes = max(bench_parameters.nodes)
+    def _select_hosts(self, bench_parameters: BenchParameters):
+        nodes = max(
+            x + y
+            for x, y in zip(
+                bench_parameters.node_instances, bench_parameters.executor_instances
+            )
+        )
 
         # Ensure there are enough hosts.
         hosts = self.manager.hosts()
@@ -137,7 +142,9 @@ class Bench:
         self,
         hosts: list[str],
         executor_hosts: list[str],
-        bench_parameters: BenchParameters,
+        nodes: int,
+        shard_num: int,
+        shard_sizes: int,
         node_parameters: NodeParameters,
         executor_parameters: ExecutorParameters,
     ):
@@ -157,13 +164,13 @@ class Bench:
 
         # Generate configuration files for nodes.
         node_keys = []
-        node_key_files = [PathMaker.key_file(i) for i in bench_parameters.nodes]
+        node_key_files = [PathMaker.key_file(i) for i in nodes]
         for node_filename in node_key_files:
             cmd = CommandMaker.generate_key(node_filename).split()
             subprocess.run(cmd, check=True)
             node_keys += [Key.from_file(node_filename)]
         node_names = [x.name for x in node_keys]
-        nodes = self._split_hosts(hosts, bench_parameters.nodes)
+        nodes = self._split_hosts(hosts, nodes)
         consensus_addr = [
             f"{x}:{self.settings.consensus_port + i}" for x, i in enumerate(nodes)
         ]
@@ -178,21 +185,19 @@ class Bench:
             consensus_addr,
             front_addr,
             mempool_addr,
-            bench_parameters.shard_num,
+            shard_num,
             -1,
         )
 
-        self.node_parameters.print(PathMaker.parameters_file())
+        node_parameters.print(PathMaker.parameters_file())
 
         # Generate configuration files for executors.
-        executor_nodes = self._split_hosts(
-            executor_hosts, bench_parameters.shard_num * bench_parameters.shard_sizes
-        )
-        for shardId in range(bench_parameters.shard_num):
+        executor_nodes = self._split_hosts(executor_hosts, shard_num * shard_sizes)
+        for shardId in range(shard_num):
             keys = []
             key_files = [
                 PathMaker.shard_executor_key_file(shardId, i)
-                for i in range(bench_parameters.shard_sizes)
+                for i in range(shard_sizes)
             ]
             for filename in key_files:
                 cmd = CommandMaker.generate_executor_key(filename).split()
@@ -200,9 +205,7 @@ class Bench:
                 keys += [Key.from_file(filename)]
             names = [x.name for x in keys]
             shard_nodes = executor_nodes[
-                shardId
-                * bench_parameters.shard_sizes : (shardId + 1)
-                * bench_parameters.shard_sizes
+                shardId * shard_sizes : (shardId + 1) * shard_sizes
             ]
             # TODO: Maybe make ports different from ordering nodes, if we ever run executor and node on the same machine.
             consensus_addr = [
@@ -224,12 +227,12 @@ class Bench:
                 front_addr,
                 mempool_addr,
                 confirmation_addr,
-                bench_parameters.shard_num,
+                shard_num,
                 shardId,
             )
             committee.print(PathMaker.shard_committee_file(shardId))
 
-            self.executor_parameters.print(PathMaker.shard_parameters_file(shardId))
+            executor_parameters.print(PathMaker.shard_parameters_file(shardId))
 
         # Cleanup all nodes.
         cmd = f"{CommandMaker.cleanup()} || true"
@@ -247,18 +250,35 @@ class Bench:
             c = Connection(host, user="ubuntu", connect_kwargs=self.connect)
             c.put(PathMaker.key_file(i), ".")
         # TODO: Maybe only upload necessary ones
-        progress = progress_bar([id, host for id in range(bench_parameters.shard_num) for host in executor_hosts], prefix="Uploading executor configuration files:")
+        progress = progress_bar(
+            [(id, host) for id in range(shard_num) for host in executor_hosts],
+            prefix="Uploading executor configuration files:",
+        )
         for id, host in progress:
             c = Connection(host, user="ubuntu", connect_kwargs=self.connect)
             c.put(PathMaker.shard_committee_file(id), ".")
             c.put(PathMaker.shard_parameters_file(id), ".")
-        progress = progress_bar(executor_nodes, prefix="Uploading executor node key files:")
+        progress = progress_bar(
+            executor_nodes, prefix="Uploading executor node key files:"
+        )
         for i, (host, id) in enumerate(progress):
             c = Connection(host, user="ubuntu", connect_kwargs=self.connect)
-            c.put(PathMaker.shard_executor_key_file(i), ".")       
+            c.put(PathMaker.shard_executor_key_file(i), ".")
         return committee
 
-    def _run_single(self, hosts, rate, bench_parameters, node_parameters, debug=False):
+    def _run_single(
+        self,
+        hosts: list[str],
+        executor_hosts: list[str],
+        nodes: int,
+        rate: float,
+        shard_num: int,
+        shard_sizes: int,
+        bench_parameters: BenchParameters,
+        node_parameters: NodeParameters,
+        executor_parameters: ExecutorParameters,
+        debug=False,
+    ):
         Print.info("Booting testbed...")
 
         # Kill any potentially unfinished run and delete logs.
@@ -348,42 +368,57 @@ class Bench:
             raise BenchError("Failed to update nodes", e)
 
         # Run benchmarks.
-        for n in bench_parameters.nodes:
-            for r in bench_parameters.rate:
-                Print.heading(f"\nRunning {n} nodes (input rate: {r:,} tx/s)")
-                hosts = selected_hosts[:n]
+        for n, shard_num, shard_sizes, r, node_instances, executor_instances in zip(
+            bench_parameters.nodes,
+            bench_parameters.shard_num,
+            bench_parameters.shard_sizes,
+            bench_parameters.rate,
+            bench_parameters.node_instances,
+            bench_parameters.executor_instances,
+        ):
+            Print.heading(
+                f"\nRunning {n} nodes with {shard_num} shards * {shard_sizes} nodes (input rate: {r:,} tx/s)"
+            )
+            hosts = selected_hosts[:node_instances]
+            executor_hosts = selected_hosts[
+                node_instances : node_instances + executor_instances
+            ]
 
-                # Upload all configuration files.
+            # Upload all configuration files.
+            try:
+                self._config(
+                    hosts=hosts,
+                    executor_hosts=executor_hosts,
+                    nodes=n,
+                    shard_num=shard_num,
+                    shard_sizes=shard_sizes,
+                    node_parameters=node_parameters,
+                    executor_parameters=executor_parameters,
+                )
+            except (subprocess.SubprocessError, GroupException) as e:
+                e = FabricError(e) if isinstance(e, GroupException) else e
+                Print.error(BenchError("Failed to configure nodes", e))
+                continue
+
+            # Do not boot faulty nodes.
+            faults = bench_parameters.faults
+            hosts = hosts[: n - faults]
+
+            # Run the benchmark.
+            for i in range(bench_parameters.runs):
+                Print.heading(f"Run {i+1}/{bench_parameters.runs}")
                 try:
-                    self._config(hosts, node_parameters)
-                except (subprocess.SubprocessError, GroupException) as e:
-                    e = FabricError(e) if isinstance(e, GroupException) else e
-                    Print.error(BenchError("Failed to configure nodes", e))
+                    self._run_single(hosts, r, bench_parameters, node_parameters, debug)
+                    self._logs(hosts, faults).print(
+                        PathMaker.result_file(faults, n, r, bench_parameters.tx_size)
+                    )
+                except (
+                    subprocess.SubprocessError,
+                    GroupException,
+                    ParseError,
+                ) as e:
+                    self.kill(hosts=hosts)
+                    if isinstance(e, GroupException):
+                        e = FabricError(e)
+                    Print.error(BenchError("Benchmark failed", e))
                     continue
-
-                # Do not boot faulty nodes.
-                faults = bench_parameters.faults
-                hosts = hosts[: n - faults]
-
-                # Run the benchmark.
-                for i in range(bench_parameters.runs):
-                    Print.heading(f"Run {i+1}/{bench_parameters.runs}")
-                    try:
-                        self._run_single(
-                            hosts, r, bench_parameters, node_parameters, debug
-                        )
-                        self._logs(hosts, faults).print(
-                            PathMaker.result_file(
-                                faults, n, r, bench_parameters.tx_size
-                            )
-                        )
-                    except (
-                        subprocess.SubprocessError,
-                        GroupException,
-                        ParseError,
-                    ) as e:
-                        self.kill(hosts=hosts)
-                        if isinstance(e, GroupException):
-                            e = FabricError(e)
-                        Print.error(BenchError("Benchmark failed", e))
-                        continue
