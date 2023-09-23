@@ -4,11 +4,12 @@ use consensus::{OBlock, Consensus};
 use crypto::SignatureService;
 use log::{info, debug};
 use mempool::Mempool;
+use rand::seq::IteratorRandom;
 use store::Store;
 use tokio::sync::mpsc::{channel, Receiver};
 use types::{ConfirmMessage, ShardInfo};
 use std::collections::HashMap;
-use std::net::{SocketAddr, IpAddr, Ipv4Addr};
+use std::net::SocketAddr;
 use network::SimpleSender;
 
 /// The default channel capacity for this module.
@@ -18,6 +19,7 @@ pub const CHANNEL_CAPACITY: usize = 1_000;
 pub struct Node {
     pub commit: Receiver<OBlock>,
     pub shard_info: ShardInfo,
+    pub shard_confirmation_addrs: HashMap<u32, SocketAddr>,
 }
 
 impl Node {
@@ -36,6 +38,16 @@ impl Node {
         let secret = Secret::read(key_file)?;
         let name = secret.name;
         let secret_key = secret.secret;
+
+        // Pick one comfirmation address for each execution shard
+        let mut shard_confirmation_addrs = HashMap::new();
+        for (shard_id, map_addrs) in committee.executor_confirmation_addresses {
+            if let Some(name_addr) = map_addrs.iter().choose(&mut rand::thread_rng()) {
+                let (_name, _confirm_addr) = name_addr;
+                shard_confirmation_addrs.insert(shard_id, *_confirm_addr);
+            }
+        }
+        info!("Node chooses ordering shard address {:?}", shard_confirmation_addrs);
 
         // Load default parameters if none are specified.
         let parameters = match parameters {
@@ -73,7 +85,7 @@ impl Node {
         );
 
         info!("Node {} successfully booted", name);
-        Ok(Self { commit: rx_commit, shard_info: committee.shard })
+        Ok(Self { commit: rx_commit, shard_info: committee.shard, shard_confirmation_addrs: shard_confirmation_addrs })
     }
 
     pub fn print_key_file(filename: &str) -> Result<(), ConfigError> {
@@ -82,12 +94,6 @@ impl Node {
 
     pub async fn analyze_block(&mut self) {
         let mut sender = SimpleSender::new();
-        // ARETE TODO replace confirm_addr
-        let confirm_addr1 = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 10011);
-        let confirm_addr2 = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 10111);
-        let mut confirm_addr: HashMap<u32, SocketAddr> = HashMap::new();
-        confirm_addr.insert(0, confirm_addr1);
-        confirm_addr.insert(1, confirm_addr2);
         while let Some(_block) = self.commit.recv().await {
             for i in _block.payload.clone() {
                 let confim_msg = ConfirmMessage::new(
@@ -100,7 +106,7 @@ impl Node {
     
                 let message = bincode::serialize(&confim_msg.clone())
                     .expect("fail to serialize the ConfirmMessage");
-                if let Some(_addr) = confirm_addr.get(&i.shard_id).copied() {
+                if let Some(_addr) = self.shard_confirmation_addrs.get(&i.shard_id).copied() {
                     sender.send(_addr, Into::into(message)).await;
                     debug!("send a confirm message {:?} to the execution shard {}", confim_msg.clone(), i.shard_id);
                 }

@@ -4,6 +4,7 @@ use certify::{EBlock, Consensus};
 use crypto::SignatureService;
 use log::{debug, info};
 use execpool::Mempool;
+use rand::seq::IteratorRandom;
 use store::Store;
 use std::net::{SocketAddr, IpAddr, Ipv4Addr};
 use tokio::sync::mpsc::{channel, Receiver};
@@ -19,7 +20,6 @@ pub struct Executor {
     pub commit: Receiver<EBlock>,  
     pub ordering_addr: SocketAddr,
     pub shard_id: u32,
-    // pub certificate_send: Framed<TcpStream, LengthDelimitedCodec>
 }
 
 impl Executor {
@@ -28,7 +28,6 @@ impl Executor {
         key_file: &str,
         store_path: &str,
         parameters: Option<String>,
-        target: Option<SocketAddr>,
     ) -> Result<Self, ConfigError> {
         let (tx_commit, rx_commit) = channel(CHANNEL_CAPACITY);
         let (tx_consensus_to_mempool, rx_consensus_to_mempool) = channel(CHANNEL_CAPACITY);
@@ -49,10 +48,13 @@ impl Executor {
         };
 
         // Get the connected ordering node address.
-        let target_addr: SocketAddr = match target {
-            Some(addr) => addr,
-            None => SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 9000),
-        };
+        // Randomly pick one
+        let mut target_addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 9000);
+        if let Some(name_addr) = committee.order_transaction_addresses.iter().choose(&mut rand::thread_rng()) {
+            let (_name, _target_addr) = name_addr;
+            target_addr = *_target_addr;
+        }
+        info!("Executor chooses ordering shard address {}", target_addr);
 
         // Make the data store.
         let store = Store::new(store_path).expect("Failed to create store");
@@ -84,12 +86,6 @@ impl Executor {
             tx_commit,
             rx_confirm_mempool_to_consensus,
         );
-
-        // Connect to the ordering node.
-        // let stream = TcpStream::connect(target_addr)
-        //     .await
-        //     .context(format!("failed to connect to {}", target_addr))?;
-        // let mut transport = Framed::new(stream, LengthDelimitedCodec::new());
 
         info!("Executor {} successfully booted", name);
         // info!("Executor connects nodes with address {}", target);

@@ -92,7 +92,6 @@ class LocalBenchShard:
             node_names = [x.name for x in node_keys]
             ordering_committee = LocalCommittee(node_names, self._get_node_port(), shardNum, self.ORDERING_SHARD_ID, {})
             ordering_transaction_addrs_dict = ordering_committee.get_order_transaction_addresses()
-            # print(f"ordering tx addrs is {ordering_transaction_addrs_dict} \n")
 
             # Run execution shards
             executor_confirmation_addrs = {}    # record all executors' confirmation addresses
@@ -116,16 +115,14 @@ class LocalBenchShard:
                 # Do not boot faulty nodes.
                 executors = executors - self.faults
 
-                order_addresses = ordering_committee.front
                 dbs = [PathMaker.shard_executor_db_path(shardId, i) for i in range(executors)]
                 executor_logs = [PathMaker.shard_executor_log_file(shardId, i) for i in range(executors)]
-                for key_file, db, log_file, addr in zip(key_files, dbs, executor_logs, order_addresses):
+                for key_file, db, log_file in zip(key_files, dbs, executor_logs):
                     cmd = CommandMaker.run_executor(
                         key_file,
                         PathMaker.shard_committee_file(shardId),
                         db,
                         PathMaker.shard_parameters_file(shardId),
-                        addr,
                         debug=debug
                     )
                     self._background_run(cmd, log_file)
@@ -164,9 +161,6 @@ class LocalBenchShard:
 
                 names = [x.name for x in keys]
                 committee = LocalExecutionCommittee(names, self._get_shard_port(shardId), shardNum, shardId, ordering_transaction_addrs_dict)
-                # committee.print(PathMaker.shard_committee_file(shardId))
-
-                # self.executor_parameters.print(PathMaker.shard_parameters_file(shardId))
 
                 # Do not boot faulty nodes.
                 executors = executors - self.faults

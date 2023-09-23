@@ -11,6 +11,7 @@ use futures::future::join_all;
 use log::error;
 use mempool::Committee as MempoolCommittee;
 use types::ShardInfo;
+use std::collections::HashMap;
 use std::fs;
 use tokio::task::JoinHandle;
 
@@ -138,6 +139,7 @@ fn deploy_testbed(nodes: u16) -> Result<Vec<JoinHandle<()>>, Box<dyn std::error:
         mempool: mempool_committee,
         consensus: consensus_committee,
         shard: ShardInfo::default(),
+        executor_confirmation_addresses: HashMap::new(),
     }
     .write(committee_file)?;
 
