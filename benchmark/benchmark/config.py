@@ -114,7 +114,6 @@ class LocalCommittee(Committee):
         )
 
 
-
 class ExecutionCommittee:
     def __init__(
         self,
@@ -300,9 +299,7 @@ class BenchParameters:
             self.runs = int(json["runs"]) if "runs" in json else 1
             # Config
             shard_num = json["shard_num"]
-            shard_num = (
-                shard_num if isinstance(shard_num, list) else [shard_num]
-            )
+            shard_num = shard_num if isinstance(shard_num, list) else [shard_num]
 
             if not shard_num or any(x <= 1 for x in shard_num):
                 raise ConfigError("Missing or invalid shard size")

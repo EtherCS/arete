@@ -181,22 +181,17 @@ class Bench:
             f"{x}:{self.settings.mempool_port + i}" for x, i in enumerate(nodes)
         ]
         committee = Committee(
-            node_names,
-            consensus_addr,
-            front_addr,
-            mempool_addr,
-            shard_num,
-            -1,
+            node_names, consensus_addr, front_addr, mempool_addr, shard_num, 2**32 - 1
         )
 
         node_parameters.print(PathMaker.parameters_file())
 
         # Generate configuration files for executors.
         executor_nodes = self._split_hosts(executor_hosts, shard_num * shard_sizes)
-        for shardId in range(shard_num):
+        for shard_id in range(shard_num):
             keys = []
             key_files = [
-                PathMaker.shard_executor_key_file(shardId, i)
+                PathMaker.shard_executor_key_file(shard_id, i)
                 for i in range(shard_sizes)
             ]
             for filename in key_files:
@@ -205,7 +200,7 @@ class Bench:
                 keys += [Key.from_file(filename)]
             names = [x.name for x in keys]
             shard_nodes = executor_nodes[
-                shardId * shard_sizes : (shardId + 1) * shard_sizes
+                shard_id * shard_sizes : (shard_id + 1) * shard_sizes
             ]
             # TODO: Maybe make ports different from ordering nodes, if we ever run executor and node on the same machine.
             consensus_addr = [
@@ -228,11 +223,11 @@ class Bench:
                 mempool_addr,
                 confirmation_addr,
                 shard_num,
-                shardId,
+                shard_id,
             )
-            committee.print(PathMaker.shard_committee_file(shardId))
+            committee.print(PathMaker.shard_committee_file(shard_id))
 
-            executor_parameters.print(PathMaker.shard_parameters_file(shardId))
+            executor_parameters.print(PathMaker.shard_parameters_file(shard_id))
 
         # Cleanup all nodes.
         cmd = f"{CommandMaker.cleanup()} || true"
@@ -271,6 +266,7 @@ class Bench:
         hosts: list[str],
         executor_hosts: list[str],
         nodes: int,
+        faults: int,
         rate: float,
         shard_num: int,
         shard_sizes: int,
@@ -283,6 +279,43 @@ class Bench:
 
         # Kill any potentially unfinished run and delete logs.
         self.kill(hosts=hosts, delete_logs=True)
+        self.kill(hosts=executor_hosts, delete_logs=True)
+
+        # Run the executors.
+        executor_nodes = self._split_hosts(executor_hosts, shard_num * shard_sizes)
+        for shard_id in range(shard_num):
+            shard_nodes = executor_nodes[
+                shard_id * shard_sizes : (shard_id + 1) * shard_sizes - faults
+            ]
+            key_files = [
+                PathMaker.shard_executor_key_file(shard_id, i)
+                for i in range(len(shard_nodes))
+            ]
+            dbs = [
+                PathMaker.shard_executor_db_path(shard_id, i)
+                for i in range(len(shard_nodes))
+            ]
+            executor_logs = [
+                PathMaker.shard_executor_log_file(shard_id, i)
+                for i in range(len(shard_nodes))
+            ]
+            # TODO: Remove this.
+            order_addresses = ["127.0.0.1:1000"] * len(shard_nodes)
+            for key_file, db, log_file, addr in zip(
+                key_files, dbs, executor_logs, order_addresses
+            ):
+                cmd = CommandMaker.run_executor(
+                    key_file,
+                    PathMaker.shard_committee_file(shard_id),
+                    db,
+                    PathMaker.shard_parameters_file(shard_id),
+                    addr,
+                    debug=debug,
+                )
+                self._background_run(host, cmd, log_file)
+
+        # Wait for the nodes to synchronize
+        sleep(2 * self.executor_parameters.certify_timeout_delay / 1000)
 
         # Run the clients (they will wait for the nodes to be ready).
         # Filter all faulty nodes from the client addresses (or they will wait
