@@ -62,8 +62,8 @@ class LocalBenchShard:
             Print.info('Setting up testbed...')
             nodes = self.nodes[0]
             executors, rate = self.shard_sizes[0], self.rate[0]
-            # shardSizes = self.shard_sizes[0]
-            shardNum = self.shard_num
+            shardSizes = self.shard_sizes[0]
+            shardNum = self.shard_num[0]
 
             # Cleanup all files.
             cmd = f'{CommandMaker.clean_logs()} ; {CommandMaker.cleanup()}'

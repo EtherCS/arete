@@ -19,7 +19,7 @@ from benchmark.config import (
 )
 from benchmark.utils import BenchError, Print, PathMaker, progress_bar
 from benchmark.commands import CommandMaker
-from benchmark.logs import LogParser, ParseError
+from benchmark.logs import ShardLogParser, ParseError
 from benchmark.instance import InstanceManager
 
 
@@ -181,8 +181,16 @@ class Bench:
             f"{x}:{self.settings.mempool_port + i}" for x, i in enumerate(nodes)
         ]
         committee = Committee(
-            node_names, consensus_addr, front_addr, mempool_addr, shard_num, 2**32 - 1
+            node_names,
+            consensus_addr,
+            front_addr,
+            mempool_addr,
+            shard_num,
+            2**32 - 1,
+            # TODO: ???
+            {},
         )
+        transaction_addrs_dict = committee.get_order_transaction_addresses()
 
         node_parameters.print(PathMaker.parameters_file())
 
@@ -224,6 +232,7 @@ class Bench:
                 confirmation_addr,
                 shard_num,
                 shard_id,
+                transaction_addrs_dict,
             )
             committee.print(PathMaker.shard_committee_file(shard_id))
 
@@ -299,10 +308,8 @@ class Bench:
                 PathMaker.shard_executor_log_file(shard_id, i)
                 for i in range(len(shard_nodes))
             ]
-            # TODO: Remove this.
-            order_addresses = ["127.0.0.1:1000"] * len(shard_nodes)
-            for key_file, db, log_file, addr in zip(
-                key_files, dbs, executor_logs, order_addresses
+            for host, key_file, db, log_file, addr in zip(
+                shard_nodes, key_files, dbs, executor_logs
             ):
                 cmd = CommandMaker.run_executor(
                     key_file,
@@ -312,30 +319,17 @@ class Bench:
                     addr,
                     debug=debug,
                 )
-                self._background_run(host, cmd, log_file)
+                self._background_run(host[0], cmd, log_file)
 
         # Wait for the nodes to synchronize
         sleep(2 * self.executor_parameters.certify_timeout_delay / 1000)
 
-        # Run the clients (they will wait for the nodes to be ready).
-        # Filter all faulty nodes from the client addresses (or they will wait
-        # for the faulty nodes to be online).
-        committee = Committee.load(PathMaker.committee_file())
-        addresses = [f"{x}:{self.settings.front_port}" for x in hosts]
-        rate_share = ceil(rate / committee.size())  # Take faults into account.
-        timeout = node_parameters.timeout_delay
-        client_logs = [PathMaker.client_log_file(i) for i in range(len(hosts))]
-        for host, addr, log_file in zip(hosts, addresses, client_logs):
-            cmd = CommandMaker.run_client(
-                addr, bench_parameters.tx_size, rate_share, timeout, nodes=addresses
-            )
-            self._background_run(host, cmd, log_file)
-
         # Run the nodes.
-        key_files = [PathMaker.key_file(i) for i in range(len(hosts))]
-        dbs = [PathMaker.db_path(i) for i in range(len(hosts))]
-        node_logs = [PathMaker.node_log_file(i) for i in range(len(hosts))]
-        for host, key_file, db, log_file in zip(hosts, key_files, dbs, node_logs):
+        host_nodes = self._split_hosts(hosts, nodes)
+        key_files = [PathMaker.key_file(i) for i in range(len(host_nodes))]
+        dbs = [PathMaker.db_path(i) for i in range(len(host_nodes))]
+        node_logs = [PathMaker.node_log_file(i) for i in range(len(host_nodes))]
+        for host, key_file, db, log_file in zip(host_nodes, key_files, dbs, node_logs):
             cmd = CommandMaker.run_node(
                 key_file,
                 PathMaker.committee_file(),
@@ -343,11 +337,39 @@ class Bench:
                 PathMaker.parameters_file(),
                 debug=debug,
             )
-            self._background_run(host, cmd, log_file)
+            self._background_run(host[0], cmd, log_file)
 
         # Wait for the nodes to synchronize
         Print.info("Waiting for the nodes to synchronize...")
         sleep(2 * node_parameters.timeout_delay / 1000)
+
+        # Run the clients (they will wait for the nodes to be ready).
+        # Filter all faulty nodes from the client addresses (or they will wait
+        # for the faulty nodes to be online).
+        for shard_id in range(shard_num):
+            shard_nodes = executor_nodes[
+                shard_id * shard_sizes : (shard_id + 1) * shard_sizes - faults
+            ]
+
+            committee = Committee.load(PathMaker.shard_committee_file(shard_id))
+
+            # Run the clients (they will wait for the executors to be ready).
+            addresses = committee.front
+            rate_share = ceil(rate / len(shard_nodes))
+            timeout = self.executor_parameters.certify_timeout_delay
+            client_logs = [
+                PathMaker.shard_client_log_file(shard_id, i)
+                for i in range(len(shard_nodes))
+            ]
+            for host, log_file in zip(shard_nodes, client_logs):
+                cmd = CommandMaker.run_client(
+                    addr,
+                    self.tx_size,
+                    rate_share,
+                    shard_id,
+                    timeout,
+                )
+                self._background_run(host[0], cmd, log_file)
 
         # Wait for all transactions to be processed.
         duration = bench_parameters.duration
@@ -355,21 +377,41 @@ class Bench:
             sleep(ceil(duration / 20))
         self.kill(hosts=hosts, delete_logs=False)
 
-    def _logs(self, hosts, faults):
+    def _logs(
+        self,
+        hosts: list[str],
+        executor_hosts: list[str],
+        nodes: int,
+        faults: int,
+        shard_num: int,
+        shard_sizes: int,
+    ):
         # Delete local logs (if any).
         cmd = CommandMaker.clean_logs()
         subprocess.run([cmd], shell=True, stderr=subprocess.DEVNULL)
 
         # Download log files.
-        progress = progress_bar(hosts, prefix="Downloading logs:")
+        host_nodes = self._split_hosts(hosts, nodes)
+        progress = progress_bar(host_nodes, prefix="Downloading node logs:")
         for i, host in enumerate(progress):
-            c = Connection(host, user="ubuntu", connect_kwargs=self.connect)
+            c = Connection(host[0], user="ubuntu", connect_kwargs=self.connect)
             c.get(PathMaker.node_log_file(i), local=PathMaker.node_log_file(i))
+
+        executor_nodes = self._split_hosts(executor_hosts, shard_num * shard_sizes)
+        progress = progress_bar(executor_nodes, prefix="Downloading node logs:")
+        for i, host in enumerate(progress):
+            c = Connection(host[0], user="ubuntu", connect_kwargs=self.connect)
+            c.get(
+                PathMaker.shard_executor_log_file(i),
+                local=PathMaker.shard_executor_log_file(i),
+            )
             c.get(PathMaker.client_log_file(i), local=PathMaker.client_log_file(i))
 
         # Parse logs and return the parser.
         Print.info("Parsing logs and computing performance...")
-        return LogParser.process(PathMaker.logs_path(), faults=faults)
+        return ShardLogParser.process_shard(
+            f"./logs", faults=faults, shardNum=shard_num
+        )
 
     def run(
         self,
@@ -433,17 +475,34 @@ class Bench:
                 Print.error(BenchError("Failed to configure nodes", e))
                 continue
 
-            # Do not boot faulty nodes.
-            faults = bench_parameters.faults
-            hosts = hosts[: n - faults]
-
             # Run the benchmark.
             for i in range(bench_parameters.runs):
                 Print.heading(f"Run {i+1}/{bench_parameters.runs}")
                 try:
-                    self._run_single(hosts, r, bench_parameters, node_parameters, debug)
-                    self._logs(hosts, faults).print(
-                        PathMaker.result_file(faults, n, r, bench_parameters.tx_size)
+                    self._run_single(
+                        hosts=hosts,
+                        executor_hosts=executor_hosts,
+                        nodes=n,
+                        faults=bench_parameters.faults,
+                        rate=r,
+                        shard_num=shard_num,
+                        shard_sizes=shard_sizes,
+                        bench_parameters=bench_parameters,
+                        node_parameters=node_parameters,
+                        executor_parameters=executor_parameters,
+                        debug=debug,
+                    )
+                    self._logs(
+                        hosts=hosts,
+                        executor_hosts=executor_hosts,
+                        nodes=n,
+                        faults=bench_parameters.faults,
+                        shard_num=shard_num,
+                        shard_sizes=shard_sizes,
+                    ).print(
+                        PathMaker.result_file(
+                            bench_parameters.faults, n, r, bench_parameters.tx_size
+                        )
                     )
                 except (
                     subprocess.SubprocessError,
