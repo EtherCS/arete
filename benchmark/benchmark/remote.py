@@ -115,12 +115,12 @@ class Bench:
         return ordered[:nodes]
 
     def _split_hosts(self, hosts: list[str], nodes: int):
-        nodes_per_host = (len(nodes) + len(hosts) - 1) // len(hosts)
+        nodes_per_host = (nodes + len(hosts) - 1) // len(hosts)
         return [(host, i) for host in hosts for i in range(nodes_per_host)][:nodes]
 
     def _background_run(self, host, command, log_file):
         name = splitext(basename(log_file))[0]
-        cmd = f'tmux new -d -s "{name}" "{command} |& tee {log_file}"'
+        cmd = f'RUST_BACKTRACE=1 tmux new -d -s "{name}" "{command} |& tee {log_file}"'
         c = Connection(host, user="ubuntu", connect_kwargs=self.connect)
         output = c.run(cmd, hide=True)
         self._check_stderr(output)
@@ -133,7 +133,10 @@ class Bench:
             f"(cd {self.settings.repo_name} && git pull -f)",
             "source $HOME/.cargo/env",
             f"(cd {self.settings.repo_name}/node && {CommandMaker.compile()})",
-            CommandMaker.alias_binaries(f"./{self.settings.repo_name}/target/release/"),
+            f"(cd {self.settings.repo_name}/executor && {CommandMaker.compile()})",
+            CommandMaker.alias_shard_binaries(
+                f"./{self.settings.repo_name}/target/release/"
+            ),
         ]
         g = Group(*hosts, user="ubuntu", connect_kwargs=self.connect)
         g.run(" && ".join(cmd), hide=True)
@@ -164,22 +167,18 @@ class Bench:
 
         # Generate configuration files for nodes.
         node_keys = []
-        node_key_files = [PathMaker.key_file(i) for i in nodes]
+        node_key_files = [PathMaker.key_file(i) for i in range(nodes)]
         for node_filename in node_key_files:
             cmd = CommandMaker.generate_key(node_filename).split()
             subprocess.run(cmd, check=True)
             node_keys += [Key.from_file(node_filename)]
         node_names = [x.name for x in node_keys]
-        nodes = self._split_hosts(hosts, nodes)
+        host_nodes = self._split_hosts(hosts, nodes)
         consensus_addr = [
-            f"{x}:{self.settings.consensus_port + i}" for x, i in enumerate(nodes)
+            f"{x}:{self.settings.consensus_port + i}" for x, i in host_nodes
         ]
-        front_addr = [
-            f"{x}:{self.settings.front_port + i}" for x, i in enumerate(nodes)
-        ]
-        mempool_addr = [
-            f"{x}:{self.settings.mempool_port + i}" for x, i in enumerate(nodes)
-        ]
+        front_addr = [f"{x}:{self.settings.front_port + i}" for x, i in host_nodes]
+        mempool_addr = [f"{x}:{self.settings.mempool_port + i}" for x, i in host_nodes]
         committee = Committee(
             node_names,
             consensus_addr,
@@ -187,7 +186,7 @@ class Bench:
             mempool_addr,
             shard_num,
             2**32 - 1,
-            # TODO: ???
+            # Confirmation address will be built later
             {},
         )
         transaction_addrs_dict = committee.get_order_transaction_addresses()
@@ -195,6 +194,7 @@ class Bench:
         node_parameters.print(PathMaker.parameters_file())
 
         # Generate configuration files for executors.
+        executor_confirmation_addrs = {}  # record all executors' confirmation addresses
         executor_nodes = self._split_hosts(executor_hosts, shard_num * shard_sizes)
         for shard_id in range(shard_num):
             keys = []
@@ -212,19 +212,16 @@ class Bench:
             ]
             # TODO: Maybe make ports different from ordering nodes, if we ever run executor and node on the same machine.
             consensus_addr = [
-                f"{x}:{self.settings.consensus_port + i}" for x, i in range(shard_nodes)
+                f"{x}:{self.settings.consensus_port + i}" for x, i in shard_nodes
             ]
-            front_addr = [
-                f"{x}:{self.settings.front_port + i}" for x, i in range(shard_nodes)
-            ]
+            front_addr = [f"{x}:{self.settings.front_port + i}" for x, i in shard_nodes]
             mempool_addr = [
-                f"{x}:{self.settings.mempool_port + i}" for x, i in range(shard_nodes)
+                f"{x}:{self.settings.mempool_port + i}" for x, i in shard_nodes
             ]
             confirmation_addr = [
-                f"{x}:{self.settings.confirmation_port + i}"
-                for x, i in range(shard_nodes)
+                f"{x}:{self.settings.confirmation_port + i}" for x, i in shard_nodes
             ]
-            committee = ExecutionCommittee(
+            execution_committee = ExecutionCommittee(
                 names,
                 consensus_addr,
                 front_addr,
@@ -234,9 +231,23 @@ class Bench:
                 shard_id,
                 transaction_addrs_dict,
             )
-            committee.print(PathMaker.shard_committee_file(shard_id))
+            execution_committee.print(PathMaker.shard_committee_file(shard_id))
+            executor_confirmation_addrs[
+                shard_id
+            ] = execution_committee.get_confirm_addresses()
 
             executor_parameters.print(PathMaker.shard_parameters_file(shard_id))
+
+        committee = Committee(
+            committee.names,
+            committee.consensus,
+            committee.front,
+            committee.mempool,
+            shard_num,
+            2**32 - 1,
+            executor_confirmation_addrs,
+        )
+        committee.print(PathMaker.committee_file())
 
         # Cleanup all nodes.
         cmd = f"{CommandMaker.cleanup()} || true"
@@ -249,7 +260,7 @@ class Bench:
             c = Connection(host, user="ubuntu", connect_kwargs=self.connect)
             c.put(PathMaker.committee_file(), ".")
             c.put(PathMaker.parameters_file(), ".")
-        progress = progress_bar(nodes, prefix="Uploading node key files:")
+        progress = progress_bar(host_nodes, prefix="Uploading node key files:")
         for i, (host, id) in enumerate(progress):
             c = Connection(host, user="ubuntu", connect_kwargs=self.connect)
             c.put(PathMaker.key_file(i), ".")
@@ -267,7 +278,10 @@ class Bench:
         )
         for i, (host, id) in enumerate(progress):
             c = Connection(host, user="ubuntu", connect_kwargs=self.connect)
-            c.put(PathMaker.shard_executor_key_file(i), ".")
+            c.put(
+                PathMaker.shard_executor_key_file(i // shard_sizes, i % shard_sizes),
+                ".",
+            )
         return committee
 
     def _run_single(
@@ -308,7 +322,7 @@ class Bench:
                 PathMaker.shard_executor_log_file(shard_id, i)
                 for i in range(len(shard_nodes))
             ]
-            for host, key_file, db, log_file, addr in zip(
+            for host, key_file, db, log_file in zip(
                 shard_nodes, key_files, dbs, executor_logs
             ):
                 cmd = CommandMaker.run_executor(
@@ -316,13 +330,12 @@ class Bench:
                     PathMaker.shard_committee_file(shard_id),
                     db,
                     PathMaker.shard_parameters_file(shard_id),
-                    addr,
                     debug=debug,
                 )
                 self._background_run(host[0], cmd, log_file)
 
         # Wait for the nodes to synchronize
-        sleep(2 * self.executor_parameters.certify_timeout_delay / 1000)
+        sleep(2 * executor_parameters.certify_timeout_delay / 1000)
 
         # Run the nodes.
         host_nodes = self._split_hosts(hosts, nodes)
@@ -351,20 +364,22 @@ class Bench:
                 shard_id * shard_sizes : (shard_id + 1) * shard_sizes - faults
             ]
 
-            committee = Committee.load(PathMaker.shard_committee_file(shard_id))
+            committee = ExecutionCommittee.load(
+                PathMaker.shard_committee_file(shard_id)
+            )
 
             # Run the clients (they will wait for the executors to be ready).
             addresses = committee.front
             rate_share = ceil(rate / len(shard_nodes))
-            timeout = self.executor_parameters.certify_timeout_delay
+            timeout = executor_parameters.certify_timeout_delay
             client_logs = [
                 PathMaker.shard_client_log_file(shard_id, i)
                 for i in range(len(shard_nodes))
             ]
-            for host, log_file in zip(shard_nodes, client_logs):
+            for host, addr, log_file in zip(shard_nodes, addresses, client_logs):
                 cmd = CommandMaker.run_client(
                     addr,
-                    self.tx_size,
+                    bench_parameters.tx_size,
                     rate_share,
                     shard_id,
                     timeout,
@@ -398,14 +413,23 @@ class Bench:
             c.get(PathMaker.node_log_file(i), local=PathMaker.node_log_file(i))
 
         executor_nodes = self._split_hosts(executor_hosts, shard_num * shard_sizes)
-        progress = progress_bar(executor_nodes, prefix="Downloading node logs:")
+        progress = progress_bar(
+            executor_nodes, prefix="Downloading executor node logs:"
+        )
         for i, host in enumerate(progress):
             c = Connection(host[0], user="ubuntu", connect_kwargs=self.connect)
             c.get(
-                PathMaker.shard_executor_log_file(i),
-                local=PathMaker.shard_executor_log_file(i),
+                PathMaker.shard_executor_log_file(i // shard_sizes, i % shard_sizes),
+                local=PathMaker.shard_executor_log_file(
+                    i // shard_sizes, i % shard_sizes
+                ),
             )
-            c.get(PathMaker.client_log_file(i), local=PathMaker.client_log_file(i))
+            c.get(
+                PathMaker.shard_client_log_file(i // shard_sizes, i % shard_sizes),
+                local=PathMaker.shard_client_log_file(
+                    i // shard_sizes, i % shard_sizes
+                ),
+            )
 
         # Parse logs and return the parser.
         Print.info("Parsing logs and computing performance...")

@@ -25,8 +25,8 @@ class Committee:
         consensus_addr,
         transactions_addr,
         mempool_addr,
-        shardNum,
-        shardId,
+        shardNum: int,
+        shardId: int,
         confirm_addrs,
     ):
         inputs = [names, consensus_addr, transactions_addr, mempool_addr]
@@ -98,7 +98,15 @@ class Committee:
         consensus_addr = [x["address"] for x in consensus_authorities]
         transactions_addr = [x["transactions_address"] for x in mempool_authorities]
         mempool_addr = [x["mempool_address"] for x in mempool_authorities]
-        return cls(names, consensus_addr, transactions_addr, mempool_addr)
+        return cls(
+            names,
+            consensus_addr,
+            transactions_addr,
+            mempool_addr,
+            data["shard"]["number"],
+            data["shard"]["id"],
+            data["executor_confirmation_addresses"],
+        )
 
 
 class LocalCommittee(Committee):
@@ -201,7 +209,14 @@ class ExecutionCommittee:
         mempool_addr = [x["mempool_address"] for x in mempool_authorities]
         confirmation_addr = [x["confirmation_address"] for x in mempool_authorities]
         return cls(
-            names, consensus_addr, transactions_addr, mempool_addr, confirmation_addr
+            names,
+            consensus_addr,
+            transactions_addr,
+            mempool_addr,
+            confirmation_addr,
+            data["shard"]["number"],
+            data["shard"]["id"],
+            data["order_transaction_addresses"],
         )
 
 
