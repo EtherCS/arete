@@ -391,6 +391,7 @@ class Bench:
         for _ in progress_bar(range(20), prefix=f"Running benchmark ({duration} sec):"):
             sleep(ceil(duration / 20))
         self.kill(hosts=hosts, delete_logs=False)
+        self.kill(hosts=executor_hosts, delete_logs=False)
 
     def _logs(
         self,

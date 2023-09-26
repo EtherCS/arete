@@ -67,9 +67,9 @@ class InstanceManager:
             GroupName=self.settings.testbed,
             IpPermissions=[
                 {
-                    "IpProtocol": "tcp",
-                    "FromPort": 0,
-                    "ToPort": 65535,
+                    "IpProtocol": -1,
+                    # "FromPort": 0,
+                    # "ToPort": 65535,
                     "IpRanges": [
                         {
                             "CidrIp": "0.0.0.0/0",

@@ -1,5 +1,5 @@
 use crate::batch_maker::{Batch, BatchMaker, Transaction};
-use crate::config::{ExecutionCommittee, CertifyParameters};
+use crate::config::{CertifyParameters, ExecutionCommittee};
 use crate::helper::Helper;
 use crate::processor::{Processor, SerializedBatchMessage};
 use crate::quorum_waiter::QuorumWaiter;
@@ -8,7 +8,7 @@ use async_trait::async_trait;
 use bytes::Bytes;
 use crypto::{Digest, PublicKey};
 use futures::sink::SinkExt as _;
-use log::{info, warn, debug};
+use log::{debug, info, warn};
 use network::{MessageHandler, Receiver as NetworkReceiver, Writer};
 use serde::{Deserialize, Serialize};
 use std::error::Error;
@@ -208,14 +208,18 @@ impl Mempool {
     /// Spawn all tasks responsible to handle confirmation messages from the ordering shard.
     fn handle_ordering_messages(&self) {
         // Receive incoming messages from the ordering shard.
-        let address = self
+        let mut address = self
             .committee
             .confirmation_address(&self.name)
             .expect("Our public key is not in the committee");
+        address.set_ip("0.0.0.0".parse().unwrap());
         debug!("Executor listen confirmation address {:?}", address);
         NetworkReceiver::spawn(
-            address, 
-            /* handler */ ConfirmationMsgReceiverHandler{tx_confirm: self.tx_confirm.clone()},
+            address,
+            /* handler */
+            ConfirmationMsgReceiverHandler {
+                tx_confirm: self.tx_confirm.clone(),
+            },
         );
     }
 }
@@ -251,16 +255,19 @@ struct ConfirmationMsgReceiverHandler {
 impl MessageHandler for ConfirmationMsgReceiverHandler {
     async fn dispatch(&self, _writer: &mut Writer, message: Bytes) -> Result<(), Box<dyn Error>> {
         // Send the transaction to the batch maker.
-        let confirm_msg: ConfirmMessage = bincode::deserialize(&message)
-            .expect("Failed to deserialize confirmation message");
+        let confirm_msg: ConfirmMessage =
+            bincode::deserialize(&message).expect("Failed to deserialize confirmation message");
         self.tx_confirm
             .send(confirm_msg.clone())
             .await
             .expect("Failed to send confirmation message");
-        #[cfg(feature = "benchmark")] 
+        #[cfg(feature = "benchmark")]
         {
             info!("executor receives confirm msg {:?}", confirm_msg);
-            info!("ARETE shard {} commit anchor block for execution round {}", confirm_msg.shard_id, confirm_msg.round);
+            info!(
+                "ARETE shard {} commit anchor block for execution round {}",
+                confirm_msg.shard_id, confirm_msg.round
+            );
         }
         // Give the change to schedule other tasks.
         tokio::task::yield_now().await;
