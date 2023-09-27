@@ -1,5 +1,5 @@
 import subprocess
-from math import ceil
+from math import ceil, floor
 from os.path import basename, splitext
 from time import sleep
 
@@ -61,10 +61,12 @@ class LocalBenchShard:
         try:
             Print.info('Setting up testbed...')
             nodes = self.nodes[0]
-            executors, rate = self.shard_sizes[0], self.rate[0]
-            shardSizes = self.shard_sizes[0]
+            order_faults = floor(nodes * self.faults)
+            
+            shardSize, rate = self.shard_sizes[0], self.rate[0]
             shardNum = self.shard_num[0]
-            total_executors = executors * shardNum
+            execution_faults = floor(shardSize * self.shard_faults)
+            total_executors = shardSize * shardNum
 
             # Cleanup all files.
             cmd = f'{CommandMaker.clean_logs()} ; {CommandMaker.cleanup()}'
@@ -99,7 +101,7 @@ class LocalBenchShard:
             for shardId in range(shardNum):
                 # Generate configuration files for executors.
                 keys = []
-                key_files = [PathMaker.shard_executor_key_file(shardId, i) for i in range(executors)]
+                key_files = [PathMaker.shard_executor_key_file(shardId, i) for i in range(shardSize)]
                 for filename in key_files:
                     cmd = CommandMaker.generate_executor_key(filename).split()
                     subprocess.run(cmd, check=True)
@@ -114,10 +116,10 @@ class LocalBenchShard:
                 executor_confirmation_addrs[shardId] = committee.get_confirm_addresses()
 
                 # Do not boot faulty nodes.
-                executors = executors - self.faults
+                run_executors = shardSize - execution_faults
 
-                dbs = [PathMaker.shard_executor_db_path(shardId, i) for i in range(executors)]
-                executor_logs = [PathMaker.shard_executor_log_file(shardId, i) for i in range(executors)]
+                dbs = [PathMaker.shard_executor_db_path(shardId, i) for i in range(run_executors)]
+                executor_logs = [PathMaker.shard_executor_log_file(shardId, i) for i in range(run_executors)]
                 for key_file, db, log_file in zip(key_files, dbs, executor_logs):
                     cmd = CommandMaker.run_executor(
                         key_file,
@@ -136,11 +138,11 @@ class LocalBenchShard:
             ordering_committee_with_confirm_addrs = LocalCommittee(node_names, self._get_node_port(), shardNum, self.ORDERING_SHARD_ID, executor_confirmation_addrs)
             ordering_committee_with_confirm_addrs.print(PathMaker.committee_file())
             self.node_parameters.print(PathMaker.parameters_file())            
-            nodes = nodes - self.faults
+            run_nodes = nodes - order_faults
             
             # Run the nodes
-            node_dbs = [PathMaker.db_path(i) for i in range(nodes)]
-            node_logs = [PathMaker.node_log_file(i) for i in range(nodes)]
+            node_dbs = [PathMaker.db_path(i) for i in range(run_nodes)]
+            node_logs = [PathMaker.node_log_file(i) for i in range(run_nodes)]
             for node_key_file, node_db, node_log_file in zip(node_key_files, node_dbs, node_logs):
                 cmd = CommandMaker.run_node(
                     node_key_file,
@@ -155,7 +157,7 @@ class LocalBenchShard:
             for shardId in range(shardNum):
                 # Generate configuration files for executors.
                 keys = []
-                key_files = [PathMaker.shard_executor_key_file(shardId, i) for i in range(executors)]
+                key_files = [PathMaker.shard_executor_key_file(shardId, i) for i in range(shardSize)]
                 for filename in key_files:
                     cmd = CommandMaker.generate_executor_key(filename).split()
                     subprocess.run(cmd, check=True)
@@ -165,11 +167,11 @@ class LocalBenchShard:
                 committee = LocalExecutionCommittee(names, self._get_shard_port(shardId), shardNum, shardId, ordering_transaction_addrs_dict)
 
                 # Do not boot faulty nodes.
-                executors = executors - self.faults
+                run_executors = shardSize - execution_faults
                 addresses = committee.front
-                rate_share = ceil(rate / executors)
+                rate_share = ceil(rate / run_executors)
                 timeout = self.executor_parameters.certify_timeout_delay
-                client_logs = [PathMaker.shard_client_log_file(shardId, i) for i in range(executors)]
+                client_logs = [PathMaker.shard_client_log_file(shardId, i) for i in range(run_executors)]
                 for addr, log_file in zip(addresses, client_logs):
                     cmd = CommandMaker.run_client(
                         addr,
@@ -188,7 +190,7 @@ class LocalBenchShard:
 
             # Parse logs and return the parser.
             Print.info('Parsing logs...')
-            return ShardLogParser.process_shard(f'./logs', faults=self.faults, shardNum=shardNum)
+            return ShardLogParser.process_shard(f'./logs', order_size=nodes, order_faults_ratio=self.faults, execution_size=shardSize, execution_faults_ration=self.shard_faults, shardNum=shardNum)
 
         except (subprocess.SubprocessError, ParseError) as e:
             self._kill_executors()

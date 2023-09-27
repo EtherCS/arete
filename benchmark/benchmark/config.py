@@ -315,7 +315,8 @@ class BenchParameters:
             self.nodes = [int(x) for x in nodes]
             self.rate = [int(x) for x in rate]
             self.tx_size = int(json["tx_size"])
-            self.faults = int(json["faults"])
+            self.faults = float(json["faults"])
+            self.shard_faults = float(json["shard_faults"])
             self.duration = int(json["duration"])
             self.runs = int(json["runs"]) if "runs" in json else 1
             # Config

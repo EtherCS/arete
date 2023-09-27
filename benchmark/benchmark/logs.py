@@ -4,7 +4,7 @@ from multiprocessing import Pool
 from os.path import join
 from re import findall, search
 from statistics import mean
-from math import ceil
+from math import ceil, floor
 import copy
 
 from benchmark.utils import Print
@@ -265,19 +265,17 @@ class LogParser:
 class ShardLogParser:
     # clients: integration of all clients' files
     # executors: integration of all executors' files
-    def __init__(self, clients, executors, faults, shardNum):
+    def __init__(self, clients, executors, order_size, order_faults_ratio, execution_size, execution_faults_ration, shardNum):
         inputs = [clients, executors]
         assert all(isinstance(x, list) for x in inputs)
         assert all(isinstance(x, str) for y in inputs for x in y)
         assert all(x for x in inputs)
 
-        self.faults = faults
-        # Jianting: shard number
+        self.order_size = order_size
+        self.order_faults_ratio = order_faults_ratio
+        self.execution_faults_ratio = execution_faults_ration
         self.shard_num = shardNum
-        if isinstance(faults, int):
-            self.committee_size = len(executors) + int(faults)
-        else:
-            self.committee_size = '?'
+        self.execution_size = execution_size
 
         # Parse the clients logs.
         try:
@@ -700,9 +698,12 @@ class ShardLogParser:
             ' SUMMARY:\n'
             '-----------------------------------------\n'
             ' + CONFIG:\n'
-            f' Shard number: {self.shard_num} shards\n'
-            f' Faults: {self.faults} nodes\n'
-            f' Committee size: {int(self.committee_size/self.shard_num)} nodes\n'
+            f' Ordering shard size: {self.order_size} nodes\n'
+            f' Ordering shard fault ratio: {self.order_faults_ratio} \n'
+            f' Execution shard number: {self.shard_num} shards\n'
+            f' Execution shard size: {self.execution_size} nodes\n'
+            f' Execution shard fault ratio: {self.execution_faults_ratio} \n'
+            # f' Committee size: {int(self.execution_size/self.shard_num)} nodes\n'
             f' Input rate per shard: {ceil(sum(self.rate)/self.shard_num):,} tx/s\n'
             f' Transaction size: {self.size[0]:,} B\n'
             f' Execution time: {round(arete_duration):,} s\n'
@@ -758,7 +759,7 @@ class ShardLogParser:
         return cls(clients, nodes, faults)
     
     @classmethod
-    def process_shard(cls, directory, faults, shardNum):
+    def process_shard(cls, directory, order_size, order_faults_ratio, execution_size, execution_faults_ration, shardNum):
         assert isinstance(directory, str)
 
         clients = []
@@ -770,4 +771,4 @@ class ShardLogParser:
             with open(filename, 'r') as f:
                 executors += [f.read()]
 
-        return cls(clients, executors, faults, shardNum)
+        return cls(clients, executors, order_size, order_faults_ratio, execution_size, execution_faults_ration, shardNum)
