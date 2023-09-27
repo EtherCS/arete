@@ -4,7 +4,7 @@ from paramiko import RSAKey
 from paramiko.ssh_exception import PasswordRequiredException, SSHException
 from os.path import basename, splitext
 from time import sleep
-from math import ceil
+from math import ceil, floor
 from os.path import join
 import subprocess
 
@@ -289,10 +289,11 @@ class Bench:
         hosts: list[str],
         executor_hosts: list[str],
         nodes: int,
-        faults: int,
+        faults: float,  # byzantine ratio of the ordering shard
         rate: float,
         shard_num: int,
         shard_sizes: int,
+        shard_faults: float,    # byzantine ratio of execution shards
         bench_parameters: BenchParameters,
         node_parameters: NodeParameters,
         executor_parameters: ExecutorParameters,
@@ -304,11 +305,13 @@ class Bench:
         self.kill(hosts=hosts, delete_logs=True)
         self.kill(hosts=executor_hosts, delete_logs=True)
 
+        order_faults = floor(nodes * faults)
+        execution_faults = floor(shard_sizes * shard_faults)
         # Run the executors.
         executor_nodes = self._split_hosts(executor_hosts, shard_num * shard_sizes)
         for shard_id in range(shard_num):
             shard_nodes = executor_nodes[
-                shard_id * shard_sizes : (shard_id + 1) * shard_sizes - faults
+                shard_id * shard_sizes : (shard_id + 1) * shard_sizes - execution_faults
             ]
             key_files = [
                 PathMaker.shard_executor_key_file(shard_id, i)
@@ -338,7 +341,7 @@ class Bench:
         sleep(2 * executor_parameters.certify_timeout_delay / 1000)
 
         # Run the nodes.
-        host_nodes = self._split_hosts(hosts, nodes)
+        host_nodes = self._split_hosts(hosts, nodes - order_faults)
         key_files = [PathMaker.key_file(i) for i in range(len(host_nodes))]
         dbs = [PathMaker.db_path(i) for i in range(len(host_nodes))]
         node_logs = [PathMaker.node_log_file(i) for i in range(len(host_nodes))]
@@ -361,7 +364,7 @@ class Bench:
         # for the faulty nodes to be online).
         for shard_id in range(shard_num):
             shard_nodes = executor_nodes[
-                shard_id * shard_sizes : (shard_id + 1) * shard_sizes - faults
+                shard_id * shard_sizes : (shard_id + 1) * shard_sizes - execution_faults
             ]
 
             committee = ExecutionCommittee.load(
@@ -512,6 +515,7 @@ class Bench:
                         rate=r,
                         shard_num=shard_num,
                         shard_sizes=shard_sizes,
+                        shard_faults=bench_parameters.shard_faults,
                         bench_parameters=bench_parameters,
                         node_parameters=node_parameters,
                         executor_parameters=executor_parameters,
