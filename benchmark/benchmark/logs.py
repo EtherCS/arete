@@ -602,7 +602,6 @@ class ShardLogParser:
                 if batch_id in self.commits:
                     if not tx_id in sent:
                         continue
-                        # print(f"Debug: send id is {tx_id} \n sent is {sent}")
                     # assert tx_id in sent  # We receive txs that we sent.
                     start = sent[tx_id]
                     end = self.commits[batch_id]
@@ -669,10 +668,6 @@ class ShardLogParser:
                             if flag == 1:   # now, it is the timestamp of next round
                                 end = ts
                                 latency += [end-start]
-                                if intra_latency[-1] > latency[-1]:
-                                    print(f"Debug: find intra {intra_latency[-1]} is larger than {latency[-1]} in round {int_exec_round} \n")
-                                    print(f"self.arete_rounds_to_timestamp[{int_exec_round}] is {self.arete_rounds_to_timestamp[int_exec_round]}\n")
-                                    print(f"self.arete_rounds_to_timestamp[{int(consensus_round)}] is {self.arete_rounds_to_timestamp[int(consensus_round)]}, self.arete_consensus_rounds_to_ts[{int(consensus_round)}] is {ts} \n")
                                 break
                             if int_exec_round <= int(consensus_round):
                                 flag = 1

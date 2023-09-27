@@ -208,10 +208,11 @@ impl Mempool {
     /// Spawn all tasks responsible to handle confirmation messages from the ordering shard.
     fn handle_ordering_messages(&self) {
         // Receive incoming messages from the ordering shard.
-        let address = self
+        let mut address = self
             .committee
             .confirmation_address(&self.name)
             .expect("Our public key is not in the committee");
+        address.set_ip("0.0.0.0".parse().unwrap());
         debug!("Executor listen confirmation address {:?}", address);
         NetworkReceiver::spawn(
             address, 
