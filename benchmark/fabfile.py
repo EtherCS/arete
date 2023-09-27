@@ -171,13 +171,14 @@ def install(ctx):
 def remote(ctx):
     """Run benchmarks on AWS"""
     bench_params = {
-        "faults": 0,
+        "faults": 0.3,
         "nodes": 4,
         "rate": 1_000,
         "tx_size": 512,
         "duration": 20,
+        "shard_faults": 0.4,
         "shard_num": 2,
-        "shard_sizes": 3,
+        "shard_sizes": 5, 
     }
     node_params = {
         "consensus": {
