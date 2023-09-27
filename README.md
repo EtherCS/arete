@@ -25,11 +25,14 @@ This command may take a long time the first time you run it (compiling rust code
  SUMMARY:
 -----------------------------------------
  + CONFIG:
- Faults: 0 nodes
- Committee size: 4 nodes
- Input rate: 1,000 tx/s
+ Ordering shard size: 4 nodes
+ Ordering shard fault ratio: 0.3 
+ Execution shard number: 2 shards
+ Execution shard size: 5 nodes
+ Execution shard fault ratio: 0.4 
+ Input rate per shard: 1,002 tx/s
  Transaction size: 512 B
- Execution time: 20 s
+ Execution time: 19 s
 
  Consensus timeout delay: 1,000 ms
  Consensus sync retry delay: 10,000 ms
@@ -40,12 +43,22 @@ This command may take a long time the first time you run it (compiling rust code
  Mempool max batch delay: 10 ms
 
  + RESULTS:
- Consensus TPS: 967 tx/s
- Consensus BPS: 495,294 B/s
- Consensus latency: 2 ms
+ Comparison Sharding:
+ Consensus TPS: 1,022 tx/s
+ Consensus BPS: 523,406 B/s
+ Consensus latency: 11 ms
+ End-to-end TPS: 954 tx/s
+ End-to-end BPS: 488,310 B/s
+ End-to-end intra latency: 1,461 ms
+ End-to-end cross latency: 9,287 ms
 
- End-to-end TPS: 960 tx/s
- End-to-end BPS: 491,519 B/s
- End-to-end latency: 9 ms
+ ARETE (ours):
+ Consensus TPS: 862 tx/s
+ Consensus BPS: 441,159 B/s
+ Consensus latency (Anchor block interval): 2,812 ms
+ End-to-end TPS: 812 tx/s
+ End-to-end BPS: 415,961 B/s
+ End-to-end arete intra latency: 2,264 ms
+ End-to-end arete cross latency: 5,291 ms
 -----------------------------------------
 ```
