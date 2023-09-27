@@ -323,8 +323,8 @@ class BenchParameters:
             shard_num = json["shard_num"]
             shard_num = shard_num if isinstance(shard_num, list) else [shard_num]
 
-            if not shard_num or any(x <= 1 for x in shard_num):
-                raise ConfigError("Missing or invalid shard size")
+            if not shard_num or any(x < 1 for x in shard_num):
+                raise ConfigError("Missing or invalid shard number")
             self.shard_num = [int(x) for x in shard_num]
 
             shard_sizes = json["shard_sizes"]
