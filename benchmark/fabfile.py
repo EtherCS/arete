@@ -2,11 +2,12 @@ from fabric import task
 
 from benchmark.local import LocalBench
 from benchmark.local_shard import LocalBenchShard
-from benchmark.logs import ParseError, LogParser
+from benchmark.logs import ParseError, LogParser, ShardLogParser
 from benchmark.utils import Print
 from benchmark.plot import Ploter, PlotError
 from benchmark.instance import InstanceManager
 from benchmark.remote import Bench, BenchError
+
 
 
 @task
@@ -63,7 +64,7 @@ def localShard(ctx):
         'tx_size': 512,
         'duration': 20,
         'shard_num': 2,
-        'shard_sizes': 10, # could be different shard size [4, 8, ...]
+        'shard_sizes': 5, # could be different shard size [4, 8, ...]
     }
     node_params = {
         'consensus': {
@@ -97,6 +98,10 @@ def localShard(ctx):
     except BenchError as e:
         Print.error(e)
         
+@task
+def parseLog(ctx, faults = 0, shardNum = 2):
+    ret = ShardLogParser.process_shard(f'./logs', faults, shardNum).result()
+    print(ret)
 
 @task
 def create(ctx, nodes=2):

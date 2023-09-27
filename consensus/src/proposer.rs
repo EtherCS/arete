@@ -7,10 +7,10 @@ use futures::stream::futures_unordered::FuturesUnordered;
 use futures::stream::StreamExt as _;
 use log::{debug, info};
 use network::{CancelHandler, ReliableSender};
-use types::{CBlock, CBlockMeta, ShardInfo};
 use std::collections::HashMap;
 use tokio::sync::mpsc::{Receiver, Sender};
-// use std::convert::TryFrom;
+use types::{CBlock, CBlockMeta, ShardInfo};
+use std::convert::TryFrom;
 
 #[derive(Debug)]
 pub enum ProposerMessage {
@@ -29,7 +29,7 @@ pub struct Proposer {
     rx_message: Receiver<ProposerMessage>,
     tx_loopback: Sender<OBlock>,
     // buffer: HashSet<Digest>,
-    shard_rounds: HashMap<u32, CBlockMeta>,  // maintain a map recording [execution_shard_id, max_received_round]
+    shard_rounds: HashMap<u32, CBlockMeta>, // maintain a map recording [execution_shard_id, max_received_round]
     max_shard_rounds: HashMap<u32, u64>,    // use it to avoid receiving old CBlocks
     network: ReliableSender,
 }
@@ -69,18 +69,29 @@ impl Proposer {
         deliver
     }
 
-    /// Detect if can start order
-    async fn is_ready(&mut self, round: Round, qc: QC, tc: Option<TC>) {
-        // let shard_num = usize::try_from(self.committee.shard_num).unwrap();
-        // while !(self.shard_rounds.len() == shard_num)
-        // && !(self.max_shard_rounds.len() < shard_num) {
-        //     // wait for create block
-        // }
-        self.make_block(round, qc.clone(), tc.clone()).await;
-        debug!("Start making a block");
+    async fn update_map(&mut self, payload: Vec<CBlockMeta>) {
+        for cbmeta in payload {
+            if let Some(max_round) = self.max_shard_rounds.get(&cbmeta.shard_id).copied() {
+                if max_round < cbmeta.round {
+                    self.max_shard_rounds.insert(cbmeta.shard_id, cbmeta.round);
+                }
+            }
+            if let Some(s_round) = self.shard_rounds.get(&cbmeta.shard_id) {
+                if s_round.round <= cbmeta.round {
+                    self.shard_rounds.remove(&cbmeta.shard_id);
+                }
+            }
+        }
     }
 
     async fn make_block(&mut self, round: Round, qc: QC, tc: Option<TC>) {
+        let shard_num = usize::try_from(self.shard_info.number).unwrap();
+        loop {
+            // wait
+            if self.max_shard_rounds.len() <= shard_num {
+                break;
+            }
+        }
         // Generate a new block.
         let block = OBlock::new(
             qc,
@@ -144,15 +155,17 @@ impl Proposer {
     }
 
     async fn run(&mut self) {
-        debug!("Shard information is: id {}, shard amount {}", self.shard_info.id, self.shard_info.number);
+        debug!(
+            "Shard information is: id {}, shard amount {}",
+            self.shard_info.id, self.shard_info.number
+        );
         loop {
-            tokio::select! {                
+            tokio::select! {
                 // ARETE: here, every node receive the transaction (CBlock) due to mempool's broadcast
                 // Update its local Map[shard_id, if_receive_CBlock]
                 Some(cblock) = self.rx_cblock.recv() => {
                     debug!("Consensus proposer receive CBlock {:?}", cblock);
-                    if !self.max_shard_rounds.contains_key(&cblock.shard_id)
-                    || self.max_shard_rounds.get(&cblock.shard_id).copied().unwrap_or(0) < cblock.round {
+                    if !self.max_shard_rounds.contains_key(&cblock.shard_id) {
                         debug!("Receive the first or a larger CBlock from shard {}, new round {}", cblock.shard_id, cblock.round);
                         let cblm = CBlockMeta::new(
                             cblock.shard_id,
@@ -161,21 +174,29 @@ impl Proposer {
                         ).await;
                         self.shard_rounds.insert(cblock.shard_id, cblm);
                         self.max_shard_rounds.insert(cblock.shard_id, cblock.round);
-                        
+                    }
+                    else if let Some(tp_round) = self.max_shard_rounds.get(&cblock.shard_id).copied() {
+                        if tp_round < cblock.round {
+                            debug!("Receive the first or a larger CBlock from shard {}, new round {}", cblock.shard_id, cblock.round);
+                            let cblm = CBlockMeta::new(
+                                cblock.shard_id,
+                                cblock.round,
+                                cblock.digest(),
+                            ).await;
+                            self.shard_rounds.insert(cblock.shard_id, cblm);
+                            self.max_shard_rounds.insert(cblock.shard_id, cblock.round);
+                        }
                     }
                 },
                 // Receive a proposer message, becoming the leader of this round
                 // Check if receiving at least CBlock from every execution shard
                 Some(message) = self.rx_message.recv() => match message {
-                    ProposerMessage::Make(round, qc, tc) => { 
-                        self.is_ready(round, qc, tc).await;
+                    ProposerMessage::Make(round, qc, tc) => {
+                        self.make_block(round, qc.clone(), tc.clone()).await;
                     },
                     ProposerMessage::Cleanup(_cbmetas) => {
-                        for x in &_cbmetas {
-                            self.shard_rounds.remove(&x.shard_id);
-                        }
+                        self.update_map(_cbmetas).await;
                         debug!("Clean shard CBlockMeta");
-                        // self.shard_rounds.clear();
                     }
                 }
             }

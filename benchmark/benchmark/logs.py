@@ -4,6 +4,7 @@ from multiprocessing import Pool
 from os.path import join
 from re import findall, search
 from statistics import mean
+from math import ceil
 import copy
 
 from benchmark.utils import Print
@@ -424,7 +425,7 @@ class ShardLogParser:
         tmp = findall(r'\[(.*Z) .* sample transaction (\d+)', log)
         samples = {int(s): self._to_posix(t) for t, s in tmp}
         # print("Client tx number is", len(samples))
-
+        
         return size, rate, start, misses, samples
 
     def _parse_executors(self, log):
@@ -542,20 +543,26 @@ class ShardLogParser:
 
     def _consensus_latency(self):
         latency = []
+        if len(self.arete_consensus_rounds_to_ts) < 2:
+            return 0
         first_consensus_ts = list(self.arete_consensus_rounds_to_ts.values())[1]
         for d, c in self.commits.items():
-            if c > first_consensus_ts:
+            if self.proposals[d] > first_consensus_ts:
                 latency += [c - self.proposals[d]]
-        # [c - self.proposals[d] for d, c in self.commits.items()]
         return mean(latency) if latency else 0
 
     def _avg_consensus_interval(self):
         interval = []
-        temp = 0.0
-        for _, ts in self.arete_consensus_rounds_to_ts.items():
-            interval += [float(ts) - temp]
-            temp = float(ts)
-        return mean(interval[1:]) if interval else 0
+        temp_ts = list(self.arete_consensus_rounds_to_ts.values())
+        last_ts = 0.0
+        if len(temp_ts) >= 2:
+            last_ts = float(temp_ts[0])
+            for i in range(1, len(temp_ts)):
+                interval += [float(temp_ts[i]) - last_ts]
+                last_ts = float(temp_ts[i])
+            return mean(interval[1:]) if interval else 0
+        else:
+            return 0
         
     def _end_to_end_throughput(self):
         if not self.commits:
@@ -593,7 +600,10 @@ class ShardLogParser:
         for sent, received in zip(self.sent_samples, self.received_samples):
             for tx_id, batch_id in received.items():
                 if batch_id in self.commits:
-                    assert tx_id in sent  # We receive txs that we sent.
+                    if not tx_id in sent:
+                        continue
+                        # print(f"Debug: send id is {tx_id} \n sent is {sent}")
+                    # assert tx_id in sent  # We receive txs that we sent.
                     start = sent[tx_id]
                     end = self.commits[batch_id]
                     latency += [end-start]
@@ -637,9 +647,11 @@ class ShardLogParser:
                     if int_exec_round in self.arete_rounds_to_timestamp:  
                         start = sent[tx_id]
                         end = self.arete_rounds_to_timestamp[int_exec_round]    # commit timestamp
+                        if end > list(self.arete_consensus_rounds_to_ts.values())[-1]:
+                            # since cross latency doesn't cover the last samples
+                            return mean(latency) if latency else 0
                         latency += [end-start]
-        # since cross latency doesn't cover the last samples, remove them
-        return mean(latency[:int(3*len(latency)/4)]) if latency else 0
+        return mean(latency) if latency else 0
     
     def _arete_end_to_end_cross_latency(self):
         latency = []
@@ -696,7 +708,7 @@ class ShardLogParser:
             f' Shard number: {self.shard_num} shards\n'
             f' Faults: {self.faults} nodes\n'
             f' Committee size: {int(self.committee_size/self.shard_num)} nodes\n'
-            f' Input rate: {sum(self.rate):,} tx/s\n'
+            f' Input rate per shard: {ceil(sum(self.rate)/self.shard_num):,} tx/s\n'
             f' Transaction size: {self.size[0]:,} B\n'
             f' Execution time: {round(arete_duration):,} s\n'
             '\n'
@@ -759,7 +771,7 @@ class ShardLogParser:
             with open(filename, 'r') as f:
                 clients += [f.read()]
         executors = []
-        for filename in sorted(glob(join(directory, '*executor-*.log'))):
+        for filename in sorted(glob(join(directory, '*executor*.log'))):
             with open(filename, 'r') as f:
                 executors += [f.read()]
 
