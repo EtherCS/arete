@@ -4,6 +4,7 @@ from multiprocessing import Pool
 from os.path import join
 from re import findall, search
 from statistics import mean
+from math import ceil
 import copy
 
 from benchmark.utils import Print
@@ -308,6 +309,7 @@ class ShardLogParser:
         self.arete_consensus_rounds_to_ts = self._update_arete_consensus_time_results(dict(sorted_temp))
         
         # self.arete_rounds_to_timestamp -> dict{int: string}
+        # Map all execution round to commit_timestamp
         self.arete_rounds_to_timestamp = self._update_arete_commit_time_results()
         
         self.sizes = {
@@ -423,7 +425,7 @@ class ShardLogParser:
         tmp = findall(r'\[(.*Z) .* sample transaction (\d+)', log)
         samples = {int(s): self._to_posix(t) for t, s in tmp}
         # print("Client tx number is", len(samples))
-
+        
         return size, rate, start, misses, samples
 
     def _parse_executors(self, log):
@@ -495,7 +497,20 @@ class ShardLogParser:
     def _to_posix(self, string):
         x = datetime.fromisoformat(string.replace('Z', '+00:00'))
         return datetime.timestamp(x)
-
+    
+    def get_second_max(self, numbers):
+        if len(numbers) < 2:
+            return "List must have at least two elements"
+        max_value = max(numbers[0], numbers[1])
+        second_max = min(numbers[0], numbers[1])
+        for num in numbers[2:]:
+            if num > max_value:
+                second_max = max_value
+                max_value = num
+            elif num > second_max and num != max_value:
+                second_max = num
+        return second_max
+    
     def _consensus_throughput(self):
         if not self.commits:
             return 0, 0, 0
@@ -505,19 +520,49 @@ class ShardLogParser:
         bps = bytes / duration
         tps = bps / self.size[0]
         return tps, bps, duration
+    
+    def _arete_consensus_throughput(self):
+        if not self.commits:
+            return 0, 0, 0
+        start, end = min(self.proposals.values()), max(self.commits.values())
+        temp = end
+        flag = int(0)
+        for _, ts in self.arete_consensus_rounds_to_ts.items():
+            if flag == 1:   # now, it is the timestamp of next round
+                end = ts
+                break
+            if end <= float(ts):
+                flag = 1
+        if temp == end: 
+            end += self._avg_consensus_interval()
+        duration = end - start
+        bytes = sum(self.sizes.values())
+        bps = bytes / duration
+        tps = bps / self.size[0]
+        return tps, bps, duration
 
     def _consensus_latency(self):
-        latency = [c - self.proposals[d] for d, c in self.commits.items()]
+        latency = []
+        if len(self.arete_consensus_rounds_to_ts) < 2:
+            return 0
+        first_consensus_ts = list(self.arete_consensus_rounds_to_ts.values())[1]
+        for d, c in self.commits.items():
+            if self.proposals[d] > first_consensus_ts:
+                latency += [c - self.proposals[d]]
         return mean(latency) if latency else 0
 
     def _avg_consensus_interval(self):
         interval = []
-        temp = 0.0
-        for _, ts in self.arete_consensus_rounds_to_ts.items():
-            interval += [float(ts) - temp]
-            temp = float(ts)
-        return mean(interval[1:]) if interval else 0
-    
+        temp_ts = list(self.arete_consensus_rounds_to_ts.values())
+        last_ts = 0.0
+        if len(temp_ts) >= 2:
+            last_ts = float(temp_ts[0])
+            for i in range(1, len(temp_ts)):
+                interval += [float(temp_ts[i]) - last_ts]
+                last_ts = float(temp_ts[i])
+            return mean(interval[1:]) if interval else 0
+        else:
+            return 0
         
     def _end_to_end_throughput(self):
         if not self.commits:
@@ -528,16 +573,67 @@ class ShardLogParser:
         bps = bytes / duration
         tps = bps / self.size[0]
         return tps, bps, duration
+    
+    def _end_to_end_arete_throughput(self):
+        if not self.commits:
+            return 0, 0, 0
+        start, end = min(self.start), max(self.commits.values())
+        temp = end
+        # ARETE: txs are confirmed with two rounds
+        flag = int(0)
+        for _, ts in self.arete_consensus_rounds_to_ts.items():
+            if flag == 1:   # now, it is the timestamp of next round
+                end = ts
+                break
+            if end <= float(ts):
+                flag = 1
+        if temp == end:     # no more txs are handled, using avg interval to evaluate
+            end += self._avg_consensus_interval()
+        duration = end - start
+        bytes = sum(self.sizes.values())
+        bps = bytes / duration
+        tps = bps / self.size[0]
+        return tps, bps, duration
 
-    def _end_to_end_latency(self):
+    def _end_to_end_intra_latency(self):
         latency = []
         for sent, received in zip(self.sent_samples, self.received_samples):
             for tx_id, batch_id in received.items():
                 if batch_id in self.commits:
-                    assert tx_id in sent  # We receive txs that we sent.
+                    if not tx_id in sent:
+                        continue
+                    # assert tx_id in sent  # We receive txs that we sent.
                     start = sent[tx_id]
                     end = self.commits[batch_id]
                     latency += [end-start]
+        return mean(latency) if latency else 0
+    
+    # Compared sharding protocols: adopt a lock-based protocol
+    def _end_to_end_cross_latency(self):
+        latency = []
+        consensus_round_latency = list(self.arete_consensus_rounds_to_ts.values())
+        index = 0
+        last_ts = 0.0
+        for sent, received in zip(self.sent_samples, self.received_samples):
+            for tx_id, batch_id in received.items():
+                if batch_id in self.arete_commits_to_round: # this batch is picked
+                    exec_round = self.arete_commits_to_round[batch_id] # its execution round
+                    int_exec_round = int(exec_round)
+                    if int_exec_round in self.arete_rounds_to_timestamp:
+                        start = sent[tx_id]
+                        if self.arete_rounds_to_timestamp[int_exec_round] > last_ts:
+                            while self.arete_rounds_to_timestamp[int_exec_round] > consensus_round_latency[index]:
+                                index += 1
+                                if index >= len(consensus_round_latency):
+                                    return mean(latency) if latency else 0
+                        else:
+                            index += 1
+                            if index >= len(consensus_round_latency):
+                                return mean(latency) if latency else 0
+                        last_ts = consensus_round_latency[index]
+                            
+                        end = consensus_round_latency[index]
+                        latency += [end-start]
         return mean(latency) if latency else 0
     
     def _arete_end_to_end_intra_latency(self):
@@ -550,9 +646,11 @@ class ShardLogParser:
                     if int_exec_round in self.arete_rounds_to_timestamp:  
                         start = sent[tx_id]
                         end = self.arete_rounds_to_timestamp[int_exec_round]    # commit timestamp
+                        if end > list(self.arete_consensus_rounds_to_ts.values())[-1]:
+                            # since cross latency doesn't cover the last samples
+                            return mean(latency) if latency else 0
                         latency += [end-start]
-        # since cross latency doesn't cover the last samples, remove them
-        return mean(latency[:int(3*len(latency)/4)]) if latency else 0
+        return mean(latency) if latency else 0
     
     def _arete_end_to_end_cross_latency(self):
         latency = []
@@ -570,20 +668,21 @@ class ShardLogParser:
                             if flag == 1:   # now, it is the timestamp of next round
                                 end = ts
                                 latency += [end-start]
-                                if intra_latency[-1] > latency[-1]:
-                                    print(f"Debug: find intra {intra_latency[-1]} is larger than {latency[-1]} in round {int_exec_round} \n")
-                                    print(f"self.arete_rounds_to_timestamp[{int_exec_round}] is {self.arete_rounds_to_timestamp[int_exec_round]}\n")
-                                    print(f"self.arete_rounds_to_timestamp[{int(consensus_round)}] is {self.arete_rounds_to_timestamp[int(consensus_round)]}, self.arete_consensus_rounds_to_ts[{int(consensus_round)}] is {ts} \n")
                                 break
                             if int_exec_round <= int(consensus_round):
                                 flag = 1
         return mean(latency) if latency else 0
 
     def result(self):
-        arete_consensus_latenct = self._avg_consensus_interval() * 1000
+        consensus_latency = self._consensus_latency() * 1000
         consensus_tps, consensus_bps, _ = self._consensus_throughput()
         end_to_end_tps, end_to_end_bps, duration = self._end_to_end_throughput()
-        end_to_end_latency = self._end_to_end_latency() * 1000
+        end_to_end_intra_latency = self._end_to_end_intra_latency() * 1000
+        end_to_end_cross_latency = self._end_to_end_cross_latency() * 1000
+        
+        arete_consensus_latency = self._avg_consensus_interval() * 1000
+        arete_consensus_tps, arete_consensus_bps, _ = self._arete_consensus_throughput()
+        arete_end_to_end_tps, arete_end_to_end_bps, arete_duration = self._end_to_end_arete_throughput()
         arete_end_to_end_intra_latency = self._arete_end_to_end_intra_latency() * 1000
         arete_end_to_end_cross_latency = self._arete_end_to_end_cross_latency() * 1000
 
@@ -604,9 +703,9 @@ class ShardLogParser:
             f' Shard number: {self.shard_num} shards\n'
             f' Faults: {self.faults} nodes\n'
             f' Committee size: {int(self.committee_size/self.shard_num)} nodes\n'
-            f' Input rate: {sum(self.rate):,} tx/s\n'
+            f' Input rate per shard: {ceil(sum(self.rate)/self.shard_num):,} tx/s\n'
             f' Transaction size: {self.size[0]:,} B\n'
-            f' Execution time: {round(duration):,} s\n'
+            f' Execution time: {round(arete_duration):,} s\n'
             '\n'
             f' Consensus timeout delay: {consensus_timeout_delay:,} ms\n'
             f' Consensus sync retry delay: {consensus_sync_retry_delay:,} ms\n'
@@ -617,13 +716,22 @@ class ShardLogParser:
             f' Mempool max batch delay: {mempool_max_batch_delay:,} ms\n'
             '\n'
             ' + RESULTS:\n'
+            f' Comparison Sharding:\n'
             f' Consensus TPS: {round(consensus_tps):,} tx/s\n'
             f' Consensus BPS: {round(consensus_bps):,} B/s\n'
-            f' Consensus latency (Anchor block interval): {round(arete_consensus_latenct):,} ms\n'
-            '\n'
+            f' Consensus latency: {round(consensus_latency):,} ms\n'
+            # '\n'
             f' End-to-end TPS: {round(end_to_end_tps):,} tx/s\n'
             f' End-to-end BPS: {round(end_to_end_bps):,} B/s\n'
-            f' End-to-end Hotstuff latency: {round(end_to_end_latency):,} ms\n'
+            f' End-to-end intra latency: {round(end_to_end_intra_latency):,} ms\n'
+            f' End-to-end cross latency: {round(end_to_end_cross_latency):,} ms\n'
+            '\n'
+            f' ARETE (ours):\n'
+            f' Consensus TPS: {round(arete_consensus_tps):,} tx/s\n'
+            f' Consensus BPS: {round(arete_consensus_bps):,} B/s\n'
+            f' Consensus latency (Anchor block interval): {round(arete_consensus_latency):,} ms\n'
+            f' End-to-end TPS: {round(arete_end_to_end_tps):,} tx/s\n'
+            f' End-to-end BPS: {round(arete_end_to_end_bps):,} B/s\n'
             f' End-to-end arete intra latency: {round(arete_end_to_end_intra_latency):,} ms\n'
             f' End-to-end arete cross latency: {round(arete_end_to_end_cross_latency):,} ms\n'
             '-----------------------------------------\n'
@@ -658,7 +766,7 @@ class ShardLogParser:
             with open(filename, 'r') as f:
                 clients += [f.read()]
         executors = []
-        for filename in sorted(glob(join(directory, '*executor-*.log'))):
+        for filename in sorted(glob(join(directory, '*executor*.log'))):
             with open(filename, 'r') as f:
                 executors += [f.read()]
 

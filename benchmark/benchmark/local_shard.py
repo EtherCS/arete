@@ -64,6 +64,7 @@ class LocalBenchShard:
             executors, rate = self.shard_sizes[0], self.rate[0]
             shardSizes = self.shard_sizes[0]
             shardNum = self.shard_num[0]
+            total_executors = executors * shardNum
 
             # Cleanup all files.
             cmd = f'{CommandMaker.clean_logs()} ; {CommandMaker.cleanup()}'
@@ -150,6 +151,7 @@ class LocalBenchShard:
                 )
                 self._background_run(cmd, node_log_file)
             
+            # Run the clients (they will wait for the executors to be ready).
             for shardId in range(shardNum):
                 # Generate configuration files for executors.
                 keys = []
@@ -164,8 +166,6 @@ class LocalBenchShard:
 
                 # Do not boot faulty nodes.
                 executors = executors - self.faults
-
-                # Run the clients (they will wait for the executors to be ready).
                 addresses = committee.front
                 rate_share = ceil(rate / executors)
                 timeout = self.executor_parameters.certify_timeout_delay
