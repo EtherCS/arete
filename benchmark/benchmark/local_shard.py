@@ -130,9 +130,9 @@ class LocalBenchShard:
                     )
                     self._background_run(cmd, log_file)
                 
-                # Wait for the nodes to synchronize
-                Print.info(f'Waiting for shard {shardId} the nodes to synchronize...')
-                sleep(2 * self.executor_parameters.certify_timeout_delay / 1000)
+            # Wait for the nodes to synchronize
+            Print.info(f'Waiting for shard {shardId} the nodes to synchronize...')
+            sleep(2 * self.executor_parameters.certify_timeout_delay / 1000)
 
             # update ordering committee with executors' information
             ordering_committee_with_confirm_addrs = LocalCommittee(node_names, self._get_node_port(), shardNum, self.ORDERING_SHARD_ID, executor_confirmation_addrs)

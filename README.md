@@ -59,3 +59,6 @@ This command may take a long time the first time you run it (compiling rust code
  End-to-end arete cross latency: 5,465 ms
 -----------------------------------------
 ```
+
+## More tests
+Test larger shard: 1) increase `duration`; 2) increase `certify_timeout_delay`
