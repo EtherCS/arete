@@ -55,6 +55,7 @@ impl EBlock {
         secret: &SecretKey,
     ) -> Self {
         let block = EBlock {
+            shard_id: 0,
             qc,
             tc: None,
             author,

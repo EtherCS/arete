@@ -1,7 +1,7 @@
 use crate::config::Export as _;
 use crate::config::{Committee, ConfigError, Parameters, Secret};
 use certify::{EBlock, Consensus};
-use crypto::SignatureService;
+use crypto::{SignatureService, Hash};
 use log::{debug, info};
 use execpool::Mempool;
 use rand::seq::IteratorRandom;
@@ -102,7 +102,8 @@ impl Executor {
             let certify_block = CBlock::new(
                 self.shard_id, 
                 _block.author, 
-                _block.round, 
+                _block.round,
+                _block.digest(), 
                 _block.payload.clone(), 
                 _block.signature.clone()).await;
             let message = bincode::serialize(&certify_block.clone())

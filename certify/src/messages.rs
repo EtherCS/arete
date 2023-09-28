@@ -16,6 +16,7 @@ pub mod messages_tests;
 // Execution block
 #[derive(Serialize, Deserialize, Default, Clone)]
 pub struct EBlock {  
+    pub shard_id: u32,
     pub qc: QC, 
     pub tc: Option<TC>, 
     pub author: PublicKey,
@@ -26,6 +27,7 @@ pub struct EBlock {
 
 impl EBlock {
     pub async fn new(
+        shard_id: u32,
         qc: QC,
         tc: Option<TC>, 
         author: PublicKey,
@@ -34,6 +36,7 @@ impl EBlock {
         mut signature_service: SignatureService,
     ) -> Self {
         let block = Self {
+            shard_id,
             qc,
             tc,
             author,
@@ -86,6 +89,7 @@ impl Hash for EBlock {
             hasher.update(x);
         }
         hasher.update(&self.qc.hash);
+        hasher.update(&self.shard_id.to_le_bytes());
         Digest(hasher.finalize().as_slice()[..32].try_into().unwrap())
     }
 }

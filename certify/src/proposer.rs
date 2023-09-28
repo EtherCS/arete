@@ -9,6 +9,7 @@ use log::{debug, info};
 use network::{CancelHandler, ReliableSender};
 use std::collections::HashSet;
 use tokio::sync::mpsc::{Receiver, Sender};
+use types::ShardInfo;
 
 #[derive(Debug)]
 pub enum ProposerMessage {
@@ -19,6 +20,7 @@ pub enum ProposerMessage {
 pub struct Proposer {
     name: PublicKey,
     committee: ExecutionCommittee,
+    shard_info: ShardInfo,
     signature_service: SignatureService,
     rx_mempool: Receiver<Digest>,
     rx_message: Receiver<ProposerMessage>,
@@ -31,6 +33,7 @@ impl Proposer {
     pub fn spawn(
         name: PublicKey,
         committee: ExecutionCommittee,
+        shard_info: ShardInfo,
         signature_service: SignatureService,
         rx_mempool: Receiver<Digest>,
         rx_message: Receiver<ProposerMessage>,
@@ -40,6 +43,7 @@ impl Proposer {
             Self {
                 name,
                 committee,
+                shard_info,
                 signature_service,
                 rx_mempool,
                 rx_message,
@@ -62,6 +66,7 @@ impl Proposer {
         info!("The number of transaction hash in a block is {}", self.buffer.capacity());
         // Generate a new block.
         let block = EBlock::new(
+            self.shard_info.id,
             qc,
             tc,
             self.name,

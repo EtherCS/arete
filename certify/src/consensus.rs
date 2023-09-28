@@ -119,6 +119,7 @@ impl Consensus {
         Proposer::spawn(
             name,
             committee.clone(),
+            shard_info.clone(),
             signature_service.clone(),
             rx_mempool,
             /* rx_message */ rx_proposer,

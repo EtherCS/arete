@@ -80,6 +80,7 @@ pub struct CBlock {
     pub shard_id: u32, 
     pub author: PublicKey,
     pub round: Round,
+    pub ebhash: Digest,
     pub payload: Vec<Digest>,   // TODO (Execution): map[ctx, succOrFail]
     pub signature: Signature,
 }
@@ -89,6 +90,7 @@ impl CBlock {
         shard_id: u32,
         author: PublicKey,
         round: Round,
+        ebhash: Digest,
         payload: Vec<Digest>,
         signature: Signature,
     ) -> Self {
@@ -96,6 +98,7 @@ impl CBlock {
             shard_id,
             author,
             round,
+            ebhash,
             payload,
             signature,
         };
@@ -115,6 +118,7 @@ impl Hash for CBlock {
         for x in &self.payload {
             hasher.update(x);
         }
+        hasher.update(&self.ebhash);
         hasher.update(&self.shard_id.to_le_bytes());
         Digest(hasher.finalize().as_slice()[..32].try_into().unwrap())
     }
