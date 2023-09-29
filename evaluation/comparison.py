@@ -36,7 +36,7 @@ def pFailWithShardSize(n, s, m, h):
         p += Fraction(scipy.special.comb(int(s), int(i), exact = True) * scipy.special.comb(int(n - s), int(m - i), exact = True), denom)
     return p
 
-def main(n, k):
+def main(n, k, s_t):
     value_width = 15
     # corruption threshold percentages we are interested in
     crps = range(99 , 32 , -1)
@@ -60,7 +60,8 @@ def main(n, k):
     # GEARBOX
     crps = range(0 , 34 , 1)
     print(" ")
-    s_n = 25    # consider s=25%
+    # s_n = 25    # consider s=25%
+    s_n = s_t
     for crp in crps:
         f_l = crp 
         f_s = 100-2*f_l-1
@@ -70,18 +71,19 @@ def main(n, k):
         print("{:<{width}}".format("GEARBOX", width=value_width) + "{:<{width}}".format(str(s_n)+"%", width=value_width) + "{:<{width}}".format(str(f_s)+"%", width=value_width) + "{:<{width}}".format(str(f_l)+"%", width=value_width) + "{:<{width}}".format(m_min, width=value_width) + "{:<{width}}".format(float(1-pFailWithShardSize(n, n*Fraction(s_n, 100), m_min, int(m_min*Fraction(100-f_l, 100)))), width=value_width))
 
     print(" ")
-    s_n = 30    # consider s=30%
-    for crp in crps:
-        f_l = crp 
-        f_s = 100-2*f_l-1
-        m_min = minCSize(n, n*Fraction(s_n, 100), Fraction(f_s, 100), k)
-        # print("GEARBOX\t\t", str(s_n) + "%\t", str(f_s) + "%\t", str(f_l) + "%\t", m_min, "\t", float(1-pFailWithShardSize(n, n*Fraction(s_n, 100), m_min, int(m_min*Fraction(100-f_l, 100)))))
-        print("{:<{width}}".format("GEARBOX", width=value_width) + "{:<{width}}".format(str(s_n)+"%", width=value_width) + "{:<{width}}".format(str(f_s)+"%", width=value_width) + "{:<{width}}".format(str(f_l)+"%", width=value_width) + "{:<{width}}".format(m_min, width=value_width) + "{:<{width}}".format(float(1-pFailWithShardSize(n, n*Fraction(s_n, 100), m_min, int(m_min*Fraction(100-f_l, 100)))), width=value_width))
+    # s_n = 30    # consider s=30%
+    # for crp in crps:
+    #     f_l = crp 
+    #     f_s = 100-2*f_l-1
+    #     m_min = minCSize(n, n*Fraction(s_n, 100), Fraction(f_s, 100), k)
+    #     # print("GEARBOX\t\t", str(s_n) + "%\t", str(f_s) + "%\t", str(f_l) + "%\t", m_min, "\t", float(1-pFailWithShardSize(n, n*Fraction(s_n, 100), m_min, int(m_min*Fraction(100-f_l, 100)))))
+    #     print("{:<{width}}".format("GEARBOX", width=value_width) + "{:<{width}}".format(str(s_n)+"%", width=value_width) + "{:<{width}}".format(str(f_s)+"%", width=value_width) + "{:<{width}}".format(str(f_l)+"%", width=value_width) + "{:<{width}}".format(m_min, width=value_width) + "{:<{width}}".format(float(1-pFailWithShardSize(n, n*Fraction(s_n, 100), m_min, int(m_min*Fraction(100-f_l, 100)))), width=value_width))
 
     # ARETE
     crps = range(99 , 49 , -1)
     print(" ")
-    s_n = 25    # consider s=25%
+    # s_n = 25    # consider s=25%
+    s_n = s_t
     for crp in crps:
         f_s = crp 
         f_l = 100-f_s-1
@@ -90,24 +92,25 @@ def main(n, k):
         print("{:<{width}}".format("ARETE", width=value_width) + "{:<{width}}".format(str(s_n)+"%", width=value_width) + "{:<{width}}".format(str(f_s)+"%", width=value_width) + "{:<{width}}".format(str(f_l)+"%", width=value_width) + "{:<{width}}".format(m_min, width=value_width) + "{:<{width}}".format(float(1-pFailWithShardSize(n, n*Fraction(s_n, 100), m_min, int(m_min*Fraction(100-f_l, 100)))), width=value_width))
         
 
-    print(" ")
-    s_n = 30    # consider s=30%
-    for crp in crps:
-        f_s = crp 
-        f_l = 100-f_s-1
-        m_min = minCSize(n, n*Fraction(s_n, 100), Fraction(f_s, 100), k)
-        # print("ARETE\t\t", str(s_n) + "%\t", str(f_s) + "%\t", str(f_l) + "%\t", m_min, "\t", float(1-pFailWithShardSize(n, n*Fraction(s_n, 100), m_min, int(m_min*Fraction(100-f_l, 100)))))
-        print("{:<{width}}".format("ARETE", width=value_width) + "{:<{width}}".format(str(s_n)+"%", width=value_width) + "{:<{width}}".format(str(f_s)+"%", width=value_width) + "{:<{width}}".format(str(f_l)+"%", width=value_width) + "{:<{width}}".format(m_min, width=value_width) + "{:<{width}}".format(float(1-pFailWithShardSize(n, n*Fraction(s_n, 100), m_min, int(m_min*Fraction(100-f_l, 100)))), width=value_width))
+    # print(" ")
+    # s_n = 30    # consider s=30%
+    # for crp in crps:
+    #     f_s = crp 
+    #     f_l = 100-f_s-1
+    #     m_min = minCSize(n, n*Fraction(s_n, 100), Fraction(f_s, 100), k)
+    #     # print("ARETE\t\t", str(s_n) + "%\t", str(f_s) + "%\t", str(f_l) + "%\t", m_min, "\t", float(1-pFailWithShardSize(n, n*Fraction(s_n, 100), m_min, int(m_min*Fraction(100-f_l, 100)))))
+    #     print("{:<{width}}".format("ARETE", width=value_width) + "{:<{width}}".format(str(s_n)+"%", width=value_width) + "{:<{width}}".format(str(f_s)+"%", width=value_width) + "{:<{width}}".format(str(f_l)+"%", width=value_width) + "{:<{width}}".format(m_min, width=value_width) + "{:<{width}}".format(float(1-pFailWithShardSize(n, n*Fraction(s_n, 100), m_min, int(m_min*Fraction(100-f_l, 100)))), width=value_width))
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--n", type=int, help="Total number of nodes")
     parser.add_argument("--k", type=int, help="Security parameter")
+    parser.add_argument("--s", type=int, help="The total byzantine ratio (0, 100)")
     
     args = parser.parse_args()
     
     # Compute values for n total parties and k bit security
-    main(args.n, args.k)
+    main(args.n, args.k, args.s)
     
     
