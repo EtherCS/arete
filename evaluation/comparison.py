@@ -40,7 +40,7 @@ def main(n, k, s_t):
     value_width = 15
     # corruption threshold percentages we are interested in
     crps = range(99 , 32 , -1)
-    print(f"Total nodes: {n:<{value_width}} Security parameter: {k:<{value_width}}")
+    print(f"Total nodes: {n:<{value_width}} Security parameter: {k:<{value_width}} Total Byzantine ratio: {s_t:<{value_width}}")
     
     print("{:<{width}}".format("protocol", width=value_width) + "{:<{width}}".format("s", width=value_width) + "{:<{width}}".format("fS", width=value_width) + "{:<{width}}".format("fL", width=value_width) + "{:<{width}}".format("m", width=value_width) + "{:<{width}}".format("liveness_ratio", width=value_width))
 
@@ -60,46 +60,25 @@ def main(n, k, s_t):
     # GEARBOX
     crps = range(0 , 34 , 1)
     print(" ")
-    # s_n = 25    # consider s=25%
     s_n = s_t
     for crp in crps:
         f_l = crp 
         f_s = 100-2*f_l-1
         m_min = minCSize(n, n*Fraction(s_n, 100), Fraction(f_s, 100), k)
-        # print("GEARBOX\t\t", str(s_n) + "%\t", str(f_s) + "%\t", str(f_l) + "%\t", m_min, "\t", float(1-pFailWithShardSize(n, n*Fraction(s_n, 100), m_min, int(m_min*Fraction(100-f_l, 100)))))
         
         print("{:<{width}}".format("GEARBOX", width=value_width) + "{:<{width}}".format(str(s_n)+"%", width=value_width) + "{:<{width}}".format(str(f_s)+"%", width=value_width) + "{:<{width}}".format(str(f_l)+"%", width=value_width) + "{:<{width}}".format(m_min, width=value_width) + "{:<{width}}".format(float(1-pFailWithShardSize(n, n*Fraction(s_n, 100), m_min, int(m_min*Fraction(100-f_l, 100)))), width=value_width))
-
     print(" ")
-    # s_n = 30    # consider s=30%
-    # for crp in crps:
-    #     f_l = crp 
-    #     f_s = 100-2*f_l-1
-    #     m_min = minCSize(n, n*Fraction(s_n, 100), Fraction(f_s, 100), k)
-    #     # print("GEARBOX\t\t", str(s_n) + "%\t", str(f_s) + "%\t", str(f_l) + "%\t", m_min, "\t", float(1-pFailWithShardSize(n, n*Fraction(s_n, 100), m_min, int(m_min*Fraction(100-f_l, 100)))))
-    #     print("{:<{width}}".format("GEARBOX", width=value_width) + "{:<{width}}".format(str(s_n)+"%", width=value_width) + "{:<{width}}".format(str(f_s)+"%", width=value_width) + "{:<{width}}".format(str(f_l)+"%", width=value_width) + "{:<{width}}".format(m_min, width=value_width) + "{:<{width}}".format(float(1-pFailWithShardSize(n, n*Fraction(s_n, 100), m_min, int(m_min*Fraction(100-f_l, 100)))), width=value_width))
 
     # ARETE
     crps = range(99 , 49 , -1)
     print(" ")
-    # s_n = 25    # consider s=25%
     s_n = s_t
     for crp in crps:
         f_s = crp 
         f_l = 100-f_s-1
         m_min = minCSize(n, n*Fraction(s_n, 100), Fraction(f_s, 100), k)
-        # print("ARETE\t\t", str(s_n) + "%\t", str(f_s) + "%\t", str(f_l) + "%\t", m_min, "\t", float(1-pFailWithShardSize(n, n*Fraction(s_n, 100), m_min, int(m_min*Fraction(100-f_l, 100)))))
-        print("{:<{width}}".format("ARETE", width=value_width) + "{:<{width}}".format(str(s_n)+"%", width=value_width) + "{:<{width}}".format(str(f_s)+"%", width=value_width) + "{:<{width}}".format(str(f_l)+"%", width=value_width) + "{:<{width}}".format(m_min, width=value_width) + "{:<{width}}".format(float(1-pFailWithShardSize(n, n*Fraction(s_n, 100), m_min, int(m_min*Fraction(100-f_l, 100)))), width=value_width))
         
-
-    # print(" ")
-    # s_n = 30    # consider s=30%
-    # for crp in crps:
-    #     f_s = crp 
-    #     f_l = 100-f_s-1
-    #     m_min = minCSize(n, n*Fraction(s_n, 100), Fraction(f_s, 100), k)
-    #     # print("ARETE\t\t", str(s_n) + "%\t", str(f_s) + "%\t", str(f_l) + "%\t", m_min, "\t", float(1-pFailWithShardSize(n, n*Fraction(s_n, 100), m_min, int(m_min*Fraction(100-f_l, 100)))))
-    #     print("{:<{width}}".format("ARETE", width=value_width) + "{:<{width}}".format(str(s_n)+"%", width=value_width) + "{:<{width}}".format(str(f_s)+"%", width=value_width) + "{:<{width}}".format(str(f_l)+"%", width=value_width) + "{:<{width}}".format(m_min, width=value_width) + "{:<{width}}".format(float(1-pFailWithShardSize(n, n*Fraction(s_n, 100), m_min, int(m_min*Fraction(100-f_l, 100)))), width=value_width))
+        print("{:<{width}}".format("ARETE", width=value_width) + "{:<{width}}".format(str(s_n)+"%", width=value_width) + "{:<{width}}".format(str(f_s)+"%", width=value_width) + "{:<{width}}".format(str(f_l)+"%", width=value_width) + "{:<{width}}".format(m_min, width=value_width) + "{:<{width}}".format(float(1-pFailWithShardSize(n, n*Fraction(s_n, 100), m_min, int(m_min*Fraction(100-f_l, 100)))), width=value_width))
 
 
 if __name__ == "__main__":
