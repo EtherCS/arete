@@ -1,5 +1,5 @@
 # ARETE
-Blockchain Sharding Made Practical
+Blockchain Sharding Made Practical. This implementation is based on [Alberto's Hotstuff codebase](https://github.com/asonnino/hotstuff).
 
 ## Quick Start
 
@@ -61,6 +61,6 @@ This command may take a long time the first time you run it (compiling rust code
 ```
 
 ## AWS test
-See [this wiki document]("https://github.com/EtherCS/arete/wiki/AWS-Benchmark").
+See [this wiki document](https://github.com/EtherCS/arete/wiki/AWS-Benchmark).
 ## More tests
 Test larger shard: 1) increase `duration`; 2) increase `certify_timeout_delay`
