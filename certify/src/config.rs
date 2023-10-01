@@ -40,10 +40,11 @@ pub struct Authority {
 pub struct ExecutionCommittee {
     pub authorities: HashMap<PublicKey, Authority>,
     pub epoch: EpochNumber,
+    pub liveness_threshold: f32,
 }
 
 impl ExecutionCommittee {
-    pub fn new(info: Vec<(PublicKey, Stake, SocketAddr)>, epoch: EpochNumber) -> Self {
+    pub fn new(info: Vec<(PublicKey, Stake, SocketAddr)>, epoch: EpochNumber, liveness_threshold: f32) -> Self {
         Self {
             authorities: info
                 .into_iter()
@@ -53,6 +54,7 @@ impl ExecutionCommittee {
                 })
                 .collect(),
             epoch,
+            liveness_threshold,
         }
     }
 
@@ -64,10 +66,10 @@ impl ExecutionCommittee {
         self.authorities.get(name).map_or_else(|| 0, |x| x.stake)
     }
 
-    // ARETE: only need (f+1)
+    // need (1-liveness_threshold)*total_stake
     pub fn quorum_threshold(&self) -> Stake {
         let total_votes: Stake = self.authorities.values().map(|x| x.stake).sum();
-        total_votes / 2 + 1
+        ((1.0-self.liveness_threshold).floor() as u32) * total_votes + 1
     }
 
     pub fn address(&self, name: &PublicKey) -> Option<SocketAddr> {

@@ -33,6 +33,7 @@ pub fn committee() -> ExecutionCommittee {
             })
             .collect(),
         /* epoch */ 100,
+        0.3,
     )
 }
 

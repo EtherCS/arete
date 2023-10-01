@@ -65,6 +65,8 @@ class LocalBenchShard:
             
             shardSize, rate = self.shard_sizes[0], self.rate[0]
             shardNum = self.shard_num[0]
+            liveness_threshold = self.liveness_threshold[0]
+            cross_shard_ratio = self.cross_shard_ratio[0]
             execution_faults = floor(shardSize * self.shard_faults)
             total_executors = shardSize * shardNum
 
@@ -108,7 +110,7 @@ class LocalBenchShard:
                     keys += [Key.from_file(filename)]
 
                 names = [x.name for x in keys]
-                committee = LocalExecutionCommittee(names, self._get_shard_port(shardId), shardNum, shardId, ordering_transaction_addrs_dict)
+                committee = LocalExecutionCommittee(names, self._get_shard_port(shardId), shardNum, shardId, ordering_transaction_addrs_dict, liveness_threshold)
                 committee.print(PathMaker.shard_committee_file(shardId))
 
                 self.executor_parameters.print(PathMaker.shard_parameters_file(shardId))
@@ -164,7 +166,7 @@ class LocalBenchShard:
                     keys += [Key.from_file(filename)]
 
                 names = [x.name for x in keys]
-                committee = LocalExecutionCommittee(names, self._get_shard_port(shardId), shardNum, shardId, ordering_transaction_addrs_dict)
+                committee = LocalExecutionCommittee(names, self._get_shard_port(shardId), shardNum, shardId, ordering_transaction_addrs_dict, liveness_threshold)
 
                 # Do not boot faulty nodes.
                 run_executors = shardSize - execution_faults
@@ -179,6 +181,7 @@ class LocalBenchShard:
                         rate_share,
                         shardId,
                         timeout,
+                        cross_shard_ratio,
                         #nodes=addresses
                     )
                     self._background_run(cmd, log_file)

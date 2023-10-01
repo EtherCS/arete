@@ -133,6 +133,7 @@ class ExecutionCommittee:
         shardNum,
         shardId,
         order_transaction_addrs,
+        liveness_threshold,
     ):
         inputs = [names, consensus_addr, transactions_addr, mempool_addr]
         assert all(isinstance(x, list) for x in inputs)
@@ -145,6 +146,7 @@ class ExecutionCommittee:
         self.mempool = mempool_addr
         self.confirmation = confirmation_addr  # execution shard receives the ordered txs from ordering shard
         self.order_transaction_addresses = order_transaction_addrs
+        self.liveness_threshold = liveness_threshold
 
         self.json = {
             "shard": self._build_shard_info(shardNum, shardId),
@@ -163,7 +165,7 @@ class ExecutionCommittee:
         node = {}
         for a, n in zip(self.consensus, self.names):
             node[n] = {"name": n, "stake": 1, "address": a}
-        return {"authorities": node, "epoch": 1}
+        return {"authorities": node, "epoch": 1, "liveness_threshold": self.liveness_threshold}
 
     def _build_mempool(self):
         node = {}
@@ -223,11 +225,12 @@ class ExecutionCommittee:
             data["shard"]["number"],
             data["shard"]["id"],
             data["order_transaction_addresses"],
+            data["consensus"]["liveness_threshold"],
         )
 
 
 class LocalExecutionCommittee(ExecutionCommittee):
-    def __init__(self, names, port, shardNum, shardId, order_transaction_addrs):
+    def __init__(self, names, port, shardNum, shardId, order_transaction_addrs, liveness_threshold):
         assert isinstance(names, list) and all(isinstance(x, str) for x in names)
         assert isinstance(port, int)
         size = len(names)
@@ -244,6 +247,7 @@ class LocalExecutionCommittee(ExecutionCommittee):
             shardNum,
             shardId,
             order_transaction_addrs,
+            liveness_threshold,
         )
 
 
@@ -319,6 +323,25 @@ class BenchParameters:
             self.shard_faults = float(json["shard_faults"])
             self.duration = int(json["duration"])
             self.runs = int(json["runs"]) if "runs" in json else 1
+            
+            # setting liveness threshold
+            liveness_threshold = json["liveness_threshold"]
+            liveness_threshold = (
+                liveness_threshold if isinstance(liveness_threshold, list) else [liveness_threshold]
+            )
+            if not liveness_threshold or any(x < 0 for x in liveness_threshold):
+                raise ConfigError("Missing or invalid liveness_threshold")
+            self.liveness_threshold = [float(x) for x in liveness_threshold]
+            
+            # setting cross-shard txs ratios 
+            cross_shard_ratio = json["cross_shard_ratio"]
+            cross_shard_ratio = (
+                cross_shard_ratio if isinstance(cross_shard_ratio, list) else [cross_shard_ratio]
+            )
+            if not cross_shard_ratio or any(x < 0 or x > 1 for x in cross_shard_ratio):
+                raise ConfigError("Missing or invalid cross_shard_ratio")
+            self.cross_shard_ratio = [float(x) for x in cross_shard_ratio]
+            
             # Config
             shard_num = json["shard_num"]
             shard_num = shard_num if isinstance(shard_num, list) else [shard_num]

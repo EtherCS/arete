@@ -132,6 +132,7 @@ fn deploy_testbed(executors: u16) -> Result<Vec<JoinHandle<()>>, Box<dyn std::er
             })
             .collect(),
         epoch,
+        0.3,
     );
 
     let committee_file = "committee.json";
