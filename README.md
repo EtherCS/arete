@@ -26,15 +26,16 @@ This command may take a long time the first time you run it (compiling rust code
 -----------------------------------------
  + CONFIG:
  Ordering shard size: 4 nodes
- Ordering shard fault ratio: 0.3 
+ Ordering shard fault ratio: 0.0 
  Execution shard number: 2 shards
  Execution shard size: 5 nodes
- Execution shard fault ratio: 0.4 
- Input rate per shard: 1,002 tx/s
+ Execution shard fault ratio: 0.0 
+ Input rate per shard: 1,000 tx/s
  Transaction size: 512 B
- Execution time: 18 s
+ Cross-shard ratio: 0.5 
+ Execution time: 12 s
 
- Consensus timeout delay: 1,000 ms
+ Consensus timeout delay: 4,000 ms
  Consensus sync retry delay: 10,000 ms
  Mempool sync retry delay: 5,000 ms
  Mempool sync retry nodes: 3 nodes
@@ -43,20 +44,20 @@ This command may take a long time the first time you run it (compiling rust code
 
  + RESULTS:
  SOTA Sharding:
- Consensus TPS: 1,089 tx/s
- Consensus BPS: 557,473 B/s
- End-to-end TPS: 959 tx/s
- End-to-end BPS: 491,242 B/s
- End-to-end intra latency: 1,497 ms
- End-to-end cross latency: 9,797 ms
+ Consensus TPS: 824 tx/s
+ Consensus BPS: 422,033 B/s
+ End-to-end TPS: 752 tx/s
+ End-to-end BPS: 384,787 B/s
+ End-to-end intra latency: 1,441 ms
+ End-to-end cross latency: 2,263 ms
 
  ARETE (ours):
- Consensus TPS: 885 tx/s
- Consensus BPS: 453,290 B/s
- End-to-end TPS: 798 tx/s
- End-to-end BPS: 408,506 B/s
- End-to-end arete intra latency: 2,541 ms
- End-to-end arete cross latency: 5,465 ms
+ Consensus TPS: 822 tx/s
+ Consensus BPS: 421,051 B/s
+ End-to-end TPS: 750 tx/s
+ End-to-end BPS: 383,970 B/s
+ End-to-end arete intra latency: 1,619 ms
+ End-to-end arete cross latency: 1,733 ms
 -----------------------------------------
 ```
 

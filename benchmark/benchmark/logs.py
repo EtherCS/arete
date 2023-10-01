@@ -636,7 +636,6 @@ class ShardLogParser:
                     start = sent[tx_id]
                     end = self.commits[batch_id]
                     latency += [end-start]
-        print("Debug: SOTA intra is {}", len(latency))
         return mean(latency) if latency else 0
     
     # Compared sharding protocols: adopt a lock-based protocol
@@ -681,7 +680,6 @@ class ShardLogParser:
                             # since cross latency doesn't cover the last samples
                             return mean(latency) if latency else 0
                         latency += [end-start]
-        print("Debug: arete intra is {}", len(latency))
         return mean(latency) if latency else 0
     
     def _arete_end_to_end_cross_latency(self):
