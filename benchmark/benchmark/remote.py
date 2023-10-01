@@ -148,6 +148,7 @@ class Bench:
         nodes: int,
         shard_num: int,
         shard_sizes: int,
+        liveness_threshold: float,
         node_parameters: NodeParameters,
         executor_parameters: ExecutorParameters,
     ):
@@ -230,6 +231,7 @@ class Bench:
                 shard_num,
                 shard_id,
                 transaction_addrs_dict,
+                liveness_threshold,
             )
             execution_committee.print(PathMaker.shard_committee_file(shard_id))
             executor_confirmation_addrs[
@@ -297,6 +299,7 @@ class Bench:
         bench_parameters: BenchParameters,
         node_parameters: NodeParameters,
         executor_parameters: ExecutorParameters,
+        cross_shard_ratio: float,
         debug=False,
     ):
         Print.info("Booting testbed...")
@@ -386,6 +389,7 @@ class Bench:
                     rate_share,
                     shard_id,
                     timeout,
+                    cross_shard_ratio,
                 )
                 self._background_run(host[0], cmd, log_file)
 
@@ -471,13 +475,15 @@ class Bench:
             raise BenchError("Failed to update nodes", e)
 
         # Run benchmarks.
-        for n, shard_num, shard_sizes, r, node_instances, executor_instances in zip(
+        for n, shard_num, shard_sizes, r, node_instances, executor_instances, liveness_threshold, cross_shard_ratio in zip(
             bench_parameters.nodes,
             bench_parameters.shard_num,
             bench_parameters.shard_sizes,
             bench_parameters.rate,
             bench_parameters.node_instances,
             bench_parameters.executor_instances,
+            bench_parameters.liveness_threshold,
+            bench_parameters.cross_shard_ratio,
         ):
             Print.heading(
                 f"\nRunning {n} nodes with {shard_num} shards * {shard_sizes} nodes (input rate: {r:,} tx/s)"
@@ -495,6 +501,7 @@ class Bench:
                     nodes=n,
                     shard_num=shard_num,
                     shard_sizes=shard_sizes,
+                    liveness_threshold=liveness_threshold,
                     node_parameters=node_parameters,
                     executor_parameters=executor_parameters,
                 )
@@ -519,6 +526,7 @@ class Bench:
                         bench_parameters=bench_parameters,
                         node_parameters=node_parameters,
                         executor_parameters=executor_parameters,
+                        cross_shard_ratio=cross_shard_ratio,
                         debug=debug,
                     )
                     self._logs(

@@ -283,7 +283,7 @@ class ShardLogParser:
                 results = p.map(self._parse_clients, clients)
         except (ValueError, IndexError) as e:
             raise ParseError(f'Failed to parse client logs: {e}')
-        self.size, self.rate, self.start, misses, self.sent_samples \
+        self.size, self.rate, self.start, misses, self.sent_samples, self.ratio \
             = zip(*results)
         self.misses = sum(misses)
 
@@ -333,6 +333,26 @@ class ShardLogParser:
             for k, v in x:
                 if not k in merged or merged[k] > v:
                     merged[k] = v
+        return merged
+    
+    def _merge_proposals_results(self, input):
+        # Keep the earliest timestamp.
+        merged = {}
+        for x in input:
+            for s, k, v in x:
+                if int(s) == 0:
+                    if not k in merged or merged[k] > v:
+                        merged[k] = v
+        return merged
+    
+    def _merge_commits_results(self, input):
+        # Keep the earliest timestamp.
+        merged = {}
+        for x in input:
+            for s, k, v in x:
+                if int(s) == 0:
+                    if not k in merged or merged[k] > v:
+                        merged[k] = v
         return merged
     
     # Get commits_to_round[batch_digest] = executed_batch_round
@@ -414,6 +434,7 @@ class ShardLogParser:
 
         size = int(search(r'Transactions size: (\d+)', log).group(1))
         rate = int(search(r'Transactions rate: (\d+)', log).group(1))
+        ratio = float(search(r'Cross-shard ratio: (\d+.\d+|\d+)', log).group(1))
 
         tmp = search(r'\[(.*Z) .* Start ', log).group(1)
         start = self._to_posix(tmp)
@@ -424,19 +445,19 @@ class ShardLogParser:
         samples = {int(s): self._to_posix(t) for t, s in tmp}
         # print("Client tx number is", len(samples))
         
-        return size, rate, start, misses, samples
+        return size, rate, start, misses, samples, ratio
 
     def _parse_executors(self, log):
         if search(r'panic', log) is not None:
             raise ParseError('Executor(s) panicked')
 
-        tmp = findall(r'\[(.*Z) .* Created B\d+ -> ([^ ]+=)', log)
-        tmp = [(d, self._to_posix(t)) for t, d in tmp]
-        proposals = self._merge_results([tmp])
+        tmp = findall(r'\[(.*Z) .* Shard (\d+) Created B\d+ -> ([^ ]+=)', log)
+        tmp = [(s, d, self._to_posix(t)) for t, s, d in tmp]
+        proposals = self._merge_proposals_results([tmp])
 
-        tmp = findall(r'\[(.*Z) .* Committed B\d+ -> ([^ ]+=)', log)
-        tmp = [(d, self._to_posix(t)) for t, d in tmp]
-        commits = self._merge_results([tmp])
+        tmp = findall(r'\[(.*Z) .* Shard (\d+) Committed B\d+ -> ([^ ]+=)', log)
+        tmp = [(s, d, self._to_posix(t)) for t, s, d in tmp]
+        commits = self._merge_commits_results([tmp])
         
         # batch_digest is picked by the ordering shard
         # arete_commits_to_round[batch_digest] = executed_batch_round
@@ -517,7 +538,9 @@ class ShardLogParser:
         bytes = sum(self.sizes.values())
         bps = bytes / duration
         tps = bps / self.size[0]
-        return tps, bps, duration
+        actual_bps = (bps * self.ratio[0])/2 + bps*(1-self.ratio[0])
+        actual_tps = (tps * self.ratio[0])/2 + tps*(1-self.ratio[0])
+        return actual_tps, actual_bps, duration
     
     def _arete_consensus_throughput(self):
         if not self.commits:
@@ -537,7 +560,9 @@ class ShardLogParser:
         bytes = sum(self.sizes.values())
         bps = bytes / duration
         tps = bps / self.size[0]
-        return tps, bps, duration
+        actual_bps = (bps * self.ratio[0])/2 + bps*(1-self.ratio[0])
+        actual_tps = (tps * self.ratio[0])/2 + tps*(1-self.ratio[0])
+        return actual_tps, actual_bps, duration
 
     def _consensus_latency(self):
         latency = []
@@ -568,9 +593,13 @@ class ShardLogParser:
         start, end = min(self.start), max(self.commits.values())
         duration = end - start
         bytes = sum(self.sizes.values())
+        # consider cross-shard txs
+        # 1 cross-shard tx = 2 sub-intra-shard txs
         bps = bytes / duration
+        actual_bps = (bps * self.ratio[0])/2 + bps*(1-self.ratio[0])
         tps = bps / self.size[0]
-        return tps, bps, duration
+        actual_tps = (tps * self.ratio[0])/2 + tps*(1-self.ratio[0])
+        return actual_tps, actual_bps, duration
     
     def _end_to_end_arete_throughput(self):
         if not self.commits:
@@ -590,8 +619,11 @@ class ShardLogParser:
         duration = end - start
         bytes = sum(self.sizes.values())
         bps = bytes / duration
+        bps = bytes / duration
+        actual_bps = (bps * self.ratio[0])/2 + bps*(1-self.ratio[0])
         tps = bps / self.size[0]
-        return tps, bps, duration
+        actual_tps = (tps * self.ratio[0])/2 + tps*(1-self.ratio[0])
+        return actual_tps, actual_bps, duration
 
     def _end_to_end_intra_latency(self):
         latency = []
@@ -604,6 +636,7 @@ class ShardLogParser:
                     start = sent[tx_id]
                     end = self.commits[batch_id]
                     latency += [end-start]
+        print("Debug: SOTA intra is {}", len(latency))
         return mean(latency) if latency else 0
     
     # Compared sharding protocols: adopt a lock-based protocol
@@ -648,6 +681,7 @@ class ShardLogParser:
                             # since cross latency doesn't cover the last samples
                             return mean(latency) if latency else 0
                         latency += [end-start]
+        print("Debug: arete intra is {}", len(latency))
         return mean(latency) if latency else 0
     
     def _arete_end_to_end_cross_latency(self):
@@ -706,6 +740,7 @@ class ShardLogParser:
             # f' Committee size: {int(self.execution_size/self.shard_num)} nodes\n'
             f' Input rate per shard: {ceil(sum(self.rate)/self.shard_num):,} tx/s\n'
             f' Transaction size: {self.size[0]:,} B\n'
+            f' Cross-shard ratio: {self.ratio[0]:,} \n'
             f' Execution time: {round(arete_duration):,} s\n'
             '\n'
             f' Consensus timeout delay: {consensus_timeout_delay:,} ms\n'

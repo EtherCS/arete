@@ -67,10 +67,12 @@ def localShard(ctx):
         "nodes": 4,
         "rate": 1_000,
         "tx_size": 512,
-        "duration": 120,
+        "cross_shard_ratio": 0.5,
+        "duration": 20,
+        "liveness_threshold": 0.3,
         "shard_faults": 0.0,
-        "shard_num": 1,
-        "shard_sizes": 30,  # could be different shard size [4, 8, ...]
+        "shard_num": 2,
+        "shard_sizes": 5,  # could be different shard size [4, 8, ...]
     }
     node_params = {
         "consensus": {
@@ -175,8 +177,10 @@ def remote(ctx):
         "nodes": 4,
         "rate": 1_000,
         "tx_size": 512,
+        "cross_shard_ratio": 0.5,
         "duration": 20,
-        "shard_faults": 0.4,
+        "liveness_threshold": 0.3,
+        "shard_faults": 0.2,
         "shard_num": 2,
         "shard_sizes": 5, 
     }

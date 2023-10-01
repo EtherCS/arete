@@ -153,7 +153,7 @@ impl Core {
                     let b_round = block.round;
                     for x in &block.payload {
                         // NOTE: This log entry is used to compute performance.
-                        info!("Committed {} -> {:?}", block, x);
+                        info!("Shard {} Committed {} -> {:?}", _s_id, block, x);
                         info!("ARETE shard {} Committed {} -> {:?} in round {}", _s_id, block, x, b_round);
                     }
                 }

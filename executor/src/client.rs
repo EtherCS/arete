@@ -36,6 +36,9 @@ struct Cli {
     /// The start transaction id.
     #[clap(short, long, value_parser, value_name = "INT")]
     shard: u64,
+    /// The ratio of cross-shard txs.
+    #[clap(short, long, value_parser, value_name = "FLOAT")]
+    ratio: f32,
     /// Network addresses that must be reachable before starting the benchmark.
     #[clap(short, long, value_parser, value_name = "[Addr]", multiple = true)]
     nodes: Vec<SocketAddr>,
@@ -52,12 +55,14 @@ async fn main() -> Result<()> {
     info!("Node address: {}", cli.target);
     info!("Transactions size: {} B", cli.size);
     info!("Transactions rate: {} tx/s", cli.rate);
+    info!("Cross-shard ratio: {}", cli.ratio);
     let client = Client {
         target: cli.target,
         size: cli.size,
         rate: cli.rate,
         shard: cli.shard,
         timeout: cli.timeout,
+        ratio: cli.ratio,
         nodes: cli.nodes,
     };
 
@@ -74,6 +79,7 @@ struct Client {
     rate: u64,
     shard: u64,  // used for differentiating shards, then for log parse
     timeout: u64,
+    ratio: f32, // cross-shard tx ratio
     nodes: Vec<SocketAddr>,
 }
 
@@ -82,6 +88,7 @@ impl Client {
         const PRECISION: u64 = 20; // Sample precision.
         const BURST_DURATION: u64 = 1000 / PRECISION;
         let start_tx_id: u64 = 1000 * self.shard;
+        let _ratio: f32 = self.ratio;
 
         // The transaction size must be at least 16 bytes to ensure all txs are different.
         if self.size < 16 {

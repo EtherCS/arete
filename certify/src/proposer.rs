@@ -82,7 +82,7 @@ impl Proposer {
             #[cfg(feature = "benchmark")]
             for x in &block.payload {
                 // NOTE: This log entry is used to compute performance.
-                info!("Created {} -> {:?}", block, x);
+                info!("Shard {} Created {} -> {:?}", self.shard_info.id, block, x);
             }
         }
         debug!("Created {:?}", block);
