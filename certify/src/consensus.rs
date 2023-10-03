@@ -83,6 +83,8 @@ impl Consensus {
             name, address
         );
 
+        info!("Liveness threshold is: {}", committee.liveness_threshold);
+
         // Make the leader election module.
         let leader_elector = LeaderElector::new(committee.clone());
 

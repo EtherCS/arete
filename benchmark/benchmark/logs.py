@@ -293,10 +293,11 @@ class ShardLogParser:
                 results = p.map(self._parse_executors, executors)
         except (ValueError, IndexError) as e:
             raise ParseError(f'Failed to parse executor logs: {e}')
-        proposals, commits, arete_commits_to_round, arete_rounds_to_timestamp, sizes, self.received_samples, timeouts, self.configs \
+        self.liveness_threshold, proposals, commits, shard_one_commits, arete_commits_to_round, arete_rounds_to_timestamp, sizes, self.received_samples, timeouts, self.configs \
             = zip(*results)
         self.proposals = self._merge_results([x.items() for x in proposals])
         self.commits = self._merge_results([x.items() for x in commits])
+        self.shard_one_commits = self._merge_results([x.items() for x in shard_one_commits])
         # self.arete_commits_to_round -> dict{string: string}
         self.arete_commits_to_round = self._get_dict_merge_arete_round_results([x.items() for x in arete_commits_to_round])
         
@@ -340,12 +341,21 @@ class ShardLogParser:
         merged = {}
         for x in input:
             for s, k, v in x:
-                if int(s) == 0:
+                # if int(s) == 0:
                     if not k in merged or merged[k] > v:
                         merged[k] = v
         return merged
     
     def _merge_commits_results(self, input):
+        # Keep the earliest timestamp.
+        merged = {}
+        for x in input:
+            for s, k, v in x:
+                # if int(s) == 0:
+                    if not k in merged or merged[k] > v:
+                        merged[k] = v
+        return merged
+    def _merge_shard_one_commits_results(self, input):
         # Keep the earliest timestamp.
         merged = {}
         for x in input:
@@ -451,6 +461,8 @@ class ShardLogParser:
         if search(r'panic', log) is not None:
             raise ParseError('Executor(s) panicked')
 
+        liveness_threshold = float(search(r'Liveness threshold is: (\d+.\d+|\d+)', log).group(1))
+        
         tmp = findall(r'\[(.*Z) .* Shard (\d+) Created B\d+ -> ([^ ]+=)', log)
         tmp = [(s, d, self._to_posix(t)) for t, s, d in tmp]
         proposals = self._merge_proposals_results([tmp])
@@ -458,6 +470,7 @@ class ShardLogParser:
         tmp = findall(r'\[(.*Z) .* Shard (\d+) Committed B\d+ -> ([^ ]+=)', log)
         tmp = [(s, d, self._to_posix(t)) for t, s, d in tmp]
         commits = self._merge_commits_results([tmp])
+        shard_one_commits = self._merge_shard_one_commits_results([tmp])
         
         # batch_digest is picked by the ordering shard
         # arete_commits_to_round[batch_digest] = executed_batch_round
@@ -511,7 +524,7 @@ class ShardLogParser:
         }
 
         # return proposals, commits, sizes, samples, timeouts, configs, block_intervals
-        return proposals, commits, arete_commits_to_round, arete_rounds_to_timestamp, sizes, samples, timeouts, configs
+        return liveness_threshold, proposals, commits, shard_one_commits, arete_commits_to_round, arete_rounds_to_timestamp, sizes, samples, timeouts, configs
 
     def _to_posix(self, string):
         x = datetime.fromisoformat(string.replace('Z', '+00:00'))
@@ -629,12 +642,12 @@ class ShardLogParser:
         latency = []
         for sent, received in zip(self.sent_samples, self.received_samples):
             for tx_id, batch_id in received.items():
-                if batch_id in self.commits:
+                if batch_id in self.shard_one_commits:
                     if not tx_id in sent:
                         continue
                     # assert tx_id in sent  # We receive txs that we sent.
                     start = sent[tx_id]
-                    end = self.commits[batch_id]
+                    end = self.shard_one_commits[batch_id]
                     latency += [end-start]
         return mean(latency) if latency else 0
     
@@ -735,6 +748,7 @@ class ShardLogParser:
             f' Execution shard number: {self.shard_num} shards\n'
             f' Execution shard size: {self.execution_size} nodes\n'
             f' Execution shard fault ratio: {self.execution_faults_ratio} \n'
+            f' Liveness threshold: {self.liveness_threshold[0]:,} \n'
             # f' Committee size: {int(self.execution_size/self.shard_num)} nodes\n'
             f' Input rate per shard: {ceil(sum(self.rate)/self.shard_num):,} tx/s\n'
             f' Transaction size: {self.size[0]:,} B\n'

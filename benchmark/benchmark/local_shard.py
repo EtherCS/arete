@@ -131,9 +131,8 @@ class LocalBenchShard:
                         debug=debug
                     )
                     self._background_run(cmd, log_file)
-                
-            # Wait for the nodes to synchronize
-            Print.info(f'Waiting for shard {shardId} the nodes to synchronize...')
+                # Wait for the nodes to synchronize
+                Print.info(f'Waiting for shard {shardId} the nodes to synchronize...')
             sleep(2 * self.executor_parameters.certify_timeout_delay / 1000)
 
             # update ordering committee with executors' information
