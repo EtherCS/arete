@@ -8,6 +8,7 @@ use futures::sink::SinkExt as _;
 use futures::stream::StreamExt as _;
 use rand::rngs::StdRng;
 use rand::SeedableRng as _;
+use std::collections::HashMap;
 use std::net::SocketAddr;
 use tokio::net::TcpListener;
 use tokio::task::JoinHandle;
@@ -52,6 +53,7 @@ impl OBlock {
         author: PublicKey,
         round: Round,
         payload: Vec<CBlockMeta>,
+        aggregators: HashMap<Digest, u8>,
         secret: &SecretKey,
     ) -> Self {
         let block = OBlock {
@@ -60,6 +62,7 @@ impl OBlock {
             author,
             round,
             payload,
+            aggregators,
             signature: Signature::default(),
         };
         let signature = Signature::new(&block.digest(), secret);
@@ -117,7 +120,7 @@ impl PartialEq for Timeout {
 // Fixture.
 pub fn block() -> OBlock {
     let (public_key, secret_key) = keys().pop().unwrap();
-    OBlock::new_from_key(QC::genesis(), public_key, 1, Vec::new(), &secret_key)
+    OBlock::new_from_key(QC::genesis(), public_key, 1, Vec::new(), HashMap::new(), &secret_key)
 }
 
 // Fixture.
@@ -157,6 +160,7 @@ pub fn chain(keys: Vec<(PublicKey, SecretKey)>) -> Vec<OBlock> {
                 *public_key,
                 1 + i as Round,
                 Vec::new(),
+                HashMap::new(),
                 secret_key,
             );
 

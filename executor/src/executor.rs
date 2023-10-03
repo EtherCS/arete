@@ -6,6 +6,7 @@ use log::{debug, info};
 use execpool::Mempool;
 use rand::seq::IteratorRandom;
 use store::Store;
+use std::collections::HashMap;
 use std::net::{SocketAddr, IpAddr, Ipv4Addr};
 use tokio::sync::mpsc::{channel, Receiver};
 use anyhow::Result;
@@ -104,7 +105,8 @@ impl Executor {
                 _block.author, 
                 _block.round,
                 _block.digest(), 
-                _block.payload.clone(), 
+                _block.payload.clone(),     // TODO: hash of new cross-shard txs
+                HashMap::new(),     // TODO: votes messages for the execution results of cross-shard txs
                 _block.signature.clone()).await;
             let message = bincode::serialize(&certify_block.clone())
                 .expect("fail to serialize the CBlock");

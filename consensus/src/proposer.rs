@@ -99,6 +99,7 @@ impl Proposer {
             self.name,
             round,
             /* payload */ self.shard_rounds.values().cloned().collect(),
+            HashMap::new(), // TODO: cross-shard execution
             self.signature_service.clone(),
         )
         .await;

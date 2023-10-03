@@ -2,7 +2,7 @@ use super::*;
 use crate::common::{chain, committee, committee_with_base_port, keys, listener};
 use crypto::SecretKey;
 use futures::future::try_join_all;
-use std::fs;
+use std::{fs, collections::HashMap};
 use tokio::sync::mpsc::channel;
 
 fn core(
@@ -100,7 +100,7 @@ async fn generate_proposal() {
     let (next_leader, next_leader_key) = leader_keys(2);
 
     // Make a block, votes, and QC.
-    let block = OBlock::new_from_key(QC::genesis(), leader, 1, Vec::new(), &leader_key);
+    let block = OBlock::new_from_key(QC::genesis(), leader, 1, Vec::new(), HashMap::new(), &leader_key);
     let hash = block.digest();
     let votes: Vec<_> = keys()
         .iter()

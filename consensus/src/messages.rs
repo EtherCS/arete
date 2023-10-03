@@ -5,7 +5,7 @@ use crypto::{Digest, Hash, PublicKey, Signature, SignatureService};
 use ed25519_dalek::Digest as _;
 use ed25519_dalek::Sha512;
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
+use std::collections::{HashSet, HashMap};
 use std::convert::TryInto;
 use std::fmt;
 use types::CBlockMeta;
@@ -20,11 +20,10 @@ pub struct OBlock {
     pub qc: QC,
     pub tc: Option<TC>,
     pub author: PublicKey,
-    pub round: Round,
-    // pub payload: Vec<Digest>,  
+    pub round: Round, 
     pub payload: Vec<CBlockMeta>,   // replace Digest with CBlockMeta for consensus
+    pub aggregators: HashMap<Digest, u8>,  // collect votes from execution shards to aggregators
     pub signature: Signature,
-    // TODO (Execution): Aggregator[ctx_hash]=ok(),fail()
 }
 
 impl OBlock {
@@ -34,6 +33,7 @@ impl OBlock {
         author: PublicKey,
         round: Round,
         payload: Vec<CBlockMeta>,
+        aggregators: HashMap<Digest, u8>,
         mut signature_service: SignatureService,
     ) -> Self {
         let block = Self {
@@ -42,6 +42,7 @@ impl OBlock {
             author,
             round,
             payload,
+            aggregators,
             signature: Signature::default(),
         };
         let signature = signature_service.request_signature(block.digest()).await;

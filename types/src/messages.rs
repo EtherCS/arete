@@ -4,6 +4,7 @@ use ed25519_dalek::Sha512;
 use serde::{Deserialize, Serialize};
 use std::convert::TryInto;
 use std::fmt;
+use std::collections::HashMap;
 
 pub type Round = u64;
 
@@ -81,7 +82,8 @@ pub struct CBlock {
     pub author: PublicKey,
     pub round: Round,
     pub ebhash: Digest,
-    pub payload: Vec<Digest>,   // TODO (Execution): map[ctx, succOrFail]
+    pub payload: Vec<Digest>,   // TODO cross-shard txs hash
+    pub votes: HashMap<Digest, u8>,  // votes[ctx_hash] = 0, 1
     pub signature: Signature,
 }
 
@@ -92,6 +94,7 @@ impl CBlock {
         round: Round,
         ebhash: Digest,
         payload: Vec<Digest>,
+        votes: HashMap<Digest, u8>,
         signature: Signature,
     ) -> Self {
         let block = Self {
@@ -100,6 +103,7 @@ impl CBlock {
             round,
             ebhash,
             payload,
+            votes,
             signature,
         };
         Self { ..block }
