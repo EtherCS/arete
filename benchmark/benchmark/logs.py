@@ -753,7 +753,7 @@ class ShardLogParser:
             f' Input rate per shard: {ceil(sum(self.rate)/self.shard_num):,} tx/s\n'
             f' Transaction size: {self.size[0]:,} B\n'
             f' Cross-shard ratio: {self.ratio[0]:,} \n'
-            f' Execution time: {round(arete_duration):,} s\n'
+            f' Execution time: {round(duration):,} s\n'
             '\n'
             f' Consensus timeout delay: {consensus_timeout_delay:,} ms\n'
             f' Consensus sync retry delay: {consensus_sync_retry_delay:,} ms\n'
