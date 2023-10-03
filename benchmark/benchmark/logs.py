@@ -663,6 +663,8 @@ class ShardLogParser:
                     exec_round = self.arete_commits_to_round[batch_id] # its execution round
                     int_exec_round = int(exec_round)
                     if int_exec_round in self.arete_rounds_to_timestamp:
+                        if not tx_id in sent:
+                            continue
                         start = sent[tx_id]
                         if self.arete_rounds_to_timestamp[int_exec_round] > last_ts:
                             while self.arete_rounds_to_timestamp[int_exec_round] > consensus_round_latency[index]:
@@ -687,6 +689,8 @@ class ShardLogParser:
                     exec_round = self.arete_commits_to_round[batch_id] # its execution round
                     int_exec_round = int(exec_round)
                     if int_exec_round in self.arete_rounds_to_timestamp:  
+                        if not tx_id in sent:
+                            continue
                         start = sent[tx_id]
                         end = self.arete_rounds_to_timestamp[int_exec_round]    # commit timestamp
                         if end > list(self.arete_consensus_rounds_to_ts.values())[-1]:
@@ -704,6 +708,8 @@ class ShardLogParser:
                     exec_round = self.arete_commits_to_round[batch_id] # its execution round
                     int_exec_round = int(exec_round)
                     if int_exec_round in self.arete_rounds_to_timestamp:  
+                        if not tx_id in sent:
+                            continue
                         start = sent[tx_id]
                         intra_latency += [self.arete_rounds_to_timestamp[int_exec_round]-start]
                         flag = int(0)
@@ -802,7 +808,7 @@ class ShardLogParser:
         return cls(clients, nodes, faults)
     
     @classmethod
-    def process_shard(cls, directory, order_size, order_faults_ratio, execution_size, execution_faults_ration, shardNum):
+    def process_shard(cls, directory, order_size, order_faults_ratio, execution_size, execution_faults_ratio, shardNum):
         assert isinstance(directory, str)
 
         clients = []
@@ -814,4 +820,4 @@ class ShardLogParser:
             with open(filename, 'r') as f:
                 executors += [f.read()]
 
-        return cls(clients, executors, order_size, order_faults_ratio, execution_size, execution_faults_ration, shardNum)
+        return cls(clients, executors, order_size, order_faults_ratio, execution_size, execution_faults_ratio, shardNum)

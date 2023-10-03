@@ -405,18 +405,25 @@ class Bench:
         hosts: list[str],
         executor_hosts: list[str],
         nodes: int,
-        faults: int,
+        faults: float,
+        execution_ratio: float,
         shard_num: int,
         shard_sizes: int,
     ):
         # Delete local logs (if any).
         cmd = CommandMaker.clean_logs()
         subprocess.run([cmd], shell=True, stderr=subprocess.DEVNULL)
-
+        # Fault number
+        order_faults = floor(nodes * faults)
+        execution_faults = floor(shard_sizes * execution_ratio)
+        
         # Download log files.
         host_nodes = self._split_hosts(hosts, nodes)
         progress = progress_bar(host_nodes, prefix="Downloading node logs:")
         for i, host in enumerate(progress):
+            # There is no logs for fault nodes
+            if i >= nodes-order_faults:
+                break
             c = Connection(host[0], user="ubuntu", connect_kwargs=self.connect)
             c.get(PathMaker.node_log_file(i), local=PathMaker.node_log_file(i))
 
@@ -425,6 +432,9 @@ class Bench:
             executor_nodes, prefix="Downloading executor node logs:"
         )
         for i, host in enumerate(progress):
+            # There is no logs for fault nodes
+            if (i % shard_sizes) >= shard_sizes-execution_faults:
+                break
             c = Connection(host[0], user="ubuntu", connect_kwargs=self.connect)
             c.get(
                 PathMaker.shard_executor_log_file(i // shard_sizes, i % shard_sizes),
@@ -442,7 +452,7 @@ class Bench:
         # Parse logs and return the parser.
         Print.info("Parsing logs and computing performance...")
         return ShardLogParser.process_shard(
-            f"./logs", faults=faults, shardNum=shard_num
+            f"./logs", order_size=nodes, order_faults_ratio=faults, execution_size=shard_sizes, execution_faults_ratio=execution_ratio, shardNum=shard_num
         )
 
     def run(
@@ -534,11 +544,12 @@ class Bench:
                         executor_hosts=executor_hosts,
                         nodes=n,
                         faults=bench_parameters.faults,
+                        execution_ratio=bench_parameters.shard_faults,
                         shard_num=shard_num,
                         shard_sizes=shard_sizes,
                     ).print(
                         PathMaker.result_file(
-                            bench_parameters.faults, n, r, bench_parameters.tx_size
+                            bench_parameters.shard_faults, shard_num, shard_sizes, liveness_threshold
                         )
                     )
                 except (

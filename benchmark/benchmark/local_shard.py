@@ -192,7 +192,7 @@ class LocalBenchShard:
 
             # Parse logs and return the parser.
             Print.info('Parsing logs...')
-            return ShardLogParser.process_shard(f'./logs', order_size=nodes, order_faults_ratio=self.faults, execution_size=shardSize, execution_faults_ration=self.shard_faults, shardNum=shardNum)
+            return ShardLogParser.process_shard(f'./logs', order_size=nodes, order_faults_ratio=self.faults, execution_size=shardSize, execution_faults_ratio=self.shard_faults, shardNum=shardNum)
 
         except (subprocess.SubprocessError, ParseError) as e:
             self._kill_executors()
