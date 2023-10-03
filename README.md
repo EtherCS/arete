@@ -30,6 +30,7 @@ This command may take a long time the first time you run it (compiling rust code
  Execution shard number: 2 shards
  Execution shard size: 5 nodes
  Execution shard fault ratio: 0.0 
+ Liveness threshold: 0.3 
  Input rate per shard: 1,000 tx/s
  Transaction size: 512 B
  Cross-shard ratio: 0.5 
@@ -44,20 +45,20 @@ This command may take a long time the first time you run it (compiling rust code
 
  + RESULTS:
  SOTA Sharding:
- Consensus TPS: 824 tx/s
- Consensus BPS: 422,033 B/s
- End-to-end TPS: 752 tx/s
- End-to-end BPS: 384,787 B/s
- End-to-end intra latency: 1,441 ms
- End-to-end cross latency: 2,263 ms
+ Consensus TPS: 1,558 tx/s
+ Consensus BPS: 797,502 B/s
+ End-to-end TPS: 1,410 tx/s
+ End-to-end BPS: 721,840 B/s
+ End-to-end intra latency: 853 ms
+ End-to-end cross latency: 2,472 ms
 
  ARETE (ours):
- Consensus TPS: 822 tx/s
- Consensus BPS: 421,051 B/s
- End-to-end TPS: 750 tx/s
- End-to-end BPS: 383,970 B/s
- End-to-end arete intra latency: 1,619 ms
- End-to-end arete cross latency: 1,733 ms
+ Consensus TPS: 1,554 tx/s
+ Consensus BPS: 795,534 B/s
+ End-to-end TPS: 1,407 tx/s
+ End-to-end BPS: 720,228 B/s
+ End-to-end arete intra latency: 1,210 ms
+ End-to-end arete cross latency: 1,511 ms
 -----------------------------------------
 ```
 
