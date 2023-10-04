@@ -107,6 +107,7 @@ impl Executor {
                 _block.digest(), 
                 _block.payload.clone(),     // TODO: hash of new cross-shard txs
                 HashMap::new(),     // TODO: votes messages for the execution results of cross-shard txs
+                _block.qc.votes.clone(),
                 _block.signature.clone()).await;
             let message = bincode::serialize(&certify_block.clone())
                 .expect("fail to serialize the CBlock");

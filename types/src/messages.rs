@@ -84,6 +84,7 @@ pub struct CBlock {
     pub ebhash: Digest,
     pub payload: Vec<Digest>,   // TODO cross-shard txs hash
     pub votes: HashMap<Digest, u8>,  // votes[ctx_hash] = 0, 1
+    pub multisignatures: Vec<(PublicKey, Signature)>,   // signatures for availability
     pub signature: Signature,
 }
 
@@ -95,6 +96,7 @@ impl CBlock {
         ebhash: Digest,
         payload: Vec<Digest>,
         votes: HashMap<Digest, u8>,
+        multisignatures: Vec<(PublicKey, Signature)>,
         signature: Signature,
     ) -> Self {
         let block = Self {
@@ -104,6 +106,7 @@ impl CBlock {
             ebhash,
             payload,
             votes,
+            multisignatures,
             signature,
         };
         Self { ..block }
@@ -121,6 +124,14 @@ impl Hash for CBlock {
         hasher.update(self.round.to_le_bytes());
         for x in &self.payload {
             hasher.update(x);
+        }
+        for (x, y) in &self.votes {
+            let serialized_data = bincode::serialize(&(x, y)).expect("Serialization failed");
+            hasher.update(serialized_data);
+        }
+        for (x, y) in &self.multisignatures {
+            let serialized_data = bincode::serialize(&(x, y)).expect("Serialization failed");
+            hasher.update(serialized_data);
         }
         hasher.update(&self.ebhash);
         hasher.update(&self.shard_id.to_le_bytes());
