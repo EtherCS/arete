@@ -116,10 +116,10 @@ def parseLog(ctx, faults = 0, shardNum = 2):
     print(ret)
 
 @task
-def create(ctx, nodes=2):
+def create(ctx, instances=3):
     """Create a testbed"""
     try:
-        InstanceManager.make().create_instances(nodes)
+        InstanceManager.make().create_instances(instances)
     except BenchError as e:
         Print.error(e)
 
@@ -178,11 +178,11 @@ def remote(ctx):
         "rate": 1_000,
         "tx_size": 512,
         "cross_shard_ratio": 0.5,
-        "duration": 20,
+        "duration": 120,
         "liveness_threshold": 0.3,
         "shard_faults": 0.2,
-        "shard_num": 5,
-        "shard_sizes": 5, 
+        "shard_num": 2,
+        "shard_sizes": 90, 
     }
     node_params = {
         "consensus": {
