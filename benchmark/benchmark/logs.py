@@ -445,7 +445,7 @@ class ShardLogParser:
         size = int(search(r'Transactions size: (\d+)', log).group(1))
         rate = int(search(r'Transactions rate: (\d+)', log).group(1))
         ratio = float(search(r'Cross-shard ratio: (\d+.\d+|\d+)', log).group(1))
-
+        
         tmp = search(r'\[(.*Z) .* Start ', log).group(1)
         start = self._to_posix(tmp)
 

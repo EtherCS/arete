@@ -68,8 +68,8 @@ class InstanceManager:
             IpPermissions=[
                 {
                     "IpProtocol": "tcp",
-                    # "FromPort": 0,
-                    # "ToPort": 65535,
+                    "FromPort": 0,
+                    "ToPort": 65535,
                     "IpRanges": [
                         {
                             "CidrIp": "0.0.0.0/0",

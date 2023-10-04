@@ -126,7 +126,7 @@ class Bench:
         self._check_stderr(output)
 
     def _update(self, hosts):
-        Print.info(f'Updating {len(hosts)} nodes (branch "{self.settings.branch}")...')
+        Print.info(f'Updating {len(hosts)} instances (branch "{self.settings.branch}")...')
         cmd = [
             f"(cd {self.settings.repo_name} && git fetch -f)",
             f"(cd {self.settings.repo_name} && git checkout -f {self.settings.branch})",
@@ -373,16 +373,16 @@ class Bench:
             committee = ExecutionCommittee.load(
                 PathMaker.shard_committee_file(shard_id)
             )
-
             # Run the clients (they will wait for the executors to be ready).
-            addresses = committee.front
-            rate_share = ceil(rate / len(shard_nodes))
+            # addresses = committee.front
+            front_addr = [f"{x}:{self.settings.front_port + i}" for x, i in shard_nodes]
+            rate_share = ceil(rate / committee.size())
             timeout = executor_parameters.certify_timeout_delay
             client_logs = [
                 PathMaker.shard_client_log_file(shard_id, i)
                 for i in range(len(shard_nodes))
             ]
-            for host, addr, log_file in zip(shard_nodes, addresses, client_logs):
+            for host, addr, log_file in zip(shard_nodes, front_addr, client_logs):
                 cmd = CommandMaker.run_client(
                     addr,
                     bench_parameters.tx_size,

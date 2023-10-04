@@ -182,7 +182,7 @@ def remote(ctx):
         "liveness_threshold": 0.3,
         "shard_faults": 0.2,
         "shard_num": 2,
-        "shard_sizes": 90, 
+        "shard_sizes": 10, 
     }
     node_params = {
         "consensus": {
@@ -199,7 +199,7 @@ def remote(ctx):
     }
     executor_params = {
         "consensus": {
-            "certify_timeout_delay": 1_000,
+            "certify_timeout_delay": 5_000,
             "certify_sync_retry_delay": 10_000,
         },
         "mempool": {
