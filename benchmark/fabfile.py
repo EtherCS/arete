@@ -6,7 +6,7 @@ from benchmark.logs import ParseError, LogParser, ShardLogParser
 from benchmark.utils import Print
 from benchmark.plot import Ploter, PlotError
 from benchmark.instance import InstanceManager
-from benchmark.remote import Bench, BenchError
+from benchmark.remote import Bench, BenchError, PathMaker
 
 
 
@@ -111,9 +111,14 @@ def localShard(ctx):
         Print.error(e)
         
 @task
-def parseLog(ctx, faults = 0, shardNum = 2):
-    ret = ShardLogParser.process_shard(f'./logs', faults, shardNum).result()
-    print(ret)
+def parseLog(ctx, nodes = 4, orderFaults = 0.0, executionRatio=0.0, shardNum = 2, shardSizes=3, batchSize=50000, rate=10000, fl=0.3):
+    ShardLogParser.process_shard(
+        f"./logs", order_size=nodes, order_faults_ratio=orderFaults, execution_size=shardSizes, execution_faults_ratio=executionRatio, shardNum=shardNum
+        ).print(
+            PathMaker.result_file(
+                batchSize, rate, executionRatio, shardNum, shardSizes, fl
+            )
+        )
 
 @task
 def create(ctx, instances=3):
@@ -173,16 +178,16 @@ def install(ctx):
 def remote(ctx):
     """Run benchmarks on AWS"""
     bench_params = {
-        "faults": 0.3,
-        "nodes": 4,
-        "rate": 1_000,
+        "faults": 0.0,
+        "nodes": 90,
+        "rate": 10_000,
         "tx_size": 512,
         "cross_shard_ratio": 0.5,
-        "duration": 120,
-        "liveness_threshold": 0.3,
-        "shard_faults": 0.2,
+        "duration": 300,
+        "liveness_threshold": 0.4,
+        "shard_faults": 0.0,
         "shard_num": 2,
-        "shard_sizes": 10, 
+        "shard_sizes": 32, 
     }
     node_params = {
         "consensus": {
@@ -233,7 +238,7 @@ def plot(ctx):
 
 @task
 def kill(ctx):
-    """Stop any HotStuff execution on all machines"""
+    """Stop any ARETE execution on all machines"""
     try:
         Bench(ctx).kill()
     except BenchError as e:
