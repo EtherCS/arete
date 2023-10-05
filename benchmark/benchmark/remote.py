@@ -79,7 +79,7 @@ class Bench:
         try:
             g = Group(*hosts, user="ubuntu", connect_kwargs=self.connect)
             g.run(" && ".join(cmd), hide=True)
-            Print.heading(f"Initialized testbed of {len(hosts)} nodes")
+            Print.heading(f"Initialized testbed of {len(hosts)} instances")
         except (GroupException, ExecutionError) as e:
             e = FabricError(e) if isinstance(e, GroupException) else e
             raise BenchError("Failed to install repo on testbed", e)
@@ -549,7 +549,7 @@ class Bench:
                         shard_sizes=shard_sizes,
                     ).print(
                         PathMaker.result_file(
-                            bench_parameters.shard_faults, shard_num, shard_sizes, liveness_threshold
+                            executor_parameters.json["mempool"]["certify_batch_size"], bench_parameters.rate, bench_parameters.shard_faults, shard_num, shard_sizes, liveness_threshold
                         )
                     )
                 except (
