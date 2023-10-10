@@ -1,7 +1,7 @@
-use crate::batch_maker::{Batch, BatchMaker, Transaction};
+use crate::batch_maker::{Batch, BatchMaker};
 use crate::config::{CertifyParameters, ExecutionCommittee};
 use crate::helper::Helper;
-use crate::processor::{Processor, SerializedBatchMessage};
+use crate::processor::{Processor, SerializedEBlockMessage};
 use crate::quorum_waiter::QuorumWaiter;
 use crate::synchronizer::Synchronizer;
 use async_trait::async_trait;
@@ -14,7 +14,7 @@ use serde::{Deserialize, Serialize};
 use std::error::Error;
 use store::Store;
 use tokio::sync::mpsc::{channel, Receiver, Sender};
-use types::ConfirmMessage;
+use types::{ConfirmMessage, EBlock, Transaction};
 
 #[cfg(test)]
 #[path = "tests/mempool_tests.rs"]
@@ -29,8 +29,10 @@ pub type Round = u64;
 /// The message exchanged between the nodes' mempool.
 #[derive(Debug, Serialize, Deserialize)]
 pub enum MempoolMessage {
-    Batch(Batch),
-    BatchRequest(Vec<Digest>, /* origin */ PublicKey),
+    EBlock(EBlock),
+    EBlockRequest(Digest, /* origin */ PublicKey),
+    // Batch(Batch),
+    // BatchRequest(Vec<Digest>, /* origin */ PublicKey),
 }
 
 /// The messages sent by the consensus and the mempool.
@@ -147,7 +149,7 @@ impl Mempool {
             self.committee.broadcast_addresses(&self.name),
         );
 
-        // The `QuorumWaiter` waits for 2f authorities to acknowledge reception of the batch. It then forwards
+        // The `QuorumWaiter` waits for (1-f_L) authorities to acknowledge reception of the batch. It then forwards
         // the batch to the `Processor`.
         QuorumWaiter::spawn(
             self.committee.clone(),
@@ -278,24 +280,25 @@ impl MessageHandler for ConfirmationMsgReceiverHandler {
 /// Defines how the network receiver handles incoming mempool messages.
 #[derive(Clone)]
 struct MempoolReceiverHandler {
-    tx_helper: Sender<(Vec<Digest>, PublicKey)>,
-    tx_processor: Sender<SerializedBatchMessage>,
+    tx_helper: Sender<(Digest, PublicKey)>,
+    tx_processor: Sender<SerializedEBlockMessage>,
 }
 
 #[async_trait]
 impl MessageHandler for MempoolReceiverHandler {
     async fn dispatch(&self, writer: &mut Writer, serialized: Bytes) -> Result<(), Box<dyn Error>> {
         // Reply with an ACK.
+        // ARETE: parse the received EBlock, sign it, send the signature back
         let _ = writer.send(Bytes::from("Ack")).await;
 
         // Deserialize and parse the message.
         match bincode::deserialize(&serialized) {
-            Ok(MempoolMessage::Batch(..)) => self
+            Ok(MempoolMessage::EBlock(..)) => self
                 .tx_processor
                 .send(serialized.to_vec())
                 .await
                 .expect("Failed to send batch"),
-            Ok(MempoolMessage::BatchRequest(missing, requestor)) => self
+            Ok(MempoolMessage::EBlockRequest(missing, requestor)) => self
                 .tx_helper
                 .send((missing, requestor))
                 .await

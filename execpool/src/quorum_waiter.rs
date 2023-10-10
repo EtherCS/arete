@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use crate::config::{ExecutionCommittee, Stake};
-use crate::processor::SerializedBatchMessage;
+use crate::processor::SerializedEBlockMessage;
 use crypto::PublicKey;
 use futures::stream::futures_unordered::FuturesUnordered;
 use futures::stream::StreamExt as _;
@@ -23,7 +23,7 @@ const DISSEMINATION_QUEUE_MAX: usize = 10_000;
 #[derive(Debug)]
 pub struct QuorumWaiterMessage {
     /// A serialized `MempoolMessage::Batch` message.
-    pub batch: SerializedBatchMessage,
+    pub batch: SerializedEBlockMessage,
     /// The cancel handlers to receive the acknowledgements of our broadcast.
     pub handlers: Vec<(PublicKey, CancelHandler)>,
 }
@@ -36,8 +36,8 @@ pub struct QuorumWaiter {
     stake: Stake,
     /// Input Channel to receive commands.
     rx_message: Receiver<QuorumWaiterMessage>,
-    /// Channel to deliver batches for which we have enough acknowledgements.
-    tx_batch: Sender<SerializedBatchMessage>,
+    /// Channel to deliver CBlock for which we have enough acknowledgements.
+    tx_batch: Sender<SerializedEBlockMessage>,
 }
 
 impl QuorumWaiter {
@@ -86,7 +86,7 @@ impl QuorumWaiter {
                         })
                         .collect();
 
-                    // Wait for the first 2f nodes to send back an Ack. Then we consider the batch
+                    // Wait for the first (1-f_L) nodes to send back an Ack. Then we consider the batch
                     // delivered and we send its digest to the consensus (that will include it into
                     // the dag). This should reduce the amount of synching.
                     let mut total_stake = self.stake;

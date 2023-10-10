@@ -1,4 +1,7 @@
-use crypto::{Digest, Hash, Signature, PublicKey};
+use crate::config::ExecutionCommittee;
+use crate::ensure;
+use crate::error::{CertifyError, CertifyResult};
+use crypto::{Digest, Hash, Signature, PublicKey, SignatureService};
 use ed25519_dalek::Digest as _;
 use ed25519_dalek::Sha512;
 use serde::{Deserialize, Serialize};
@@ -6,7 +9,10 @@ use std::convert::TryInto;
 use std::fmt;
 use std::collections::HashMap;
 
+
+
 pub type Round = u64;
+pub type Transaction = Vec<u8>;
 
 #[derive(Serialize, Deserialize, Default, Clone)]
 pub struct ConfirmMessage {
@@ -74,6 +80,89 @@ impl fmt::Display for ConfirmMessage {
         write!(f, "ConfirmMsg{}", self.round)
     }
 }
+
+// Execution block
+#[derive(Serialize, Deserialize, Default, Clone)]
+pub struct EBlock {  
+    pub shard_id: u32,
+    pub author: PublicKey,
+    pub intratxs: Vec<Transaction>,
+    pub crosstxs: Vec<Transaction>,
+    pub signature: Signature,
+}
+
+impl EBlock {
+    pub async fn new(
+        shard_id: u32,
+        author: PublicKey,
+        intratxs: Vec<Transaction>,
+        crosstxs: Vec<Transaction>,
+        mut signature_service: SignatureService,
+    ) -> Self {
+        let block = Self {
+            shard_id,
+            author,
+            intratxs,
+            crosstxs,
+            signature: Signature::default(),
+        };
+        let signature = signature_service.request_signature(block.digest()).await;
+        Self { signature, ..block }
+    }
+
+    pub fn genesis() -> Self {
+        EBlock::default()
+    }
+
+    pub fn verify(&self, committee: &ExecutionCommittee) -> CertifyResult<()> {
+        // Ensure the authority has voting rights.
+        let voting_rights = committee.stake(&self.author);
+        ensure!(
+            voting_rights > 0,
+            CertifyError::UnknownAuthority(self.author)
+        );
+
+        // Check the signature.
+        self.signature.verify(&self.digest(), &self.author)?;
+
+        Ok(())
+    }
+}
+
+impl Hash for EBlock {
+    fn digest(&self) -> Digest {
+        let mut hasher = Sha512::new();
+        hasher.update(self.author.0);
+        for x in &self.intratxs {
+            hasher.update(x);
+        }
+        for x in &self.crosstxs {
+            hasher.update(x);
+        }
+        hasher.update(&self.shard_id.to_le_bytes());
+        Digest(hasher.finalize().as_slice()[..32].try_into().unwrap())
+    }
+}
+
+impl fmt::Debug for EBlock {
+    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        write!(
+            f,
+            "{}: EB({}, {}, {})",
+            self.digest(),
+            self.author,
+            self.intratxs.iter().map(|x| x.len()).sum::<usize>(),
+            self.crosstxs.iter().map(|x| x.len()).sum::<usize>(),
+        )
+    }
+}
+
+impl fmt::Display for EBlock {
+    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        write!(f, "EB{}", self.digest())
+    }
+}
+
 
 // Certificate block
 #[derive(Serialize, Deserialize, Default, Clone)]

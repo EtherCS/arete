@@ -3,7 +3,7 @@ use crate::quorum_waiter::QuorumWaiterMessage;
 use bytes::Bytes;
 #[cfg(feature = "benchmark")]
 use crypto::Digest;
-use crypto::PublicKey;
+use crypto::{PublicKey, SignatureService};
 #[cfg(feature = "benchmark")]
 use ed25519_dalek::{Digest as _, Sha512};
 #[cfg(feature = "benchmark")]
@@ -14,16 +14,25 @@ use std::convert::TryInto as _;
 use std::net::SocketAddr;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::time::{sleep, Duration, Instant};
+use types::{EBlock, Transaction, ShardInfo};
 
 #[cfg(test)]
 #[path = "tests/batch_maker_tests.rs"]
 pub mod batch_maker_tests;
 
-pub type Transaction = Vec<u8>;
+// pub type Transaction = Vec<u8>;
 pub type Batch = Vec<Transaction>;
 
 /// Assemble clients transactions into batches.
 pub struct BatchMaker {
+    /// The node
+    name: PublicKey,
+    /// The execution shard information
+    shard_info: ShardInfo,
+    /// The signagure service
+    signature_service: SignatureService,
+    /// The ratio of cross-shard txs (TODO: remove)
+    ratio_cross_shard_txs: f32,
     /// The preferred batch size (in bytes).
     batch_size: usize,
     /// The maximum delay after which to seal the batch (in ms).
@@ -44,6 +53,10 @@ pub struct BatchMaker {
 
 impl BatchMaker {
     pub fn spawn(
+        name: PublicKey,
+        shard_info: ShardInfo,
+        signature_service: SignatureService,
+        ratio_cross_shard_txs: f32,
         batch_size: usize,
         max_batch_delay: u64,
         rx_transaction: Receiver<Transaction>,
@@ -52,6 +65,10 @@ impl BatchMaker {
     ) {
         tokio::spawn(async move {
             Self {
+                name,
+                shard_info,
+                signature_service,
+                ratio_cross_shard_txs,
                 batch_size,
                 max_batch_delay,
                 rx_transaction,
@@ -114,6 +131,10 @@ impl BatchMaker {
         // Serialize the batch.
         self.current_batch_size = 0;
         let batch: Vec<_> = self.current_batch.drain(..).collect();
+        let ctx_num = (batch.len() as i32) * self.ratio_cross_shard_txs;
+        let intratxs = &batch.
+        // ARETE: use Transactions to create a EBlock
+        let eblock = EBlock::new(self.shard_info.id, self.name, intratxs, crosstxs, signature_service);
         let message = MempoolMessage::Batch(batch);
         let serialized = bincode::serialize(&message).expect("Failed to serialize our own batch");
 
