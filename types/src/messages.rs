@@ -86,6 +86,7 @@ impl fmt::Display for ConfirmMessage {
 pub struct EBlock {  
     pub shard_id: u32,
     pub author: PublicKey,
+    pub round: Round,
     pub intratxs: Vec<Transaction>,
     pub crosstxs: Vec<Transaction>,
     pub signature: Signature,
@@ -95,6 +96,7 @@ impl EBlock {
     pub async fn new(
         shard_id: u32,
         author: PublicKey,
+        round: Round,
         intratxs: Vec<Transaction>,
         crosstxs: Vec<Transaction>,
         mut signature_service: SignatureService,
@@ -102,6 +104,7 @@ impl EBlock {
         let block = Self {
             shard_id,
             author,
+            round,
             intratxs,
             crosstxs,
             signature: Signature::default(),
@@ -133,6 +136,7 @@ impl Hash for EBlock {
     fn digest(&self) -> Digest {
         let mut hasher = Sha512::new();
         hasher.update(self.author.0);
+        hasher.update(self.round.to_le_bytes());
         for x in &self.intratxs {
             hasher.update(x);
         }
@@ -163,6 +167,42 @@ impl fmt::Display for EBlock {
     }
 }
 
+// For certify the EBlock
+#[derive(Serialize, Deserialize, Default, Clone)]
+pub struct NodeSignature {
+    pub name: PublicKey,
+    pub signature: Signature,
+}
+
+impl NodeSignature {
+    pub async fn new(
+        name: PublicKey,
+        signature: Signature,
+    ) -> Self {
+        let nodesignature: NodeSignature = Self { 
+            name, 
+            signature, 
+        };
+        Self { ..nodesignature }
+    }
+}
+impl Hash for NodeSignature {
+    fn digest(&self) -> Digest {
+        let mut hasher = Sha512::new();
+        hasher.update(self.name.0);
+        Digest(hasher.finalize().as_slice()[..32].try_into().unwrap())
+    }
+}
+impl fmt::Debug for NodeSignature {
+    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        write!(
+            f,
+            "name{}, signagure{:?}",
+            self.name,
+            self.signature,
+        )
+    }
+}
 
 // Certificate block
 #[derive(Serialize, Deserialize, Default, Clone)]
@@ -171,10 +211,10 @@ pub struct CBlock {
     pub author: PublicKey,
     pub round: Round,
     pub ebhash: Digest,
-    pub payload: Vec<Digest>,   // TODO cross-shard txs hash
-    pub votes: HashMap<Digest, u8>,  // votes[ctx_hash] = 0, 1
-    pub multisignatures: Vec<(PublicKey, Signature)>,   // signatures for availability
-    pub signature: Signature,
+    pub ctx_hashes: Vec<Digest>,   // TODO cross-shard txs hash
+    // pub votes: HashMap<Digest, u8>,  // votes[ctx_hash] = 0, 1
+    pub multisignatures: Vec<NodeSignature>,   // signatures for availability
+    // pub signature: Signature,
 }
 
 impl CBlock {
@@ -183,20 +223,20 @@ impl CBlock {
         author: PublicKey,
         round: Round,
         ebhash: Digest,
-        payload: Vec<Digest>,
-        votes: HashMap<Digest, u8>,
-        multisignatures: Vec<(PublicKey, Signature)>,
-        signature: Signature,
+        ctx_hashes: Vec<Digest>,
+        // votes: HashMap<Digest, u8>,
+        multisignatures: Vec<NodeSignature>,
+        // signature: Signature,
     ) -> Self {
         let block = Self {
             shard_id,
             author,
             round,
             ebhash,
-            payload,
-            votes,
+            ctx_hashes,
+            // votes,
             multisignatures,
-            signature,
+            // signature,
         };
         Self { ..block }
     }
@@ -211,17 +251,16 @@ impl Hash for CBlock {
         let mut hasher = Sha512::new();
         hasher.update(self.author.0);
         hasher.update(self.round.to_le_bytes());
-        for x in &self.payload {
+        for x in &self.ctx_hashes {
             hasher.update(x);
         }
-        for (x, y) in &self.votes {
-            let serialized_data = bincode::serialize(&(x, y)).expect("Serialization failed");
-            hasher.update(serialized_data);
-        }
-        for (x, y) in &self.multisignatures {
-            let serialized_data = bincode::serialize(&(x, y)).expect("Serialization failed");
-            hasher.update(serialized_data);
-        }
+        // for (x, y) in &self.votes {
+        //     let serialized_data = bincode::serialize(&(x, y)).expect("Serialization failed");
+        //     hasher.update(serialized_data);
+        // }
+        // for x in &self.multisignatures {
+        //     hasher.update(x.digest());
+        // }
         hasher.update(&self.ebhash);
         hasher.update(&self.shard_id.to_le_bytes());
         Digest(hasher.finalize().as_slice()[..32].try_into().unwrap())
@@ -237,7 +276,7 @@ impl fmt::Debug for CBlock {
             self.author,
             self.round,
             self.shard_id,
-            self.payload.iter().map(|x| x.size()).sum::<usize>(),
+            self.ctx_hashes.iter().map(|x| x.size()).sum::<usize>(),
         )
     }
 }

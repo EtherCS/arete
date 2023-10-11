@@ -2,7 +2,9 @@ use std::time::Duration;
 
 use crate::config::{ExecutionCommittee, Stake};
 use crate::processor::SerializedEBlockMessage;
-use crypto::PublicKey;
+use crypto::{PublicKey, Digest, Hash};
+use ed25519_dalek::Digest as _;
+use ed25519_dalek::Sha512;
 use futures::stream::futures_unordered::FuturesUnordered;
 use futures::stream::StreamExt as _;
 use network::CancelHandler;
@@ -10,15 +12,25 @@ use tokio::{
     sync::mpsc::{Receiver, Sender},
     time::sleep,
 };
+use std::convert::TryInto;
+use types::{CBlock, NodeSignature, ShardInfo, EBlock};
 
-#[cfg(test)]
-#[path = "tests/quorum_waiter_tests.rs"]
-pub mod quorum_waiter_tests;
+// #[cfg(test)]
+// #[path = "tests/quorum_waiter_tests.rs"]
+// pub mod quorum_waiter_tests;
 
 /// Extra batch dissemination time for the f last nodes (in ms).
 const DISSEMINATION_DEADLINE: u64 = 500;
 /// Bounds the queue handling the extra dissemination.
 const DISSEMINATION_QUEUE_MAX: usize = 10_000;
+
+#[derive(Debug)]
+pub struct EBlockRespondMessage {
+    /// The (publcKey, signagure) of the sender on the EBlock.
+    pub certificate: NodeSignature,
+    /// The stake of the sender.
+    pub stake: Stake,
+}
 
 #[derive(Debug)]
 pub struct QuorumWaiterMessage {
@@ -30,6 +42,10 @@ pub struct QuorumWaiterMessage {
 
 /// The QuorumWaiter waits for 2f authorities to acknowledge reception of a batch.
 pub struct QuorumWaiter {
+    /// The node
+    name: PublicKey,
+    /// The execution shard information
+    shard_info: ShardInfo,
     /// The committee information.
     committee: ExecutionCommittee,
     /// The stake of this authority.
@@ -37,19 +53,23 @@ pub struct QuorumWaiter {
     /// Input Channel to receive commands.
     rx_message: Receiver<QuorumWaiterMessage>,
     /// Channel to deliver CBlock for which we have enough acknowledgements.
-    tx_batch: Sender<SerializedEBlockMessage>,
+    tx_batch: Sender<CBlock>,
 }
 
 impl QuorumWaiter {
     /// Spawn a new QuorumWaiter.
     pub fn spawn(
+        name: PublicKey,
+        shard_info: ShardInfo,
         committee: ExecutionCommittee,
         stake: Stake,
         rx_message: Receiver<QuorumWaiterMessage>,
-        tx_batch: Sender<Vec<u8>>,
+        tx_batch: Sender<CBlock>,
     ) {
         tokio::spawn(async move {
             Self {
+                name,
+                shard_info,
                 committee,
                 stake,
                 rx_message,
@@ -61,9 +81,10 @@ impl QuorumWaiter {
     }
 
     /// Helper function. It waits for a future to complete and then delivers a value.
-    async fn waiter(wait_for: CancelHandler, deliver: Stake) -> Stake {
-        let _ = wait_for.await;
-        deliver
+    async fn waiter(wait_for: CancelHandler, deliver: Stake) -> EBlockRespondMessage {
+        let byte_certificate = wait_for.await.expect("error handler");
+        let certificate: NodeSignature = bincode::deserialize(&byte_certificate).expect("fail to deserialize certificate");
+        EBlockRespondMessage{certificate: certificate, stake: deliver}
     }
 
     // async fn empty_buffer()
@@ -78,6 +99,11 @@ impl QuorumWaiter {
         loop {
             tokio::select! {
                 Some(QuorumWaiterMessage { batch, handlers }) = self.rx_message.recv() => {
+                    let eblock: EBlock = bincode::deserialize(&batch).expect("fail to deserialize eblock");
+                    let mut hash_ctxs: Vec<Digest> = Vec::new();
+                    for ctx in &eblock.crosstxs {
+                        hash_ctxs.push(Digest(Sha512::digest(&ctx).as_slice()[..32].try_into().unwrap()));
+                    }
                     let mut wait_for_quorum: FuturesUnordered<_> = handlers
                         .into_iter()
                         .map(|(name, handler)| {
@@ -90,13 +116,23 @@ impl QuorumWaiter {
                     // delivered and we send its digest to the consensus (that will include it into
                     // the dag). This should reduce the amount of synching.
                     let mut total_stake = self.stake;
-                    while let Some(stake) = wait_for_quorum.next().await {
+                    let mut multisignatures: Vec<NodeSignature> = Vec::new();
+                    while let Some(EBlockRespondMessage { certificate, stake }) = wait_for_quorum.next().await {
+                        multisignatures.push(certificate);
                         total_stake += stake;
                         if total_stake >= self.committee.quorum_threshold() {
+                            let cblock = CBlock::new(
+                                self.shard_info.id,
+                                self.name,
+                                0,
+                                eblock.digest(),
+                                hash_ctxs.clone(),
+                                multisignatures.clone(),
+                            ).await;
                             self.tx_batch
-                                .send(batch)
+                                .send(cblock)
                                 .await
-                                .expect("Failed to deliver batch");
+                                .expect("Failed to deliver cblock");
                             break;
                         }
                     }

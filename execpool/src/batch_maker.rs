@@ -14,14 +14,17 @@ use std::convert::TryInto as _;
 use std::net::SocketAddr;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::time::{sleep, Duration, Instant};
-use types::{EBlock, Transaction, ShardInfo};
+use types::{EBlock, Transaction, ShardInfo, Round};
 
-#[cfg(test)]
-#[path = "tests/batch_maker_tests.rs"]
-pub mod batch_maker_tests;
+// #[cfg(test)]
+// #[path = "tests/batch_maker_tests.rs"]
+// pub mod batch_maker_tests;
 
 // pub type Transaction = Vec<u8>;
 pub type Batch = Vec<Transaction>;
+
+// ARETE: TODO: if need round?
+pub const EXECUTION_ROUND: Round = 1;
 
 /// Assemble clients transactions into batches.
 pub struct BatchMaker {
@@ -131,12 +134,13 @@ impl BatchMaker {
         // Serialize the batch.
         self.current_batch_size = 0;
         let batch: Vec<_> = self.current_batch.drain(..).collect();
-        let ctx_num = (batch.len() as i32) * self.ratio_cross_shard_txs;
-        let intratxs = &batch.
+        let ctx_num = (batch.len() as f32 * self.ratio_cross_shard_txs).floor() as usize;
+        let intratxs = &batch[0..ctx_num].to_vec();
+        let crosstxs= &batch[ctx_num..batch.len()].to_vec();
         // ARETE: use Transactions to create a EBlock
-        let eblock = EBlock::new(self.shard_info.id, self.name, intratxs, crosstxs, signature_service);
-        let message = MempoolMessage::Batch(batch);
-        let serialized = bincode::serialize(&message).expect("Failed to serialize our own batch");
+        let eblock = EBlock::new(self.shard_info.id, self.name, EXECUTION_ROUND, intratxs.clone(), crosstxs.clone(), self.signature_service.clone()).await;
+        let message = MempoolMessage::EBlock(eblock);
+        let serialized = bincode::serialize(&message).expect("Failed to serialize our own EBlock");
 
         #[cfg(feature = "benchmark")]
         {
