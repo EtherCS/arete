@@ -18,7 +18,7 @@ pub const CHANNEL_CAPACITY: usize = 1_000;
 
 // Executor is the replica in the ordering shard
 pub struct Executor {
-    pub commit: Receiver<EBlock>,  
+    pub certify: Receiver<CBlock>,  
     pub ordering_addr: SocketAddr,
     pub shard_id: u32,
 }
@@ -30,7 +30,7 @@ impl Executor {
         store_path: &str,
         parameters: Option<String>,
     ) -> Result<Self, ConfigError> {
-        let (tx_commit, rx_commit) = channel(CHANNEL_CAPACITY);
+        let (tx_certify, rx_certify) = channel(CHANNEL_CAPACITY);
         let (tx_consensus_to_mempool, rx_consensus_to_mempool) = channel(CHANNEL_CAPACITY);
         let (tx_mempool_to_consensus, rx_mempool_to_consensus) = channel(CHANNEL_CAPACITY);
         let (tx_confirm_mempool_to_consensus, rx_confirm_mempool_to_consensus) = channel(CHANNEL_CAPACITY);
@@ -66,6 +66,8 @@ impl Executor {
         // Make a new mempool.
         Mempool::spawn(
             name,
+            committee.shard,
+            signature_service.clone(),
             committee.mempool,
             parameters.mempool,
             store.clone(),
@@ -80,17 +82,17 @@ impl Executor {
             committee.consensus,
             parameters.consensus,
             committee.shard,
-            signature_service,
+            signature_service.clone(),
             store,
             rx_mempool_to_consensus,
             tx_consensus_to_mempool,
-            tx_commit,
+            tx_certify,
             rx_confirm_mempool_to_consensus,
         );
 
         info!("Executor {} successfully booted", name);
         // info!("Executor connects nodes with address {}", target);
-        Ok(Self { commit: rx_commit, ordering_addr: target_addr, shard_id: shard_id})
+        Ok(Self { certify: rx_certify, ordering_addr: target_addr, shard_id: shard_id})
     }
 
     pub fn print_key_file(filename: &str) -> Result<(), ConfigError> {
@@ -99,17 +101,17 @@ impl Executor {
 
     pub async fn analyze_block(&mut self) -> Result<()> {
         let mut sender = SimpleSender::new();
-        while let Some(_block) = self.commit.recv().await {
-            let certify_block = CBlock::new(
-                self.shard_id, 
-                _block.author, 
-                _block.round,
-                _block.digest(), 
-                _block.payload.clone(),     // TODO: hash of new cross-shard txs
-                HashMap::new(),     // TODO: votes messages for the execution results of cross-shard txs
-                _block.qc.votes.clone(),
-                _block.signature.clone()).await;
-            let message = bincode::serialize(&certify_block.clone())
+        while let Some(_block) = self.certify.recv().await {
+            // let certify_block = CBlock::new(
+            //     self.shard_id, 
+            //     _block.author, 
+            //     _block.round,
+            //     _block.digest(), 
+            //     _block.payload.clone(),     // TODO: hash of new cross-shard txs
+            //     HashMap::new(),     // TODO: votes messages for the execution results of cross-shard txs
+            //     _block.qc.votes.clone(),
+            //     _block.signature.clone()).await;
+            let message = bincode::serialize(&_block.clone())
                 .expect("fail to serialize the CBlock");
             sender.send(self.ordering_addr, Into::into(message)).await;
 

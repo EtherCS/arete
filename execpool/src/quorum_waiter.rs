@@ -2,18 +2,18 @@ use std::time::Duration;
 
 use crate::config::{ExecutionCommittee, Stake};
 use crate::processor::SerializedEBlockMessage;
-use crypto::{PublicKey, Digest, Hash};
+use crypto::{Digest, Hash, PublicKey};
 use ed25519_dalek::Digest as _;
 use ed25519_dalek::Sha512;
 use futures::stream::futures_unordered::FuturesUnordered;
 use futures::stream::StreamExt as _;
 use network::CancelHandler;
+use std::convert::TryInto;
 use tokio::{
     sync::mpsc::{Receiver, Sender},
     time::sleep,
 };
-use std::convert::TryInto;
-use types::{CBlock, NodeSignature, ShardInfo, EBlock};
+use types::{CBlock, EBlock, NodeSignature, ShardInfo};
 
 // #[cfg(test)]
 // #[path = "tests/quorum_waiter_tests.rs"]
@@ -52,8 +52,10 @@ pub struct QuorumWaiter {
     stake: Stake,
     /// Input Channel to receive commands.
     rx_message: Receiver<QuorumWaiterMessage>,
+    /// Send EBlock to processor for storing
+    tx_processor: Sender<EBlock>,
     /// Channel to deliver CBlock for which we have enough acknowledgements.
-    tx_batch: Sender<CBlock>,
+    tx_cblock: Sender<CBlock>,
 }
 
 impl QuorumWaiter {
@@ -64,7 +66,8 @@ impl QuorumWaiter {
         committee: ExecutionCommittee,
         stake: Stake,
         rx_message: Receiver<QuorumWaiterMessage>,
-        tx_batch: Sender<CBlock>,
+        tx_processor: Sender<EBlock>,
+        tx_cblock: Sender<CBlock>,
     ) {
         tokio::spawn(async move {
             Self {
@@ -73,7 +76,8 @@ impl QuorumWaiter {
                 committee,
                 stake,
                 rx_message,
-                tx_batch,
+                tx_processor,
+                tx_cblock,
             }
             .run()
             .await;
@@ -83,8 +87,12 @@ impl QuorumWaiter {
     /// Helper function. It waits for a future to complete and then delivers a value.
     async fn waiter(wait_for: CancelHandler, deliver: Stake) -> EBlockRespondMessage {
         let byte_certificate = wait_for.await.expect("error handler");
-        let certificate: NodeSignature = bincode::deserialize(&byte_certificate).expect("fail to deserialize certificate");
-        EBlockRespondMessage{certificate: certificate, stake: deliver}
+        let certificate: NodeSignature =
+            bincode::deserialize(&byte_certificate).expect("fail to deserialize certificate");
+        EBlockRespondMessage {
+            certificate: certificate,
+            stake: deliver,
+        }
     }
 
     // async fn empty_buffer()
@@ -95,11 +103,13 @@ impl QuorumWaiter {
         let mut pending = FuturesUnordered::new();
         let mut pending_counter = 0;
 
-        // while let Some(QuorumWaiterMessage { batch, handlers }) = self.rx_message.recv().await {
         loop {
             tokio::select! {
                 Some(QuorumWaiterMessage { batch, handlers }) = self.rx_message.recv() => {
                     let eblock: EBlock = bincode::deserialize(&batch).expect("fail to deserialize eblock");
+                    // Send this EBlock to processor for storing
+                    self.tx_processor.send(eblock.clone()).await.expect("Failed to send EBlock to processor");
+                    // Collect signatures to create CBlock
                     let mut hash_ctxs: Vec<Digest> = Vec::new();
                     for ctx in &eblock.crosstxs {
                         hash_ctxs.push(Digest(Sha512::digest(&ctx).as_slice()[..32].try_into().unwrap()));
@@ -129,7 +139,7 @@ impl QuorumWaiter {
                                 hash_ctxs.clone(),
                                 multisignatures.clone(),
                             ).await;
-                            self.tx_batch
+                            self.tx_cblock
                                 .send(cblock)
                                 .await
                                 .expect("Failed to deliver cblock");

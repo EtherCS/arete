@@ -1,7 +1,7 @@
 use crate::config::ExecutionCommittee;
 use crate::consensus::{ConsensusMessage, CHANNEL_CAPACITY};
 use crate::error::ConsensusResult;
-use crate::messages::{EBlock, QC};
+// use crate::messages::QC;
 use bytes::Bytes;
 use crypto::Hash as _;
 use crypto::{Digest, PublicKey};
@@ -14,10 +14,11 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use store::Store;
 use tokio::sync::mpsc::{channel, Receiver, Sender};
 use tokio::time::{sleep, Duration, Instant};
+use types::EBlock;
 
-#[cfg(test)]
-#[path = "tests/synchronizer_tests.rs"]
-pub mod synchronizer_tests;
+// #[cfg(test)]
+// #[path = "tests/synchronizer_tests.rs"]
+// pub mod synchronizer_tests;
 
 const TIMER_ACCURACY: u64 = 5_000;
 

@@ -14,6 +14,7 @@ use std::collections::HashMap;
 pub type Round = u64;
 pub type Transaction = Vec<u8>;
 
+// Execution shards receive the ordered txs from the ordering shard
 #[derive(Serialize, Deserialize, Default, Clone)]
 pub struct ConfirmMessage {
     pub shard_id: u32,  

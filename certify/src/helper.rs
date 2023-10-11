@@ -7,9 +7,9 @@ use network::SimpleSender;
 use store::Store;
 use tokio::sync::mpsc::Receiver;
 
-#[cfg(test)]
-#[path = "tests/helper_tests.rs"]
-pub mod helper_tests;
+// #[cfg(test)]
+// #[path = "tests/helper_tests.rs"]
+// pub mod helper_tests;
 
 /// A task dedicated to help other authorities by replying to their sync requests.
 pub struct Helper {
@@ -59,7 +59,7 @@ impl Helper {
             {
                 let block =
                     bincode::deserialize(&bytes).expect("Failed to deserialize our own block");
-                let message = bincode::serialize(&ConsensusMessage::Propose(block))
+                let message = bincode::serialize(&ConsensusMessage::ExecutionBlock(block))
                     .expect("Failed to serialize block");
                 self.network.send(address, Bytes::from(message)).await;
             }

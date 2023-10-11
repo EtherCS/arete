@@ -6,7 +6,7 @@ use crate::quorum_waiter::QuorumWaiter;
 use crate::synchronizer::Synchronizer;
 use async_trait::async_trait;
 use bytes::Bytes;
-use crypto::{Digest, PublicKey, SignatureService, Hash};
+use crypto::{Digest, Hash, PublicKey, SignatureService};
 use ed25519_dalek::Digest as _;
 use ed25519_dalek::Sha512;
 use futures::sink::SinkExt as _;
@@ -17,7 +17,7 @@ use std::convert::TryInto;
 use std::error::Error;
 use store::Store;
 use tokio::sync::mpsc::{channel, Receiver, Sender};
-use types::{ConfirmMessage, EBlock, Transaction, ShardInfo, CBlock, NodeSignature};
+use types::{CBlock, ConfirmMessage, EBlock, NodeSignature, ShardInfo, Transaction};
 
 // #[cfg(test)]
 // #[path = "tests/mempool_tests.rs"]
@@ -63,8 +63,8 @@ pub struct Mempool {
     parameters: CertifyParameters,
     /// The persistent storage.
     store: Store,
-    /// Send messages to consensus.
-    tx_consensus: Sender<Digest>,
+    /// Send messages to certify.
+    tx_certify: Sender<CBlock>,
     /// Send confirmation messages to consensus
     tx_confirm: Sender<ConfirmMessage>,
 }
@@ -78,7 +78,7 @@ impl Mempool {
         parameters: CertifyParameters,
         store: Store,
         rx_consensus: Receiver<ExecutionMempoolMessage>,
-        tx_consensus: Sender<Digest>,
+        tx_certify: Sender<CBlock>,
         tx_confirm: Sender<ConfirmMessage>,
     ) {
         // NOTE: This log entry is used to compute performance.
@@ -92,7 +92,7 @@ impl Mempool {
             committee,
             parameters,
             store,
-            tx_consensus,
+            tx_certify,
             tx_confirm,
         };
 
@@ -175,7 +175,8 @@ impl Mempool {
             self.committee.clone(),
             /* stake */ self.committee.stake(&self.name),
             /* rx_message */ rx_quorum_waiter,
-            /* tx_batch */ tx_processor,
+            tx_processor,
+            self.tx_certify.clone(),
         );
 
         // The `Processor` hashes and stores the batch. It then forwards the batch's digest to the consensus.
@@ -184,7 +185,7 @@ impl Mempool {
             self.name,
             self.store.clone(),
             /* rx_batch */ rx_processor,
-            /* tx_digest */ self.tx_consensus.clone(),
+            // /* tx_digest */ self.tx_certify.clone(),
         );
 
         info!("Mempool listening to client transactions on {}", address);
@@ -225,7 +226,7 @@ impl Mempool {
             self.name,
             self.store.clone(),
             /* rx_batch */ rx_processor,
-            /* tx_digest */ self.tx_consensus.clone(),
+            // /* tx_digest */ self.tx_certify.clone(),
         );
 
         info!("Mempool listening to mempool messages on {}", address);
@@ -305,7 +306,7 @@ impl MessageHandler for ConfirmationMsgReceiverHandler {
 #[derive(Clone)]
 struct MempoolReceiverHandler {
     tx_helper: Sender<(Digest, PublicKey)>,
-    tx_processor: Sender<CBlock>,
+    tx_processor: Sender<EBlock>,
     name: PublicKey,
     signature_service: SignatureService,
 }
@@ -316,15 +317,22 @@ impl MessageHandler for MempoolReceiverHandler {
         // Reply with an ACK.
         // ARETE: parse the received EBlock, sign it, send the signature back
         // let _ = writer.send(Bytes::from("Ack")).await;
-        
+
         // Deserialize and parse the message.
         match bincode::deserialize(&serialized) {
             Ok(MempoolMessage::EBlock(eblock)) => {
                 // Get digests of ctxs
                 let mut hash_ctxs: Vec<Digest> = Vec::new();
                 for ctx in &eblock.crosstxs {
-                    hash_ctxs.push(Digest(Sha512::digest(&ctx).as_slice()[..32].try_into().unwrap()));
+                    hash_ctxs.push(Digest(
+                        Sha512::digest(&ctx).as_slice()[..32].try_into().unwrap(),
+                    ));
                 }
+                // Send cblock to processor for storing
+                self.tx_processor
+                    .send(eblock.clone())
+                    .await
+                    .expect("Failed to send EBlock to store");
                 let cblock = CBlock::new(
                     eblock.shard_id,
                     eblock.author,
@@ -332,27 +340,20 @@ impl MessageHandler for MempoolReceiverHandler {
                     eblock.digest(),
                     hash_ctxs.clone(),
                     Vec::new(),
-                ).await;
-                // Send cblock to processor for storing
-                self
-                    .tx_processor
-                    .send(cblock.clone())
-                    .await
-                    .expect("Failed to send batch");
-                    let mut signature_service = self.signature_service.clone();
-                    let signature = signature_service.request_signature(cblock.digest()).await;
-                    let node_signature = NodeSignature::new(
-                        self.name,
-                        signature,
-                    ).await;
+                )
+                .await;
                 // Send signature to the EBlock creator
-                let cblock_serialized = bincode::serialize(&node_signature.clone()).expect("Failed to serialize received CBlock");
+                let mut signature_service = self.signature_service.clone();
+                let signature = signature_service.request_signature(cblock.digest()).await;
+                let node_signature = NodeSignature::new(self.name, signature).await;
+
+                let cblock_serialized = bincode::serialize(&node_signature.clone())
+                    .expect("Failed to serialize received CBlock");
                 let cblock_bytes = Bytes::from(cblock_serialized.clone());
                 let _ = writer.send(cblock_bytes).await;
             }
             Ok(MempoolMessage::EBlockRequest(missing, requestor)) => {
-                self
-                    .tx_helper
+                self.tx_helper
                     .send((missing, requestor))
                     .await
                     .expect("Failed to send batch request");

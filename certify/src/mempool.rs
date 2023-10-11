@@ -1,27 +1,28 @@
 use crate::consensus::{Round, CHANNEL_CAPACITY};
 use crate::error::{ConsensusError, ConsensusResult};
-use crate::messages::EBlock;
+// use crate::messages::EBlock;
 use crypto::Digest;
 use crypto::Hash as _;
 use futures::future::try_join_all;
 use futures::stream::futures_unordered::FuturesUnordered;
 use futures::stream::StreamExt as _;
 use log::error;
-use execpool::ConsensusMempoolMessage;
+use execpool::ExecutionMempoolMessage;
 use std::collections::HashMap;
 use store::Store;
 use tokio::sync::mpsc::{channel, Receiver, Sender};
+use types::EBlock;
 
 pub struct MempoolDriver {
     store: Store,
-    tx_mempool: Sender<ConsensusMempoolMessage>,
+    tx_mempool: Sender<ExecutionMempoolMessage>,
     tx_payload_waiter: Sender<PayloadWaiterMessage>,
 }
 
 impl MempoolDriver {
     pub fn new(
         store: Store,
-        tx_mempool: Sender<ConsensusMempoolMessage>,
+        tx_mempool: Sender<ExecutionMempoolMessage>,
         tx_loopback: Sender<EBlock>,
     ) -> Self {
         let (tx_payload_waiter, rx_payload_waiter) = channel(CHANNEL_CAPACITY);
@@ -49,7 +50,7 @@ impl MempoolDriver {
             return Ok(true);
         }
 
-        let message = ConsensusMempoolMessage::Synchronize(missing.clone(), block.author);
+        let message = ExecutionMempoolMessage::Synchronize(missing.clone(), block.author);
         self.tx_mempool
             .send(message)
             .await
@@ -66,7 +67,7 @@ impl MempoolDriver {
     pub async fn cleanup(&mut self, round: Round) {
         // Cleanup the mempool.
         self.tx_mempool
-            .send(ConsensusMempoolMessage::Cleanup(round))
+            .send(ExecutionMempoolMessage::Cleanup(round))
             .await
             .expect("Failed to send cleanup message");
 

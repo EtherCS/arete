@@ -5,7 +5,7 @@ use ed25519_dalek::Sha512;
 use std::convert::TryInto;
 use store::Store;
 use tokio::sync::mpsc::{Receiver, Sender};
-use types::CBlock;
+use types::EBlock;
 
 // #[cfg(test)]
 // #[path = "tests/processor_tests.rs"]
@@ -22,27 +22,27 @@ impl Processor {
         // The name of the executor
         name: PublicKey,
         // The persistent storage.
+        // Store <Hash, EBlock>
         mut store: Store,
-        // Input channel to receive batches.
-        mut rx_batch: Receiver<CBlock>,
+        // Input channel to receive CBlock.
+        mut rx_cblock: Receiver<EBlock>,
         // Output channel to send out batches' digests.
-        tx_digest: Sender<Digest>,
+        // tx_to_certify_digest: Sender<CBlock>,
     ) {
         tokio::spawn(async move {
             // Receive cblock after certifying (get f+1 signatures)
-            while let Some(cblock) = rx_batch.recv().await {
+            while let Some(eblock) = rx_cblock.recv().await {
                 // Hash the cblock.
-                let digest = cblock.digest();
-                let value = bincode::serialize(&cblock).expect("Failed to serialize cblock");
+                let digest = eblock.digest();
+                let value = bincode::serialize(&eblock).expect("Failed to serialize cblock");
 
                 // Store the cblock.
                 store.write(digest.to_vec(), value).await;
 
                 // Send to channel, wait to send to the ordering shard
-                if cblock.author == name {
-                    tx_digest.send(digest).await.expect("Failed to send digest");
-                }
-                
+                // if cblock.author == name {
+                //     tx_to_certify_digest.send(cblock).await.expect("Failed to send cblock to certify");
+                // }
             }
         });
     }
