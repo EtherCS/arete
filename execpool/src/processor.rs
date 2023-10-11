@@ -1,3 +1,4 @@
+use crypto::PublicKey;
 use crypto::{Digest, Hash};
 use ed25519_dalek::Digest as _;
 use ed25519_dalek::Sha512;
@@ -18,6 +19,8 @@ pub struct Processor;
 
 impl Processor {
     pub fn spawn(
+        // The name of the executor
+        name: PublicKey,
         // The persistent storage.
         mut store: Store,
         // Input channel to receive batches.
@@ -31,10 +34,15 @@ impl Processor {
                 // Hash the cblock.
                 let digest = cblock.digest();
                 let value = bincode::serialize(&cblock).expect("Failed to serialize cblock");
+
                 // Store the cblock.
                 store.write(digest.to_vec(), value).await;
 
-                tx_digest.send(digest).await.expect("Failed to send digest");
+                // Send to channel, wait to send to the ordering shard
+                if cblock.author == name {
+                    tx_digest.send(digest).await.expect("Failed to send digest");
+                }
+                
             }
         });
     }

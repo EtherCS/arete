@@ -181,6 +181,7 @@ impl Mempool {
         // The `Processor` hashes and stores the batch. It then forwards the batch's digest to the consensus.
         // ARETE: 'Processor' will send this to the ordering shard instead of the consensus (certify)
         Processor::spawn(
+            self.name,
             self.store.clone(),
             /* rx_batch */ rx_processor,
             /* tx_digest */ self.tx_consensus.clone(),
@@ -221,6 +222,7 @@ impl Mempool {
         // This `Processor` hashes and stores the batches we receive from the other mempools. It then forwards the
         // batch's digest to the consensus.
         Processor::spawn(
+            self.name,
             self.store.clone(),
             /* rx_batch */ rx_processor,
             /* tx_digest */ self.tx_consensus.clone(),
