@@ -5,7 +5,7 @@ use crate::error::ConsensusError;
 use crate::helper::Helper;
 use crate::leader::LeaderElector;
 use crate::mempool::MempoolDriver;
-use crate::messages::{Timeout, Vote, TC};
+// use crate::messages::{Timeout, Vote, TC};
 use crate::proposer::Proposer;
 use crate::synchronizer::Synchronizer;
 use async_trait::async_trait;
@@ -61,7 +61,7 @@ impl Consensus {
         parameters.log();
 
         let (tx_consensus, rx_consensus) = channel(CHANNEL_CAPACITY);
-        // let (tx_loopback, rx_loopback) = channel(CHANNEL_CAPACITY);
+        let (tx_loopback, rx_loopback) = channel(CHANNEL_CAPACITY);
         // let (tx_proposer, rx_proposer) = channel(CHANNEL_CAPACITY);
         let (tx_helper, rx_helper) = channel(CHANNEL_CAPACITY);
 
@@ -89,7 +89,7 @@ impl Consensus {
         // let leader_elector = LeaderElector::new(committee.clone());
 
         // // Make the mempool driver.
-        // let mempool_driver = MempoolDriver::new(store.clone(), tx_mempool, tx_loopback.clone());
+        let mempool_driver = MempoolDriver::new(store.clone(), tx_mempool, tx_loopback.clone());
 
         // // Make the synchronizer.
         let synchronizer = Synchronizer::new(
@@ -130,7 +130,7 @@ impl Consensus {
         );
 
         // Spawn the confirm executor.
-        ConfirmExecutor::spawn(name, committee.clone(), rx_confirm);
+        ConfirmExecutor::spawn(name, committee.clone(), rx_confirm, tx_consensus);
 
         // Spawn the helper module.
         Helper::spawn(committee, store, /* rx_requests */ rx_helper);

@@ -44,7 +44,7 @@ pub enum MempoolMessage {
 /// The messages sent by the consensus and the mempool.
 #[derive(Debug, Serialize, Deserialize)]
 pub enum ExecutionMempoolMessage {
-    /// The execution notifies the mempool that it need to sync the target missing cblock.
+    /// The execution notifies the mempool that it need to sync the target missing EBlock.
     Synchronize(Digest, /* target */ PublicKey),
     /// The consensus notifies the mempool of a round update.
     Cleanup(Round),

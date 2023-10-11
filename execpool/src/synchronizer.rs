@@ -135,7 +135,7 @@ impl Synchronizer {
                         let address = match self.committee.mempool_address(&target) {
                             Some(address) => address,
                             None => {
-                                error!("Consensus asked us to sync with an unknown node: {}", target);
+                                error!("Execution asked us to sync with an unknown node: {}", target);
                                 continue;
                             }
                         };
