@@ -11,14 +11,14 @@ use std::net::{SocketAddr, IpAddr, Ipv4Addr};
 use tokio::sync::mpsc::{channel, Receiver};
 use anyhow::Result;
 use network::SimpleSender;
-use types::{EBlock, CBlock};
+use types::{EBlock, CBlock, CertifyMessage};
 
 /// The default channel capacity for this module.
 pub const CHANNEL_CAPACITY: usize = 1_000;
 
 // Executor is the replica in the ordering shard
 pub struct Executor {
-    pub certify: Receiver<CBlock>,  
+    pub certify: Receiver<CertifyMessage>,  
     pub ordering_addr: SocketAddr,
     pub shard_id: u32,
 }
@@ -99,24 +99,15 @@ impl Executor {
         Secret::new().write(filename)
     }
 
-    pub async fn analyze_block(&mut self) -> Result<()> {
+    pub async fn send_certificate_message(&mut self) -> Result<()> {
         let mut sender = SimpleSender::new();
-        while let Some(_block) = self.certify.recv().await {
-            // let certify_block = CBlock::new(
-            //     self.shard_id, 
-            //     _block.author, 
-            //     _block.round,
-            //     _block.digest(), 
-            //     _block.payload.clone(),     // TODO: hash of new cross-shard txs
-            //     HashMap::new(),     // TODO: votes messages for the execution results of cross-shard txs
-            //     _block.qc.votes.clone(),
-            //     _block.signature.clone()).await;
-            let message = bincode::serialize(&_block.clone())
+        while let Some(_cmsg) = self.certify.recv().await {
+            let message = bincode::serialize(&_cmsg.clone())
                 .expect("fail to serialize the CBlock");
             sender.send(self.ordering_addr, Into::into(message)).await;
 
-            debug!("send a certificate block {:?} to the ordering shard", certify_block.clone());
-            info!("Executor commits block {:?} successfully", _block); // {:?} means: display based on the Debug function
+            debug!("send a certificate message {:?} to the ordering shard", _cmsg.clone());
+            // info!("Executor commits block {:?} successfully", _cmsg); // {:?} means: display based on the Debug function
         }
         Ok(())
     }

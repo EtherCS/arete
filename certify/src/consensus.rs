@@ -7,7 +7,9 @@ use crate::leader::LeaderElector;
 use crate::mempool::MempoolDriver;
 // use crate::messages::{Timeout, Vote, TC};
 use crate::proposer::Proposer;
+use crate::quorum_waiter::QuorumWaiter;
 use crate::synchronizer::Synchronizer;
+use crate::vote_maker::VoteMaker;
 use async_trait::async_trait;
 use bytes::Bytes;
 use crypto::{Digest, PublicKey, SignatureService};
@@ -19,7 +21,7 @@ use serde::{Deserialize, Serialize};
 use std::error::Error;
 use store::Store;
 use tokio::sync::mpsc::{channel, Receiver, Sender};
-use types::{CBlock, ConfirmMessage, EBlock, ShardInfo};
+use types::{CBlock, ConfirmMessage, EBlock, ShardInfo, CertifyMessage};
 
 // #[cfg(test)]
 // #[path = "tests/consensus_tests.rs"]
@@ -34,10 +36,6 @@ pub type Round = u64;
 #[derive(Serialize, Deserialize, Debug)]
 pub enum ConsensusMessage {
     ExecutionBlock(EBlock),
-    // Vote(Vote),
-    // Timeout(Timeout),
-    // TC(TC),
-    // SyncRequest(Digest, PublicKey),
     ConfirmMsg(ConfirmMessage),
 }
 
@@ -54,7 +52,7 @@ impl Consensus {
         store: Store,
         rx_mempool: Receiver<CBlock>, // receive channel from execpool
         tx_mempool: Sender<ExecutionMempoolMessage>, // send to execpool for synchronizing missing eblock
-        tx_certify: Sender<CBlock>,
+        tx_certify: Sender<CertifyMessage>,
         rx_confirm: Receiver<ConfirmMessage>,
     ) {
         // NOTE: This log entry is used to compute performance.
@@ -62,7 +60,8 @@ impl Consensus {
 
         let (tx_consensus, rx_consensus) = channel(CHANNEL_CAPACITY);
         let (tx_loopback, rx_loopback) = channel(CHANNEL_CAPACITY);
-        // let (tx_proposer, rx_proposer) = channel(CHANNEL_CAPACITY);
+        let (tx_order_ctx, rx_order_ctx) = channel(CHANNEL_CAPACITY);
+        let (tx_vote_quorum_waiter, rx_vote_quorum_waiter) = channel(CHANNEL_CAPACITY);
         let (tx_helper, rx_helper) = channel(CHANNEL_CAPACITY);
 
         // Spawn the network receiver.
@@ -107,17 +106,34 @@ impl Consensus {
             shard_info.clone(),
             signature_service.clone(),
             store.clone(),
-            // leader_elector,
-            // mempool_driver,
+            mempool_driver,
             synchronizer,
-            // parameters.certify_timeout_delay,
-            /* rx_message */
             rx_consensus,
-            // rx_loopback,
-            // tx_proposer,
-            // tx_certify,
+            rx_loopback,
+            tx_order_ctx,
+            tx_certify.clone(),
         );
 
+        // Spawn the vote_maker
+        VoteMaker::spawn(
+            name,
+            committee.clone(),
+            shard_info.clone(),
+            signature_service.clone(),
+            rx_order_ctx,
+            tx_vote_quorum_waiter,
+        );
+
+        /// Spawn the quorum_waiter
+        QuorumWaiter::spawn(
+            name,
+            shard_info.clone(),
+            committee.clone(),
+            committee.stake(&name),
+            rx_vote_quorum_waiter,
+            tx_certify.clone(),
+        );
+        
         // Spawn the block proposer.
         Proposer::spawn(
             // name,

@@ -1,7 +1,7 @@
-use crate::batch_maker::{Batch, BatchMaker};
+use crate::batch_maker::BatchMaker;
 use crate::config::{CertifyParameters, ExecutionCommittee};
 use crate::helper::Helper;
-use crate::processor::{Processor, SerializedEBlockMessage};
+use crate::processor::Processor;
 use crate::quorum_waiter::QuorumWaiter;
 use crate::synchronizer::Synchronizer;
 use async_trait::async_trait;
@@ -18,10 +18,6 @@ use std::error::Error;
 use store::Store;
 use tokio::sync::mpsc::{channel, Receiver, Sender};
 use types::{CBlock, ConfirmMessage, EBlock, NodeSignature, ShardInfo, Transaction};
-
-// #[cfg(test)]
-// #[path = "tests/mempool_tests.rs"]
-// pub mod mempool_tests;
 
 /// The default channel capacity for each channel of the mempool.
 pub const CHANNEL_CAPACITY: usize = 1_000;
@@ -182,7 +178,6 @@ impl Mempool {
         // The `Processor` hashes and stores the batch. It then forwards the batch's digest to the consensus.
         // ARETE: 'Processor' will send this to the ordering shard instead of the consensus (certify)
         Processor::spawn(
-            self.name,
             self.store.clone(),
             /* rx_batch */ rx_processor,
             // /* tx_digest */ self.tx_certify.clone(),
@@ -223,7 +218,6 @@ impl Mempool {
         // This `Processor` hashes and stores the batches we receive from the other mempools. It then forwards the
         // batch's digest to the consensus.
         Processor::spawn(
-            self.name,
             self.store.clone(),
             /* rx_batch */ rx_processor,
             // /* tx_digest */ self.tx_certify.clone(),

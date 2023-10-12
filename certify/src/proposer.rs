@@ -1,15 +1,15 @@
-use crate::config::{ExecutionCommittee, Stake};
-use crate::consensus::{ConsensusMessage, Round};
+// use crate::config::{ExecutionCommittee, Stake};
+// use crate::consensus::{ConsensusMessage, Round};
 // use crate::messages::{QC, TC};
-use bytes::Bytes;
-use crypto::{Digest, PublicKey, SignatureService};
-use futures::stream::futures_unordered::FuturesUnordered;
-use futures::stream::StreamExt as _;
-use log::{debug, info};
-use network::{CancelHandler, ReliableSender};
-use std::collections::HashSet;
+// use bytes::Bytes;
+// use crypto::{Digest, PublicKey, SignatureService};
+// use futures::stream::futures_unordered::FuturesUnordered;
+// use futures::stream::StreamExt as _;
+use log::debug;
+// use network::{CancelHandler, ReliableSender};
+// use std::collections::HashSet;
 use tokio::sync::mpsc::{Receiver, Sender};
-use types::{ShardInfo, CBlock};
+use types::{CBlock, CertifyMessage};
 
 // #[derive(Debug)]
 // pub enum ProposerMessage {
@@ -23,8 +23,8 @@ pub struct Proposer {
     // committee: ExecutionCommittee,
     // shard_info: ShardInfo,
     // signature_service: SignatureService,
-    rx_mempool: Receiver<CBlock>,
-    tx_certify: Sender<CBlock>,
+    rx_mempool: Receiver<CBlock>,   // receive certificate block from execpool
+    tx_certify: Sender<CertifyMessage>,     // send the received certificate block to executor.analyze_block()
     // rx_message: Receiver<ProposerMessage>,
     // tx_loopback: Sender<EBlock>,
     // buffer: HashSet<Digest>,
@@ -38,7 +38,7 @@ impl Proposer {
         // shard_info: ShardInfo,
         // signature_service: SignatureService,
         rx_mempool: Receiver<CBlock>,
-        tx_certify: Sender<CBlock>,
+        tx_certify: Sender<CertifyMessage>,
         // rx_message: Receiver<ProposerMessage>,
         // tx_loopback: Sender<EBlock>,
     ) {
@@ -138,7 +138,8 @@ impl Proposer {
                     //if self.buffer.len() < 155 {
                         // self.buffer.insert(digest);
                     //}
-                    self.tx_certify.send(cblock).await.expect("Failed send cblock");
+                    self.tx_certify.send(CertifyMessage::CBlock(cblock.clone())).await.expect("Failed send cblock");
+                    debug!("Send a certificate block {:?} to the ordering shard", cblock);
                 },
                 // I am the leader now
                 // Some(message) = self.rx_message.recv() => match message {

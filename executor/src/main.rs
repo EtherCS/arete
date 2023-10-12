@@ -86,10 +86,10 @@ async fn main() {
         } => match Executor::new(&committee, &keys, &store, parameters).await {
             Ok(mut executor) => {
                 tokio::spawn(async move {
-                    let _ = executor.analyze_block().await;
+                    let _ = executor.send_certificate_message().await;
                 })
                 .await
-                .expect("Failed to analyze committed blocks");
+                .expect("Failed to send certificate message to the ordering shard");
             }
             Err(e) => error!("{}", e),
         },

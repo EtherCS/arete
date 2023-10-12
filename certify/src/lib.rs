@@ -1,6 +1,5 @@
 #[macro_use]
 mod error;
-mod aggregator;
 mod config;
 mod confirm_executor;
 mod consensus;
@@ -10,8 +9,10 @@ mod leader;
 mod mempool;
 mod messages;
 mod proposer;
+mod quorum_waiter;
 mod synchronizer;
 mod timer;
+mod vote_maker;
 
 // #[cfg(test)]
 // #[path = "tests/common.rs"]
