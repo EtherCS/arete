@@ -95,20 +95,31 @@ impl Node {
     pub async fn analyze_block(&mut self) {
         let mut sender = SimpleSender::new();
         while let Some(_block) = self.commit.recv().await {
+            let mut confirm_msgs: HashMap<u32, ConfirmMessage> = HashMap::new();
             for i in _block.payload.clone() {
-                let confim_msg = ConfirmMessage::new(
-                    i.shard_id,
-                    i.hash, 
-                    i.round,    // corresponding execution shard's round
-                    _block.round, 
-                    _block.get_digests(), 
-                    _block.signature.clone()).await;
-    
+                // multiple blocks are packed for shard i.shard_id
+                if confirm_msgs.contains_key(&i.shard_id) {
+                    confirm_msgs.get(&i.shard_id).copied().unwrap().block_hashes.append(i.hash);
+                    // ARETE TODO: pack cross-shard transactions from other execution shards.
+                    confirm_msgs.get(&i.shard_id).copied().unwrap().ordered_ctxs.extend(i.ctx_hashes);
+                } else {
+                    let confim_msg = ConfirmMessage::new(
+                        i.shard_id,
+                        i.ebhash, 
+                        // i.round,    // corresponding execution shard's round
+                        _block.round, 
+                        i.ctx_hashes.clone(), 
+                        _block.aggregators.clone(),
+                        _block.signature.clone()).await;
+                }
+            }
+            // Send confirmation message to the specific execution shard
+            for (shard, confim_msg) in &confirm_msgs {
                 let message = bincode::serialize(&confim_msg.clone())
                     .expect("fail to serialize the ConfirmMessage");
-                if let Some(_addr) = self.shard_confirmation_addrs.get(&i.shard_id).copied() {
+                if let Some(_addr) = self.shard_confirmation_addrs.get(&shard).copied() {
                     sender.send(_addr, Into::into(message)).await;
-                    debug!("send a confirm message {:?} to the execution shard {}", confim_msg.clone(), i.shard_id);
+                    debug!("send a confirm message {:?} to the execution shard {}", confim_msg.clone(), shard);
                 }
             }
             

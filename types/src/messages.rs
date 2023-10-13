@@ -82,6 +82,7 @@ pub struct ConfirmMessage {
     // pub round: u64,           // corresponding execution shard's round
     pub order_round: u64,     // consensus round in the ordering shard
     pub ordered_ctxs: Vec<Digest>, // new cross-shard transactions
+    pub votes: HashMap<Digest, u8>, // vote (execution results) of previous cross-shard transactions
     pub signature: Signature,
 }
 
@@ -92,6 +93,7 @@ impl ConfirmMessage {
         // round: u64,
         order_round: u64,
         ordered_ctxs: Vec<Digest>,
+        votes: HashMap<Digest, u8>,
         signature: Signature,
     ) -> Self {
         let confirm_message = Self {
@@ -100,6 +102,7 @@ impl ConfirmMessage {
             // round,
             order_round,
             ordered_ctxs,
+            votes,
             signature,
         };
         confirm_message
@@ -118,6 +121,10 @@ impl Hash for ConfirmMessage {
         hasher.update(self.order_round.to_le_bytes());
         for x in &self.ordered_ctxs {
             hasher.update(x);
+        }
+        for (x, y) in &self.votes {
+            let serialized_data = bincode::serialize(&(x, y)).expect("Serialization failed");
+            hasher.update(serialized_data);
         }
         Digest(hasher.finalize().as_slice()[..32].try_into().unwrap())
     }
@@ -341,20 +348,22 @@ impl fmt::Display for CBlock {
 pub struct CBlockMeta {
     pub shard_id: u32,
     pub round: Round,
-    pub hash: Digest,
+    pub ebhash: Digest,
+    pub ctx_hashes: Vec<Digest>,
 }
 
 impl CBlockMeta {
-    pub async fn new(shard_id: u32, round: u64, hash: Digest) -> Self {
+    pub async fn new(shard_id: u32, round: u64, ebhash: Digest, ctx_hashes: Vec<Digest>) -> Self {
         let cblockmeta = Self {
             shard_id,
             round,
-            hash,
+            ebhash,
+            ctx_hashes,
         };
         Self { ..cblockmeta }
     }
     pub fn size(&self) -> usize {
-        self.hash.size()
+        self.ebhash.size()
     }
 }
 
@@ -362,7 +371,10 @@ impl Hash for CBlockMeta {
     fn digest(&self) -> Digest {
         let mut hasher = Sha512::new();
         hasher.update(self.round.to_le_bytes());
-        hasher.update(&self.hash);
+        hasher.update(&self.ebhash);
+        for x in &self.ctx_hashes {
+            hasher.update(&x);
+        }
         hasher.update(&self.shard_id.to_le_bytes());
         Digest(hasher.finalize().as_slice()[..32].try_into().unwrap())
     }
