@@ -99,18 +99,22 @@ impl Node {
             for i in _block.payload.clone() {
                 // multiple blocks are packed for shard i.shard_id
                 if confirm_msgs.contains_key(&i.shard_id) {
-                    confirm_msgs.get(&i.shard_id).copied().unwrap().block_hashes.append(i.hash);
-                    // ARETE TODO: pack cross-shard transactions from other execution shards.
-                    confirm_msgs.get(&i.shard_id).copied().unwrap().ordered_ctxs.extend(i.ctx_hashes);
+                    if let Some(cmsg) = confirm_msgs.get_mut(&i.shard_id) {
+                        cmsg.block_hashes.insert(i.author, i.ebhash);
+                        cmsg.ordered_ctxs.extend(i.ctx_hashes);
+                    }
                 } else {
+                    let mut map_ebhash = HashMap::new();
+                    map_ebhash.insert(i.author, i.ebhash);
                     let confim_msg = ConfirmMessage::new(
                         i.shard_id,
-                        i.ebhash, 
+                        map_ebhash.clone(), 
                         // i.round,    // corresponding execution shard's round
                         _block.round, 
                         i.ctx_hashes.clone(), 
                         _block.aggregators.clone(),
                         _block.signature.clone()).await;
+                    confirm_msgs.insert(i.shard_id, confim_msg);
                 }
             }
             // Send confirmation message to the specific execution shard

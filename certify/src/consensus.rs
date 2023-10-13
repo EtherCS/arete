@@ -3,12 +3,10 @@ use crate::confirm_executor::ConfirmExecutor;
 use crate::core::Core;
 use crate::error::ConsensusError;
 use crate::helper::Helper;
-use crate::leader::LeaderElector;
 use crate::mempool::MempoolDriver;
-// use crate::messages::{Timeout, Vote, TC};
 use crate::proposer::Proposer;
 use crate::quorum_waiter::QuorumWaiter;
-use crate::synchronizer::Synchronizer;
+// use crate::synchronizer::Synchronizer;
 use crate::vote_maker::VoteMaker;
 use async_trait::async_trait;
 use bytes::Bytes;
@@ -36,6 +34,7 @@ pub type Round = u64;
 #[derive(Serialize, Deserialize, Debug)]
 pub enum ConsensusMessage {
     ExecutionBlock(EBlock),
+    SyncRequest(Digest, PublicKey),
     ConfirmMsg(ConfirmMessage),
 }
 
@@ -73,7 +72,7 @@ impl Consensus {
             address,
             /* handler */
             ConsensusReceiverHandler {
-                tx_consensus,
+                tx_consensus: tx_consensus.clone(),
                 tx_helper,
             },
         );
@@ -91,13 +90,13 @@ impl Consensus {
         let mempool_driver = MempoolDriver::new(store.clone(), tx_mempool, tx_loopback.clone());
 
         // // Make the synchronizer.
-        let synchronizer = Synchronizer::new(
-            name,
-            committee.clone(),
-            store.clone(),
-            tx_loopback.clone(),
-            parameters.certify_sync_retry_delay,
-        );
+        // let synchronizer = Synchronizer::new(
+        //     name,
+        //     committee.clone(),
+        //     store.clone(),
+        //     tx_loopback.clone(),
+        //     parameters.certify_sync_retry_delay,
+        // );
 
         // Spawn the consensus core.
         Core::spawn(
@@ -107,7 +106,7 @@ impl Consensus {
             signature_service.clone(),
             store.clone(),
             mempool_driver,
-            synchronizer,
+            // synchronizer,
             rx_consensus,
             rx_loopback,
             tx_order_ctx,
@@ -124,7 +123,7 @@ impl Consensus {
             tx_vote_quorum_waiter,
         );
 
-        /// Spawn the quorum_waiter
+        // Spawn the quorum_waiter
         QuorumWaiter::spawn(
             name,
             shard_info.clone(),
@@ -136,17 +135,11 @@ impl Consensus {
         
         // Spawn the block proposer.
         Proposer::spawn(
-            // name,
-            // committee.clone(),
-            // shard_info.clone(),
-            // signature_service.clone(),
             rx_mempool, tx_certify,
-            // /* rx_message */ rx_proposer,
-            // tx_loopback,
         );
 
         // Spawn the confirm executor.
-        ConfirmExecutor::spawn(name, committee.clone(), rx_confirm, tx_consensus);
+        ConfirmExecutor::spawn(name, committee.clone(), rx_confirm, tx_consensus.clone());
 
         // Spawn the helper module.
         Helper::spawn(committee, store, /* rx_requests */ rx_helper);
@@ -165,11 +158,11 @@ impl MessageHandler for ConsensusReceiverHandler {
     async fn dispatch(&self, writer: &mut Writer, serialized: Bytes) -> Result<(), Box<dyn Error>> {
         // Deserialize and parse the message.
         match bincode::deserialize(&serialized).map_err(ConsensusError::SerializationError)? {
-            // ConsensusMessage::SyncRequest(missing, origin) => self
-            //     .tx_helper
-            //     .send((missing, origin))
-            //     .await
-            //     .expect("Failed to send consensus message"),
+            ConsensusMessage::SyncRequest(missing, origin) => self
+                .tx_helper
+                .send((missing, origin))
+                .await
+                .expect("Failed to send consensus message"),
             message @ ConsensusMessage::ConfirmMsg(..) => {
                 // receive a consensus msg (a block is confirm) from other executors
                 // Reply with an ACK.
@@ -182,12 +175,16 @@ impl MessageHandler for ConsensusReceiverHandler {
             }
             message @ ConsensusMessage::ExecutionBlock(..) => {
                 // self.
+                self.tx_consensus
+                    .send(message)
+                    .await
+                    .expect("Failed to send confirm message to core")
             }
-            message => self
-                .tx_consensus
-                .send(message)
-                .await
-                .expect("Failed to consensus message"),
+            // message => self
+            //     .tx_consensus
+            //     .send(message)
+            //     .await
+            //     .expect("Failed to consensus message"),
         }
         Ok(())
     }

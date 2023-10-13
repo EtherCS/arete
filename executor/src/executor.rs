@@ -1,17 +1,16 @@
 use crate::config::Export as _;
 use crate::config::{Committee, ConfigError, Parameters, Secret};
 use certify::Consensus;
-use crypto::{SignatureService, Hash};
+use crypto::SignatureService;
 use log::{debug, info};
 use execpool::Mempool;
 use rand::seq::IteratorRandom;
 use store::Store;
-use std::collections::HashMap;
 use std::net::{SocketAddr, IpAddr, Ipv4Addr};
 use tokio::sync::mpsc::{channel, Receiver};
 use anyhow::Result;
 use network::SimpleSender;
-use types::{EBlock, CBlock, CertifyMessage};
+use types::CertifyMessage;
 
 /// The default channel capacity for this module.
 pub const CHANNEL_CAPACITY: usize = 1_000;
@@ -66,7 +65,7 @@ impl Executor {
         // Make a new mempool.
         Mempool::spawn(
             name,
-            committee.shard,
+            committee.shard.clone(),
             signature_service.clone(),
             committee.mempool,
             parameters.mempool,
@@ -81,7 +80,7 @@ impl Executor {
             name,
             committee.consensus,
             parameters.consensus,
-            committee.shard,
+            committee.shard.clone(),
             signature_service.clone(),
             store,
             rx_mempool_to_consensus,

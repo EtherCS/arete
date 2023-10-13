@@ -68,7 +68,7 @@ impl fmt::Display for CrossTransactionVote {
 }
 
 // Message from execution shards to the ordering shard
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub enum CertifyMessage {
     CBlock(CBlock),
     CtxVote(CrossTransactionVote),
@@ -78,7 +78,7 @@ pub enum CertifyMessage {
 #[derive(Serialize, Deserialize, Default, Clone)]
 pub struct ConfirmMessage {
     pub shard_id: u32,
-    pub block_hashes: Vec<Digest>,   // Corresponding EBlocks' hashes
+    pub block_hashes: HashMap<PublicKey, Digest>,   // Corresponding EBlocks' hashes
     // pub round: u64,           // corresponding execution shard's round
     pub order_round: u64,     // consensus round in the ordering shard
     pub ordered_ctxs: Vec<Digest>, // new cross-shard transactions
@@ -89,7 +89,7 @@ pub struct ConfirmMessage {
 impl ConfirmMessage {
     pub async fn new(
         shard_id: u32,
-        block_hashes: Vec<Digest>,
+        block_hashes: HashMap<PublicKey, Digest>,
         // round: u64,
         order_round: u64,
         ordered_ctxs: Vec<Digest>,
@@ -115,8 +115,9 @@ impl Hash for ConfirmMessage {
     fn digest(&self) -> Digest {
         let mut hasher = Sha512::new();
         hasher.update(&self.shard_id.to_le_bytes());
-        for x in &self.block_hashes {
-            hasher.update(x);
+        for (x, y) in &self.block_hashes {
+            let serialized_data = bincode::serialize(&(x, y)).expect("Serialization failed");
+            hasher.update(serialized_data);
         }
         hasher.update(self.order_round.to_le_bytes());
         for x in &self.ordered_ctxs {
@@ -137,7 +138,7 @@ impl fmt::Debug for ConfirmMessage {
             "{}: confirm message(order round {}, EBlock num {})",
             self.digest(),
             self.order_round,
-            self.block_hashes.iter().map(|x| x.size()).sum::<usize>(),
+            self.block_hashes.len(),
         )
     }
 }
@@ -347,15 +348,17 @@ impl fmt::Display for CBlock {
 #[derive(Hash, PartialEq, Default, Eq, Clone, Deserialize, Serialize, Ord, PartialOrd)]
 pub struct CBlockMeta {
     pub shard_id: u32,
+    pub author: PublicKey,
     pub round: Round,
     pub ebhash: Digest,
     pub ctx_hashes: Vec<Digest>,
 }
 
 impl CBlockMeta {
-    pub async fn new(shard_id: u32, round: u64, ebhash: Digest, ctx_hashes: Vec<Digest>) -> Self {
+    pub async fn new(shard_id: u32, author: PublicKey, round: u64, ebhash: Digest, ctx_hashes: Vec<Digest>) -> Self {
         let cblockmeta = Self {
             shard_id,
+            author,
             round,
             ebhash,
             ctx_hashes,
@@ -370,6 +373,7 @@ impl CBlockMeta {
 impl Hash for CBlockMeta {
     fn digest(&self) -> Digest {
         let mut hasher = Sha512::new();
+        hasher.update(self.author.0);
         hasher.update(self.round.to_le_bytes());
         hasher.update(&self.ebhash);
         for x in &self.ctx_hashes {

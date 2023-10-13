@@ -2,7 +2,7 @@ use crate::config::{Committee, Stake};
 use crate::consensus::{ConsensusMessage, Round};
 use crate::messages::{OBlock, QC, TC};
 use bytes::Bytes;
-use crypto::{Hash, PublicKey, SignatureService};
+use crypto::{PublicKey, SignatureService};
 use futures::stream::futures_unordered::FuturesUnordered;
 use futures::stream::StreamExt as _;
 use log::{debug, info};
@@ -170,8 +170,10 @@ impl Proposer {
                         debug!("Receive the first or a larger CBlock from shard {}, new round {}", cblock.shard_id, cblock.round);
                         let cblm = CBlockMeta::new(
                             cblock.shard_id,
+                            cblock.author,
                             cblock.round,
-                            cblock.digest(),
+                            cblock.ebhash,
+                            cblock.ctx_hashes,
                         ).await;
                         self.shard_rounds.insert(cblock.shard_id, cblm);
                         self.max_shard_rounds.insert(cblock.shard_id, cblock.round);
@@ -181,8 +183,10 @@ impl Proposer {
                             debug!("Receive the first or a larger CBlock from shard {}, new round {}", cblock.shard_id, cblock.round);
                             let cblm = CBlockMeta::new(
                                 cblock.shard_id,
+                                cblock.author,
                                 cblock.round,
-                                cblock.digest(),
+                                cblock.ebhash,
+                                cblock.ctx_hashes,
                             ).await;
                             self.shard_rounds.insert(cblock.shard_id, cblm);
                             self.max_shard_rounds.insert(cblock.shard_id, cblock.round);

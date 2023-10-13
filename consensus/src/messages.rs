@@ -83,7 +83,7 @@ impl OBlock {
     pub fn get_digests(&self) -> Vec<Digest> {
         let mut digests = Vec::new();
         for x in self.payload.clone() {
-            digests.push(x.hash);
+            digests.push(x.ebhash);
         }
         digests
     }

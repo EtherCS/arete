@@ -5,12 +5,9 @@ mod confirm_executor;
 mod consensus;
 mod core;
 mod helper;
-mod leader;
 mod mempool;
-mod messages;
 mod proposer;
 mod quorum_waiter;
-mod synchronizer;
 mod timer;
 mod vote_maker;
 

@@ -2,19 +2,19 @@ use crate::config::ExecutionCommittee;
 use crate::consensus::{ConsensusMessage, Round};
 use crate::error::{ConsensusError, ConsensusResult};
 use crate::mempool::MempoolDriver;
-use crate::synchronizer::Synchronizer;
+// use crate::synchronizer::Synchronizer;
 use async_recursion::async_recursion;
 use crypto::Hash as _;
-use crypto::{PublicKey, SignatureService, Digest};
+use crypto::{Digest, PublicKey, SignatureService};
 use ed25519_dalek::Digest as _;
 use ed25519_dalek::Sha512;
 use log::{debug, error, info, warn};
 use network::SimpleSender;
-use std::collections::{VecDeque, HashMap};
-use store::Store;
+use std::collections::{HashMap, VecDeque};
 use std::convert::TryInto;
+use store::Store;
 use tokio::sync::mpsc::{Receiver, Sender};
-use types::{ConfirmMessage, ShardInfo, EBlock, Transaction, CertifyMessage, CrossTransactionVote};
+use types::{CertifyMessage, ConfirmMessage, CrossTransactionVote, EBlock, ShardInfo, Transaction};
 
 pub struct Core {
     name: PublicKey,
@@ -24,7 +24,7 @@ pub struct Core {
     signature_service: SignatureService,
     // leader_elector: LeaderElector,
     mempool_driver: MempoolDriver,
-    synchronizer: Synchronizer,
+    // synchronizer: Synchronizer,
     rx_message: Receiver<ConsensusMessage>,
     rx_loopback: Receiver<EBlock>,
     tx_order_ctx: Sender<CrossTransactionVote>, // send executed vote results to vote_maker
@@ -42,11 +42,11 @@ impl Core {
         signature_service: SignatureService,
         store: Store,
         mempool_driver: MempoolDriver,
-        synchronizer: Synchronizer,
+        // synchronizer: Synchronizer,
         rx_message: Receiver<ConsensusMessage>,
         rx_loopback: Receiver<EBlock>,
         tx_order_ctx: Sender<CrossTransactionVote>, // send cross-shard transactions to vote_maker after execution
-        tx_certify: Sender<CertifyMessage>, // send certify vote message
+        tx_certify: Sender<CertifyMessage>,         // send certify vote message
     ) {
         tokio::spawn(async move {
             Self {
@@ -56,7 +56,7 @@ impl Core {
                 signature_service,
                 store,
                 mempool_driver,
-                synchronizer,
+                // synchronizer,
                 rx_message,
                 rx_loopback,
                 tx_order_ctx,
@@ -75,7 +75,6 @@ impl Core {
         self.store.write(key, value).await;
     }
 
-
     async fn commit(&mut self, block: EBlock) -> ConsensusResult<()> {
         // Ensure we commit the entire chain. This is needed after view-change.
         let mut to_commit = VecDeque::new();
@@ -90,16 +89,20 @@ impl Core {
         // Send all the newly committed blocks to the node's application layer.
         while let Some(block) = to_commit.pop_back() {
             // if !block.payload.is_empty() {
-                info!("Committed {}", block);
+            info!("Committed {}", block);
 
-                #[cfg(feature = "benchmark")] {
-                    let b_round = block.round;
-                    for x in &block.payload {
-                        // NOTE: This log entry is used to compute performance.
-                        info!("Shard {} Committed {} -> {:?}", _s_id, block, x);
-                        info!("ARETE shard {} Committed {} -> {:?} in round {}", _s_id, block, x, b_round);
-                    }
+            #[cfg(feature = "benchmark")]
+            {
+                let b_round = block.round;
+                for x in &block.payload {
+                    // NOTE: This log entry is used to compute performance.
+                    info!("Shard {} Committed {} -> {:?}", _s_id, block, x);
+                    info!(
+                        "ARETE shard {} Committed {} -> {:?} in round {}",
+                        _s_id, block, x, b_round
+                    );
                 }
+            }
             // }
             debug!("Committed {:?}", block);
             // if let Err(e) = self.tx_commit.send(block).await {
@@ -114,7 +117,10 @@ impl Core {
         for ctx in crosstxs {
             // ARETE TODO: execute ctx;
             // Assume all are successful now
-            vote.insert(Digest(Sha512::digest(&ctx).as_slice()[..32].try_into().unwrap()), 1);
+            vote.insert(
+                Digest(Sha512::digest(&ctx).as_slice()[..32].try_into().unwrap()),
+                1,
+            );
         }
         vote
     }
@@ -123,89 +129,70 @@ impl Core {
     async fn process_block(&mut self, block: &EBlock) -> ConsensusResult<()> {
         debug!("Processing {:?}", block);
 
-        // Let's see if we have the last three ancestors of the block, that is:
-        //      b0 <- |qc0; b1| <- |qc1; block|
-        // If we don't, the synchronizer asks for them to other nodes. It will
-        // then ensure we process both ancestors in the correct order, and
-        // finally make us resume processing this block.
-        // let (b0, b1) = match self.synchronizer.get_ancestors(block).await? {
-        //     Some(ancestors) => ancestors,
-        //     None => {
-        //         debug!("Processing of {} suspended: missing parent", block.digest());
-        //         return Ok(());
-        //     }
-        // };
-
         // Store the block only if we have already processed all its ancestors.
         self.store_block(block).await;
 
         self.commit(block.clone()).await;
 
-        // self.cleanup_proposer(&b0, &b1, block).await;
-
-        // Check if we can commit the head of the 2-chain.
-        // Note that we commit blocks only if we have all its ancestors.
-        // if b0.round + 1 == b1.round {
-        //     self.mempool_driver.cleanup(b0.round).await;
-        //     self.commit(b0).await?;
-        // }
-
-        // Ensure the block's round is as expected.
-        // This check is important: it prevents bad leaders from producing blocks
-        // far in the future that may cause overflow on the round number.
-        // if block.round != self.round {
-        //     return Ok(());
-        // }
-
-        // See if we can vote for this block.
-        // if let Some(vote) = self.make_vote(block).await {
-        //     debug!("Created {:?}", vote);
-        //     let next_leader = self.leader_elector.get_leader(self.round + 1);
-        //     if next_leader == self.name {
-        //         self.handle_vote(&vote).await?;
-        //     } else {
-        //         debug!("Sending {:?} to {}", vote, next_leader);
-        //         let address = self
-        //             .committee
-        //             .address(&next_leader)
-        //             .expect("The next leader is not in the committee");
-        //         let message = bincode::serialize(&ConsensusMessage::Vote(vote))
-        //             .expect("Failed to serialize vote");
-        //         self.network.send(address, Bytes::from(message)).await;
-        //     }
-        // }
         Ok(())
     }
 
-    async fn handle_confirmation_message(&mut self, confirm_msg: ConfirmMessage) -> ConsensusResult<()> {
+    #[async_recursion]
+    async fn process_confirm(&mut self, confirm_msg: ConfirmMessage,) -> ConsensusResult<()> {
+        for (_, eblock_hash) in confirm_msg.block_hashes.clone() {
+            match self.store.read(eblock_hash.to_vec()).await? {
+                Some(bytes) => {
+                    let block: EBlock = bincode::deserialize(&bytes).expect("Failed to deserialize EBlock");
+                    self.store_block(&block).await;
+                    self.commit(block.clone()).await;
+                },
+                None => {
+                    // if let Err(e) = self.inner_channel.send(block.clone()).await {
+                    //     panic!("Failed to send request to synchronizer: {}", e);
+                    // }
+                    // Ok(None)
+                }
+            }
+        }
+        Ok(())
+    }
+
+    async fn handle_confirmation_message(
+        &mut self,
+        confirm_msg: ConfirmMessage,
+    ) -> ConsensusResult<()> {
         // ARETE TODO: execute transactions, create vote for ctxs
-        #[cfg(feature = "benchmark")] 
+        #[cfg(feature = "benchmark")]
         // {
-        info!("ARETE shard {} commit anchor block for execution round {}", confirm_msg.shard_id, confirm_msg.round);
+        info!(
+            "ARETE shard {} commit anchor block for execution round {}",
+            confirm_msg.shard_id, confirm_msg.round
+        );
         // }
         debug!("receive a confirm message from peer {:?}", confirm_msg);
-        Ok(())
+
+        let digest = confirm_msg.digest();
+        if !self.mempool_driver.verify(confirm_msg.clone()).await? {
+            debug!("Processing of {} suspended: missing some EBlock", digest);
+            return Ok(());
+        }
+        // Otherwise, have all EBlocks, and execute
+        self.process_confirm(confirm_msg).await
     }
 
     pub async fn run(&mut self) {
-        // Upon booting, generate the very first block (if we are the leader).
-        // Also, schedule a timer in case we don't hear from the leader.
-        // self.timer.reset();
-        // if self.name == self.leader_elector.get_leader(self.round) {
-        //     self.generate_proposal(None).await;
-        // }
-
         // This is the main loop: it processes incoming blocks and votes,
         // and receive timeout notifications from our Timeout Manager.
         loop {
             let result = tokio::select! {
                 Some(message) = self.rx_message.recv() => match message {
-                    ConsensusMessage::ExecutionBlock(block) => self.process_block(&block).await,
+                    ConsensusMessage::ExecutionBlock(block) => self.process_block(&block).await,   
                     ConsensusMessage::ConfirmMsg(confirm_message) => self.handle_confirmation_message(confirm_message).await,
                     _ => panic!("Unexpected protocol message")
                 },
-                // Some(block) = self.rx_loopback.recv() => self.process_block(&block).await,
-                // () = &mut self.timer => self.local_timeout_round().await,
+                // Get the block after synchronization
+                // Now commit it
+                Some(block) = self.rx_loopback.recv() => self.process_block(&block).await,
             };
             match result {
                 Ok(()) => (),
