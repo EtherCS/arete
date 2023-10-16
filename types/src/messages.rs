@@ -74,15 +74,40 @@ pub enum CertifyMessage {
     CtxVote(CrossTransactionVote),
 }
 
+// Aggregate execution results of cross-shard transactions
+// round is the block height where these cross-shard transactions are ordered
+#[derive(Serialize, Deserialize, Default, Clone)]
+pub struct VoteResult {
+    pub round: u64,
+    pub results: HashMap<Digest, u8>,
+}
+impl VoteResult {
+    pub async fn new(round: u64, results: HashMap<Digest, u8>) -> Self {
+        let vote_result = Self { round, results };
+        vote_result
+    }
+}
+impl Hash for VoteResult {
+    fn digest(&self) -> Digest {
+        let mut hasher = Sha512::new();
+        hasher.update(&self.round.to_le_bytes());
+        for (x, y) in &self.results {
+            let serialized_data = bincode::serialize(&(x, y)).expect("Serialization failed");
+            hasher.update(serialized_data);
+        }
+        Digest(hasher.finalize().as_slice()[..32].try_into().unwrap())
+    }
+}
+
 // Execution shards receive the ordered txs from the ordering shard
 #[derive(Serialize, Deserialize, Default, Clone)]
 pub struct ConfirmMessage {
     pub shard_id: u32,
-    pub block_hashes: HashMap<PublicKey, Digest>,   // Corresponding EBlocks' hashes
+    pub block_hashes: HashMap<PublicKey, Digest>, // Corresponding EBlocks' hashes
     // pub round: u64,           // corresponding execution shard's round
-    pub order_round: u64,     // consensus round in the ordering shard
+    pub order_round: u64,          // consensus round in the ordering shard
     pub ordered_ctxs: Vec<Digest>, // new cross-shard transactions
-    pub votes: HashMap<Digest, u8>, // vote (execution results) of previous cross-shard transactions
+    pub votes: Vec<VoteResult>,    // vote (execution results) of previous cross-shard transactions
     pub signature: Signature,
 }
 
@@ -93,7 +118,7 @@ impl ConfirmMessage {
         // round: u64,
         order_round: u64,
         ordered_ctxs: Vec<Digest>,
-        votes: HashMap<Digest, u8>,
+        votes: Vec<VoteResult>,
         signature: Signature,
     ) -> Self {
         let confirm_message = Self {
@@ -123,9 +148,8 @@ impl Hash for ConfirmMessage {
         for x in &self.ordered_ctxs {
             hasher.update(x);
         }
-        for (x, y) in &self.votes {
-            let serialized_data = bincode::serialize(&(x, y)).expect("Serialization failed");
-            hasher.update(serialized_data);
+        for x in &self.votes {
+            hasher.update(x.digest());
         }
         Digest(hasher.finalize().as_slice()[..32].try_into().unwrap())
     }
@@ -355,7 +379,13 @@ pub struct CBlockMeta {
 }
 
 impl CBlockMeta {
-    pub async fn new(shard_id: u32, author: PublicKey, round: u64, ebhash: Digest, ctx_hashes: Vec<Digest>) -> Self {
+    pub async fn new(
+        shard_id: u32,
+        author: PublicKey,
+        round: u64,
+        ebhash: Digest,
+        ctx_hashes: Vec<Digest>,
+    ) -> Self {
         let cblockmeta = Self {
             shard_id,
             author,

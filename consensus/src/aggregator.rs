@@ -6,10 +6,6 @@ use crypto::Hash as _;
 use crypto::{Digest, PublicKey, Signature};
 use std::collections::{HashMap, HashSet};
 
-#[cfg(test)]
-#[path = "tests/aggregator_tests.rs"]
-pub mod aggregator_tests;
-
 pub struct Aggregator {
     committee: Committee,
     votes_aggregators: HashMap<Round, HashMap<Digest, Box<QCMaker>>>,

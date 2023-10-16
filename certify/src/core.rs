@@ -132,7 +132,7 @@ impl Core {
         // Store the block only if we have already processed all its ancestors.
         self.store_block(block).await;
 
-        self.commit(block.clone()).await;
+        self.commit(block.clone()).await?;
 
         Ok(())
     }
@@ -144,7 +144,7 @@ impl Core {
                 Some(bytes) => {
                     let block: EBlock = bincode::deserialize(&bytes).expect("Failed to deserialize EBlock");
                     self.store_block(&block).await;
-                    self.commit(block.clone()).await;
+                    self.commit(block.clone()).await?;
                 },
                 None => {
                     // if let Err(e) = self.inner_channel.send(block.clone()).await {

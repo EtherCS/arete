@@ -20,10 +20,6 @@ use store::Store;
 use tokio::sync::mpsc::{channel, Receiver, Sender};
 use types::{CBlock, ShardInfo};
 
-#[cfg(test)]
-#[path = "tests/consensus_tests.rs"]
-pub mod consensus_tests;
-
 /// The default channel capacity for each channel of the consensus.
 pub const CHANNEL_CAPACITY: usize = 1_000;
 

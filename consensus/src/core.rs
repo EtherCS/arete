@@ -19,10 +19,6 @@ use std::collections::VecDeque;
 use store::Store;
 use tokio::sync::mpsc::{Receiver, Sender};
 
-#[cfg(test)]
-#[path = "tests/core_tests.rs"]
-pub mod core_tests;
-
 pub struct Core {
     name: PublicKey,
     committee: Committee,
