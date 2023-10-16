@@ -10,7 +10,7 @@ use crate::quorum_waiter::QuorumWaiter;
 use crate::vote_maker::VoteMaker;
 use async_trait::async_trait;
 use bytes::Bytes;
-use crypto::{Digest, PublicKey, SignatureService};
+use crypto::{Digest, Hash, PublicKey, SignatureService};
 use execpool::ExecutionMempoolMessage;
 use futures::SinkExt as _;
 use log::info;
@@ -19,7 +19,7 @@ use serde::{Deserialize, Serialize};
 use std::error::Error;
 use store::Store;
 use tokio::sync::mpsc::{channel, Receiver, Sender};
-use types::{CBlock, ConfirmMessage, EBlock, ShardInfo, CertifyMessage};
+use types::{CBlock, ConfirmMessage, EBlock, ShardInfo, CertifyMessage, CrossTransactionVote, NodeSignature};
 
 // #[cfg(test)]
 // #[path = "tests/consensus_tests.rs"]
@@ -36,6 +36,7 @@ pub enum ConsensusMessage {
     ExecutionBlock(EBlock),
     SyncRequest(Digest, PublicKey),
     ConfirmMsg(ConfirmMessage),
+    CrossTransactionVote(CrossTransactionVote),
 }
 
 pub struct Consensus;
@@ -74,6 +75,8 @@ impl Consensus {
             ConsensusReceiverHandler {
                 tx_consensus: tx_consensus.clone(),
                 tx_helper,
+                name: name,
+                signature_service: signature_service.clone(),
             },
         );
         info!(
@@ -100,33 +103,33 @@ impl Consensus {
 
         // Spawn the consensus core.
         Core::spawn(
-            name,
-            committee.clone(),
+            // name,
+            // committee.clone(),
             shard_info.clone(),
-            signature_service.clone(),
+            // signature_service.clone(),
             store.clone(),
             mempool_driver,
             // synchronizer,
             rx_consensus,
             rx_loopback,
             tx_order_ctx,
-            tx_certify.clone(),
+            // tx_certify.clone(),
         );
 
         // Spawn the vote_maker
         VoteMaker::spawn(
             name,
             committee.clone(),
-            shard_info.clone(),
-            signature_service.clone(),
+            // shard_info.clone(),
+            // signature_service.clone(),
             rx_order_ctx,
             tx_vote_quorum_waiter,
         );
 
         // Spawn the quorum_waiter
         QuorumWaiter::spawn(
-            name,
-            shard_info.clone(),
+            // name,
+            // shard_info.clone(),
             committee.clone(),
             committee.stake(&name),
             rx_vote_quorum_waiter,
@@ -151,6 +154,8 @@ impl Consensus {
 struct ConsensusReceiverHandler {
     tx_consensus: Sender<ConsensusMessage>,
     tx_helper: Sender<(Digest, PublicKey)>,
+    name: PublicKey,
+    signature_service: SignatureService,
 }
 
 #[async_trait]
@@ -163,6 +168,18 @@ impl MessageHandler for ConsensusReceiverHandler {
                 .send((missing, origin))
                 .await
                 .expect("Failed to send consensus message"),
+            ConsensusMessage::CrossTransactionVote(ctx_vote) => {
+                // ARETE TODO: verify the vote results
+                // if they are consistent with ours or not
+                // send the CrossTransactionVote to the creator with our signature
+                let mut signature_service = self.signature_service.clone();
+                let signature = signature_service.request_signature(ctx_vote.digest()).await;
+                let node_signature = NodeSignature::new(self.name, signature).await;
+                let ctx_vote_serialized = bincode::serialize(&node_signature.clone())
+                .expect("Failed to serialize received ctx vote");
+                let ctx_vote_bytes = Bytes::from(ctx_vote_serialized.clone());
+                let _ = writer.send(ctx_vote_bytes).await;
+            }
             message @ ConsensusMessage::ConfirmMsg(..) => {
                 // receive a consensus msg (a block is confirm) from other executors
                 // Reply with an ACK.
@@ -180,6 +197,7 @@ impl MessageHandler for ConsensusReceiverHandler {
                     .await
                     .expect("Failed to send confirm message to core")
             }
+            
             // message => self
             //     .tx_consensus
             //     .send(message)

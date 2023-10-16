@@ -10,7 +10,7 @@ use tokio::{
     sync::mpsc::{Receiver, Sender},
     time::sleep,
 };
-use types::{NodeSignature, ShardInfo, CrossTransactionVote, CertifyMessage};
+use types::{NodeSignature, CrossTransactionVote, CertifyMessage};
 
 /// Extra batch dissemination time for the f last nodes (in ms).
 const DISSEMINATION_DEADLINE: u64 = 500;
@@ -37,10 +37,10 @@ pub struct QuorumVoteMessage {
 
 /// The QuorumWaiter waits for 2f authorities to acknowledge reception of a batch.
 pub struct QuorumWaiter {
-    /// The node
-    name: PublicKey,
-    /// The execution shard information
-    shard_info: ShardInfo,
+    // /// The node
+    // name: PublicKey,
+    // /// The execution shard information
+    // shard_info: ShardInfo,
     /// The committee information.
     committee: ExecutionCommittee,
     /// The stake of this authority.
@@ -54,8 +54,8 @@ pub struct QuorumWaiter {
 impl QuorumWaiter {
     /// Spawn a new QuorumWaiter.
     pub fn spawn(
-        name: PublicKey,
-        shard_info: ShardInfo,
+        // name: PublicKey,
+        // shard_info: ShardInfo,
         committee: ExecutionCommittee,
         stake: Stake,
         rx_message: Receiver<QuorumVoteMessage>,
@@ -63,8 +63,8 @@ impl QuorumWaiter {
     ) {
         tokio::spawn(async move {
             Self {
-                name,
-                shard_info,
+                // name,
+                // shard_info,
                 committee,
                 stake,
                 rx_message,

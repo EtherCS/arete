@@ -1,4 +1,5 @@
-use crate::consensus::{Round, CHANNEL_CAPACITY};
+// use crate::consensus::{Round, CHANNEL_CAPACITY};
+use crate::consensus::CHANNEL_CAPACITY;
 // use crate::error::{ConsensusError, ConsensusResult};
 use crate::error::ConsensusResult;
 // use crate::messages::EBlock;
@@ -82,25 +83,25 @@ impl MempoolDriver {
         Ok(false)
     }
 
-    pub async fn cleanup(&mut self, round: Round) {
-        // Cleanup the mempool.
-        self.tx_mempool
-            .send(ExecutionMempoolMessage::Cleanup(round))
-            .await
-            .expect("Failed to send cleanup message");
+    // pub async fn cleanup(&mut self, round: Round) {
+    //     // Cleanup the mempool.
+    //     self.tx_mempool
+    //         .send(ExecutionMempoolMessage::Cleanup(round))
+    //         .await
+    //         .expect("Failed to send cleanup message");
 
-        // Cleanup the payload waiter.
-        // self.tx_payload_waiter
-        //     .send(PayloadWaiterMessage::Cleanup(round))
-        //     .await
-        //     .expect("Failed to send cleanup message");
-    }
+    //     // Cleanup the payload waiter.
+    //     // self.tx_payload_waiter
+    //     //     .send(PayloadWaiterMessage::Cleanup(round))
+    //     //     .await
+    //     //     .expect("Failed to send cleanup message");
+    // }
 }
 
 #[derive(Debug)]
 enum PayloadWaiterMessage {
     Wait(Digest),
-    Cleanup(Round),
+    // Cleanup(Round),
 }
 
 struct PayloadWaiter {
@@ -166,14 +167,14 @@ impl PayloadWaiter {
                         let fut = Self::waiter(wait_for, rx_cancel);
                         waiting.push(fut);
                     },
-                    PayloadWaiterMessage::Cleanup(mut round) => {
-                        for (r, handler) in pending.values() {
-                            if r <= &round {
-                                let _ = handler.send(()).await;
-                            }
-                        }
-                        pending.retain(|_, (r, _)| r > &mut round);
-                    }
+                    // PayloadWaiterMessage::Cleanup(mut round) => {
+                    //     for (r, handler) in pending.values() {
+                    //         if r <= &round {
+                    //             let _ = handler.send(()).await;
+                    //         }
+                    //     }
+                    //     pending.retain(|_, (r, _)| r > &mut round);
+                    // }
                 },
                 Some(result) = waiting.next() => {
                     match result {

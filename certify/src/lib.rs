@@ -8,7 +8,7 @@ mod helper;
 mod mempool;
 mod proposer;
 mod quorum_waiter;
-mod timer;
+// mod timer;
 mod vote_maker;
 
 // #[cfg(test)]

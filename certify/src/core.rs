@@ -1,68 +1,68 @@
-use crate::config::ExecutionCommittee;
+// use crate::config::ExecutionCommittee;
 use crate::consensus::{ConsensusMessage, Round};
 use crate::error::{ConsensusError, ConsensusResult};
 use crate::mempool::MempoolDriver;
 // use crate::synchronizer::Synchronizer;
 use async_recursion::async_recursion;
 use crypto::Hash as _;
-use crypto::{Digest, PublicKey, SignatureService};
-use ed25519_dalek::Digest as _;
-use ed25519_dalek::Sha512;
+use crypto::Digest;
+// use crypto::{Digest, PublicKey, SignatureService};
+// use ed25519_dalek::Digest as _;
+// use ed25519_dalek::Sha512;
 use log::{debug, error, info, warn};
-use network::SimpleSender;
+// use network::SimpleSender;
 use std::collections::{HashMap, VecDeque};
-use std::convert::TryInto;
 use store::Store;
 use tokio::sync::mpsc::{Receiver, Sender};
-use types::{CertifyMessage, ConfirmMessage, CrossTransactionVote, EBlock, ShardInfo, Transaction};
+use types::{ConfirmMessage, CrossTransactionVote, EBlock, ShardInfo};
 
 pub struct Core {
-    name: PublicKey,
-    committee: ExecutionCommittee,
+    // name: PublicKey,
+    // committee: ExecutionCommittee,
     shard_info: ShardInfo,
     store: Store,
-    signature_service: SignatureService,
+    // signature_service: SignatureService,
     // leader_elector: LeaderElector,
     mempool_driver: MempoolDriver,
     // synchronizer: Synchronizer,
     rx_message: Receiver<ConsensusMessage>,
     rx_loopback: Receiver<EBlock>,
     tx_order_ctx: Sender<CrossTransactionVote>, // send executed vote results to vote_maker
-    tx_certify: Sender<CertifyMessage>,
+    // tx_certify: Sender<CertifyMessage>,
     round: Round,
-    network: SimpleSender,
+    // network: SimpleSender,
 }
 
 impl Core {
     #[allow(clippy::too_many_arguments)]
     pub fn spawn(
-        name: PublicKey,
-        committee: ExecutionCommittee,
+        // name: PublicKey,
+        // committee: ExecutionCommittee,
         shard_info: ShardInfo,
-        signature_service: SignatureService,
+        // signature_service: SignatureService,
         store: Store,
         mempool_driver: MempoolDriver,
         // synchronizer: Synchronizer,
         rx_message: Receiver<ConsensusMessage>,
         rx_loopback: Receiver<EBlock>,
         tx_order_ctx: Sender<CrossTransactionVote>, // send cross-shard transactions to vote_maker after execution
-        tx_certify: Sender<CertifyMessage>,         // send certify vote message
+        // tx_certify: Sender<CertifyMessage>,         // send certify vote message
     ) {
         tokio::spawn(async move {
             Self {
-                name,
-                committee: committee.clone(),
+                // name,
+                // committee: committee.clone(),
                 shard_info: shard_info.clone(),
-                signature_service,
+                // signature_service,
                 store,
                 mempool_driver,
                 // synchronizer,
                 rx_message,
                 rx_loopback,
                 tx_order_ctx,
-                tx_certify,
+                // tx_certify,
                 round: 1,
-                network: SimpleSender::new(),
+                // network: SimpleSender::new(),
             }
             .run()
             .await
@@ -112,13 +112,13 @@ impl Core {
         Ok(())
     }
 
-    async fn generate_vote(&mut self, crosstxs: Vec<Transaction>) -> HashMap<Digest, u8> {
+    async fn generate_vote(&mut self, crosstxs: Vec<Digest>) -> HashMap<Digest, u8> {
         let mut vote = HashMap::new();
         for ctx in crosstxs {
             // ARETE TODO: execute ctx;
             // Assume all are successful now
             vote.insert(
-                Digest(Sha512::digest(&ctx).as_slice()[..32].try_into().unwrap()),
+                ctx,
                 1,
             );
         }
@@ -139,6 +139,7 @@ impl Core {
 
     #[async_recursion]
     async fn process_confirm(&mut self, confirm_msg: ConfirmMessage,) -> ConsensusResult<()> {
+        // First handle the ordered intra-shard transactions
         for (_, eblock_hash) in confirm_msg.block_hashes.clone() {
             match self.store.read(eblock_hash.to_vec()).await? {
                 Some(bytes) => {
@@ -154,6 +155,13 @@ impl Core {
                 }
             }
         }
+        // Then, handle the ordered cross-shard transactions
+        let votes = self.generate_vote(confirm_msg.ordered_ctxs).await;
+        let cross_tx_vote: CrossTransactionVote = CrossTransactionVote::new(self.shard_info.id, confirm_msg.order_round, votes.clone(), Vec::new()).await;
+        // Send it to vote_maker for collecting quorum of certificates
+        self.tx_order_ctx.send(cross_tx_vote).await.expect("Failed to send cross-transaction vote");
+
+        self.round = confirm_msg.order_round;
         Ok(())
     }
 
@@ -161,19 +169,23 @@ impl Core {
         &mut self,
         confirm_msg: ConfirmMessage,
     ) -> ConsensusResult<()> {
-        // ARETE TODO: execute transactions, create vote for ctxs
+        // ARETE TODO: commit cross-shard transactions
         #[cfg(feature = "benchmark")]
-        // {
+        {
         info!(
-            "ARETE shard {} commit anchor block for execution round {}",
-            confirm_msg.shard_id, confirm_msg.round
+            "ARETE shard {} commit blocks for ordering round {}",
+            confirm_msg.shard_id, confirm_msg.order_round
         );
-        // }
-        debug!("receive a confirm message from peer {:?}", confirm_msg);
+        for i in &confirm_msg.votes {
+            info!("ARETE shard {} commit ctxs for ordering round {}",
+            confirm_msg.shard_id, i.round);
+        }
+        }
 
         let digest = confirm_msg.digest();
         if !self.mempool_driver.verify(confirm_msg.clone()).await? {
             debug!("Processing of {} suspended: missing some EBlock", digest);
+            self.round = confirm_msg.order_round;
             return Ok(());
         }
         // Otherwise, have all EBlocks, and execute

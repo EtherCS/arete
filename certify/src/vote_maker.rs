@@ -1,9 +1,9 @@
-use crate::config::ExecutionCommittee;
+use crate::{config::ExecutionCommittee, consensus::ConsensusMessage};
 use crate::quorum_waiter::QuorumVoteMessage;
 use bytes::Bytes;
 #[cfg(feature = "benchmark")]
 use crypto::Digest;
-use crypto::{PublicKey, SignatureService};
+use crypto::PublicKey;
 #[cfg(feature = "benchmark")]
 use ed25519_dalek::{Digest as _, Sha512};
 #[cfg(feature = "benchmark")]
@@ -12,13 +12,7 @@ use network::ReliableSender;
 #[cfg(feature = "benchmark")]
 use std::convert::TryInto as _;
 use tokio::sync::mpsc::{Receiver, Sender};
-use types::{Transaction, ShardInfo, Round, CrossTransactionVote};
-
-// pub type Transaction = Vec<u8>;
-pub type Batch = Vec<Transaction>;
-
-// ARETE: TODO: if need round?
-pub const EXECUTION_ROUND: Round = 1;
+use types::CrossTransactionVote;
 
 /// Assemble clients transactions into batches.
 pub struct VoteMaker {
@@ -26,10 +20,10 @@ pub struct VoteMaker {
     name: PublicKey,
     /// The committee information.
     committee: ExecutionCommittee,
-    /// The execution shard information
-    shard_info: ShardInfo,
+    // /// The execution shard information
+    // shard_info: ShardInfo,
     /// The signagure service
-    signature_service: SignatureService,
+    // signature_service: SignatureService,
     /// Channel receive vote results (CrossTransactionVote) from core
     rx_order_ctx: Receiver<CrossTransactionVote>,
     /// Output channel to deliver sealed vote results to the `QuorumWaiter`.
@@ -42,8 +36,8 @@ impl VoteMaker {
     pub fn spawn(
         name: PublicKey,
         committee: ExecutionCommittee,
-        shard_info: ShardInfo,
-        signature_service: SignatureService,
+        // shard_info: ShardInfo,
+        // signature_service: SignatureService,
         rx_order_ctx: Receiver<CrossTransactionVote>,
         tx_message: Sender<QuorumVoteMessage>,
     ) {
@@ -51,8 +45,8 @@ impl VoteMaker {
             Self {
                 name,
                 committee,
-                shard_info,
-                signature_service,
+                // shard_info,
+                // signature_service,
                 rx_order_ctx,
                 tx_message,
                 network: ReliableSender::new(),
@@ -75,10 +69,11 @@ impl VoteMaker {
 
     /// Seal and broadcast the vote results.
     async fn seal(&mut self, ctx_vote: CrossTransactionVote) {
+        let message = ConsensusMessage::CrossTransactionVote(ctx_vote);
         // Serialize the vote results.
-        let serialized = bincode::serialize(&ctx_vote).expect("Failed to serialize vote results");
+        let serialized = bincode::serialize(&message).expect("Failed to serialize vote results");
 
-        // Broadcast the vote results through the network.
+        // Broadcast the vote results through the (consensus) network.
         let (names, consensus_addresses): (Vec<_>, _) = self.committee
             .broadcast_addresses(&self.name)
             .iter()
