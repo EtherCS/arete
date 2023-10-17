@@ -63,10 +63,11 @@ pub struct Authority {
 pub struct ExecutionCommittee {
     pub authorities: HashMap<PublicKey, Authority>,
     pub epoch: EpochNumber,
+    pub liveness_threshold: f32,
 }
 
 impl ExecutionCommittee {
-    pub fn new(info: Vec<(PublicKey, Stake, SocketAddr, SocketAddr, SocketAddr)>, epoch: EpochNumber) -> Self {
+    pub fn new(info: Vec<(PublicKey, Stake, SocketAddr, SocketAddr, SocketAddr)>, epoch: EpochNumber, liveness_threshold: f32) -> Self {
         Self {
             authorities: info
                 .into_iter()
@@ -81,6 +82,7 @@ impl ExecutionCommittee {
                 })
                 .collect(),
             epoch,
+            liveness_threshold,
         }
     }
 
@@ -92,7 +94,7 @@ impl ExecutionCommittee {
     /// Returns the stake required to reach a quorum (f+1) for execution shard.
     pub fn quorum_threshold(&self) -> Stake {
         let total_votes: Stake = self.authorities.values().map(|x| x.stake).sum();
-        total_votes / 2 + 1
+        ((1.0-self.liveness_threshold) * total_votes as f32).ceil() as u32
     }
 
     /// Returns the address to receive client transactions.

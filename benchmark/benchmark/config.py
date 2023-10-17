@@ -177,7 +177,7 @@ class ExecutionCommittee:
                 "mempool_address": m,
                 "confirmation_address": c,
             }
-        return {"authorities": node, "epoch": 1}
+        return {"authorities": node, "epoch": 1, "liveness_threshold": self.liveness_threshold}
 
     def print(self, filename):
         assert isinstance(filename, str)
