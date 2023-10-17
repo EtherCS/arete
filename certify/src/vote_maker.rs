@@ -1,16 +1,16 @@
 use crate::{config::ExecutionCommittee, consensus::ConsensusMessage};
 use crate::quorum_waiter::QuorumVoteMessage;
 use bytes::Bytes;
-#[cfg(feature = "benchmark")]
-use crypto::Digest;
+// #[cfg(feature = "benchmark")]
+// use crypto::Digest;
 use crypto::PublicKey;
-#[cfg(feature = "benchmark")]
-use ed25519_dalek::{Digest as _, Sha512};
-#[cfg(feature = "benchmark")]
-use log::info;
+// #[cfg(feature = "benchmark")]
+// use ed25519_dalek::Digest as _;
+// #[cfg(feature = "benchmark")]
+// use log::info;
 use network::ReliableSender;
-#[cfg(feature = "benchmark")]
-use std::convert::TryInto as _;
+// #[cfg(feature = "benchmark")]
+// use std::convert::TryInto as _;
 use tokio::sync::mpsc::{Receiver, Sender};
 use types::CrossTransactionVote;
 

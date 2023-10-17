@@ -91,18 +91,18 @@ impl Core {
             // if !block.payload.is_empty() {
             info!("Committed {}", block);
 
-            #[cfg(feature = "benchmark")]
-            {
-                let b_round = block.round;
-                for x in &block.payload {
-                    // NOTE: This log entry is used to compute performance.
-                    info!("Shard {} Committed {} -> {:?}", _s_id, block, x);
-                    info!(
-                        "ARETE shard {} Committed {} -> {:?} in round {}",
-                        _s_id, block, x, b_round
-                    );
-                }
-            }
+            // #[cfg(feature = "benchmark")]
+            // {
+            //     let b_round = block.round;
+            //     for x in &block.payload {
+            //         // NOTE: This log entry is used to compute performance.
+            //         info!("Shard {} Committed {} -> {:?}", _s_id, block, x);
+            //         info!(
+            //             "ARETE shard {} Committed {} -> {:?} in round {}",
+            //             _s_id, block, x, b_round
+            //         );
+            //     }
+            // }
             // }
             debug!("Committed {:?}", block);
             // if let Err(e) = self.tx_commit.send(block).await {

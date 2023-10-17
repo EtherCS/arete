@@ -168,6 +168,7 @@ impl Mempool {
         QuorumWaiter::spawn(
             self.name,
             self.shard_info.clone(),
+            self.signature_service.clone(),
             self.committee.clone(),
             /* stake */ self.committee.stake(&self.name),
             /* rx_message */ rx_quorum_waiter,
@@ -285,9 +286,10 @@ impl MessageHandler for ConfirmationMsgReceiverHandler {
         #[cfg(feature = "benchmark")]
         {
             info!("executor receives confirm msg {:?}", confirm_msg);
+            
             info!(
-                "ARETE shard {} commit anchor block for execution round {}",
-                confirm_msg.shard_id, confirm_msg.round
+                "ARETE shard {} commit blocks for ordering round {}",
+                confirm_msg.shard_id, confirm_msg.order_round
             );
         }
         // Give the change to schedule other tasks.

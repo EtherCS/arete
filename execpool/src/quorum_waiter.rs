@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use crate::config::{ExecutionCommittee, Stake};
 use crate::processor::SerializedEBlockMessage;
-use crypto::{Digest, Hash, PublicKey};
+use crypto::{Digest, Hash, PublicKey, SignatureService};
 use ed25519_dalek::Digest as _;
 use ed25519_dalek::Sha512;
 use futures::stream::futures_unordered::FuturesUnordered;
@@ -46,6 +46,8 @@ pub struct QuorumWaiter {
     name: PublicKey,
     /// The execution shard information
     shard_info: ShardInfo,
+    /// The signature service
+    signature_service: SignatureService,
     /// The committee information.
     committee: ExecutionCommittee,
     /// The stake of this authority.
@@ -63,6 +65,7 @@ impl QuorumWaiter {
     pub fn spawn(
         name: PublicKey,
         shard_info: ShardInfo,
+        signature_service: SignatureService,
         committee: ExecutionCommittee,
         stake: Stake,
         rx_message: Receiver<QuorumWaiterMessage>,
@@ -73,6 +76,7 @@ impl QuorumWaiter {
             Self {
                 name,
                 shard_info,
+                signature_service,
                 committee,
                 stake,
                 rx_message,
@@ -125,8 +129,21 @@ impl QuorumWaiter {
                     // Wait for the first (1-f_L) nodes to send back an Ack. Then we consider the batch
                     // delivered and we send its digest to the consensus (that will include it into
                     // the dag). This should reduce the amount of synching.
+                    let my_cblock = CBlock::new(
+                        eblock.shard_id,
+                        eblock.author,
+                        eblock.round,
+                        eblock.digest(),
+                        hash_ctxs.clone(),
+                        Vec::new(),
+                    ).await;
+                    // create my signature
+                    let mut signature_service = self.signature_service.clone();
+                    let signature = signature_service.request_signature(my_cblock.digest()).await;
+                    let node_signature = NodeSignature::new(self.name, signature).await;
                     let mut total_stake = self.stake;
                     let mut multisignatures: Vec<NodeSignature> = Vec::new();
+                    multisignatures.push(node_signature);
                     while let Some(EBlockRespondMessage { certificate, stake }) = wait_for_quorum.next().await {
                         multisignatures.push(certificate);
                         total_stake += stake;

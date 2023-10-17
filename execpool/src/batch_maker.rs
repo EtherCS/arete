@@ -139,8 +139,8 @@ impl BatchMaker {
         let crosstxs= &batch[ctx_num..batch.len()].to_vec();
         // ARETE: use Transactions to create a EBlock
         let eblock = EBlock::new(self.shard_info.id, self.name, EXECUTION_ROUND, intratxs.clone(), crosstxs.clone(), self.signature_service.clone()).await;
-        let message = MempoolMessage::EBlock(eblock);
-        let serialized = bincode::serialize(&message).expect("Failed to serialize our own EBlock");
+        let message = MempoolMessage::EBlock(eblock.clone());
+        let serialized = bincode::serialize(&message).expect("Failed to serialize our own MempoolMessage EBlock");
 
         #[cfg(feature = "benchmark")]
         {
@@ -170,9 +170,10 @@ impl BatchMaker {
         let handlers = self.network.broadcast(addresses, bytes).await;
 
         // Send the batch through the deliver channel for further processing.
+        let eblock_serialized = bincode::serialize(&eblock).expect("Failed to serialize our own EBlock");
         self.tx_message
             .send(QuorumWaiterMessage {
-                batch: serialized,
+                batch: eblock_serialized,
                 handlers: names.into_iter().zip(handlers.into_iter()).collect(),
             })
             .await
