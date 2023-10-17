@@ -10,7 +10,7 @@ use std::collections::HashMap;
 use std::net::SocketAddr;
 use store::Store;
 use tokio::sync::mpsc::{channel, Receiver};
-use types::{ConfirmMessage, ShardInfo};
+use types::{ConfirmMessage, ShardInfo, BlockCreator};
 
 /// The default channel capacity for this module.
 pub const CHANNEL_CAPACITY: usize = 1_000;
@@ -112,12 +112,14 @@ impl Node {
                 // multiple blocks are packed for shard i.shard_id
                 if confirm_msgs.contains_key(&i.shard_id) {
                     if let Some(cmsg) = confirm_msgs.get_mut(&i.shard_id) {
-                        cmsg.block_hashes.insert(i.author, i.ebhash);
+                        let temp_block_creator = BlockCreator::new(i.author, i.ebhash).await;
+                        cmsg.block_hashes.push(temp_block_creator);
                         cmsg.ordered_ctxs.extend(i.ctx_hashes);
                     }
                 } else {
-                    let mut map_ebhash = HashMap::new();
-                    map_ebhash.insert(i.author, i.ebhash);
+                    let temp_block_creator = BlockCreator::new(i.author, i.ebhash).await;
+                    let mut map_ebhash = Vec::new();
+                    map_ebhash.push(temp_block_creator);
                     let confim_msg = ConfirmMessage::new(
                         i.shard_id,
                         map_ebhash.clone(),

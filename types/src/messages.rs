@@ -122,7 +122,7 @@ impl fmt::Debug for VoteResult {
 #[derive(Serialize, Deserialize, Default, Clone)]
 pub struct ConfirmMessage {
     pub shard_id: u32,
-    pub block_hashes: HashMap<PublicKey, Digest>, // Corresponding EBlocks' hashes
+    pub block_hashes: Vec<BlockCreator>, // Corresponding EBlocks' hashes
     // pub round: u64,           // corresponding execution shard's round
     pub order_round: u64,          // consensus round in the ordering shard
     pub ordered_ctxs: Vec<Digest>, // new cross-shard transactions
@@ -133,7 +133,7 @@ pub struct ConfirmMessage {
 impl ConfirmMessage {
     pub async fn new(
         shard_id: u32,
-        block_hashes: HashMap<PublicKey, Digest>,
+        block_hashes: Vec<BlockCreator>,
         // round: u64,
         order_round: u64,
         ordered_ctxs: Vec<Digest>,
@@ -159,9 +159,8 @@ impl Hash for ConfirmMessage {
     fn digest(&self) -> Digest {
         let mut hasher = Sha512::new();
         hasher.update(&self.shard_id.to_le_bytes());
-        for (x, y) in &self.block_hashes {
-            let serialized_data = bincode::serialize(&(x, y)).expect("Serialization failed");
-            hasher.update(serialized_data);
+        for x in &self.block_hashes {
+            hasher.update(x.digest());
         }
         hasher.update(self.order_round.to_le_bytes());
         for x in &self.ordered_ctxs {
@@ -275,6 +274,33 @@ impl fmt::Debug for EBlock {
 impl fmt::Display for EBlock {
     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         write!(f, "EB{}", self.digest())
+    }
+}
+
+// The author of an eblock
+#[derive(Serialize, Deserialize, Default, Clone)]
+pub struct BlockCreator {
+    pub author: PublicKey,
+    pub ebhash: Digest,
+}
+
+impl BlockCreator {
+    pub async fn new(author: PublicKey, ebhash: Digest) -> Self {
+        let blockcreator: BlockCreator = Self { author, ebhash };
+        Self { ..blockcreator }
+    }
+}
+impl Hash for BlockCreator {
+    fn digest(&self) -> Digest {
+        let mut hasher = Sha512::new();
+        hasher.update(self.author.0);
+        hasher.update(&self.ebhash);
+        Digest(hasher.finalize().as_slice()[..32].try_into().unwrap())
+    }
+}
+impl fmt::Debug for BlockCreator {
+    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        write!(f, "name{}, eblock digest{:?}", self.author, self.ebhash,)
     }
 }
 

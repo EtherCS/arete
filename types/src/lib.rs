@@ -5,6 +5,6 @@ mod error;
 
 pub use crate::config::{CertifyParameters, ExecutionCommittee};
 pub use crate::messages::{
-    CBlock, CBlockMeta, CertifyMessage, ConfirmMessage, CrossTransactionVote, EBlock,
+    BlockCreator, CBlock, CBlockMeta, CertifyMessage, ConfirmMessage, CrossTransactionVote, EBlock,
     NodeSignature, Round, ShardInfo, Transaction, VoteResult,
 };

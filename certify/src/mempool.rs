@@ -41,17 +41,17 @@ impl MempoolDriver {
     }
 
     pub async fn verify(&mut self, confirm_msg: ConfirmMessage) -> ConsensusResult<bool> {
-        for (author, hash) in &confirm_msg.block_hashes {
-            if self.store.read(hash.to_vec()).await?.is_none() {
+        for block_creator in &confirm_msg.block_hashes {
+            if self.store.read(block_creator.ebhash.to_vec()).await?.is_none() {
                 // missing this eblock
-                let message = ExecutionMempoolMessage::Synchronize(hash.clone(), author.clone());
+                let message = ExecutionMempoolMessage::Synchronize(block_creator.ebhash.clone(), block_creator.author.clone());
                 self.tx_mempool
                     .send(message)
                     .await
                     .expect("Failed to send sync message");
 
                 self.tx_payload_waiter
-                    .send(PayloadWaiterMessage::Wait(hash.clone()))
+                    .send(PayloadWaiterMessage::Wait(block_creator.ebhash.clone()))
                     .await
                     .expect("Failed to send message to payload waiter");
             }

@@ -140,8 +140,8 @@ impl Core {
     #[async_recursion]
     async fn process_confirm(&mut self, confirm_msg: ConfirmMessage,) -> ConsensusResult<()> {
         // First handle the ordered intra-shard transactions
-        for (_, eblock_hash) in confirm_msg.block_hashes.clone() {
-            match self.store.read(eblock_hash.to_vec()).await? {
+        for block_creator in confirm_msg.block_hashes.clone() {
+            match self.store.read(block_creator.ebhash.to_vec()).await? {
                 Some(bytes) => {
                     let block: EBlock = bincode::deserialize(&bytes).expect("Failed to deserialize EBlock");
                     self.store_block(&block).await;
