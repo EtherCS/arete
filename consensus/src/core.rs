@@ -284,15 +284,15 @@ impl Core {
     }
 
     async fn cleanup_proposer(&mut self, b0: &OBlock, b1: &OBlock, block: &OBlock) {
-        let digests: Vec<types::CBlockMeta> = b0
-            .payload
+        let aggs: Vec<types::VoteResult> = b0
+            .aggregators
             .iter()
             .cloned()
-            .chain(b1.payload.iter().cloned())
-            .chain(block.payload.iter().cloned())
+            .chain(b1.aggregators.iter().cloned())
+            .chain(block.aggregators.iter().cloned())
             .collect();
         self.tx_proposer
-            .send(ProposerMessage::Cleanup(digests))
+            .send(ProposerMessage::Cleanup(aggs))
             .await
             .expect("Failed to send message to proposer");
     }

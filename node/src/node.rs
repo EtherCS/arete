@@ -1,16 +1,16 @@
 use crate::config::Export as _;
 use crate::config::{Committee, ConfigError, Parameters, Secret};
-use consensus::{OBlock, Consensus};
+use consensus::{Consensus, OBlock};
 use crypto::SignatureService;
-use log::{info, debug};
+use log::{debug, info};
 use mempool::Mempool;
+use network::SimpleSender;
 use rand::seq::IteratorRandom;
+use std::collections::HashMap;
+use std::net::SocketAddr;
 use store::Store;
 use tokio::sync::mpsc::{channel, Receiver};
 use types::{ConfirmMessage, ShardInfo};
-use std::collections::HashMap;
-use std::net::SocketAddr;
-use network::SimpleSender;
 
 /// The default channel capacity for this module.
 pub const CHANNEL_CAPACITY: usize = 1_000;
@@ -33,6 +33,9 @@ impl Node {
         let (tx_consensus_to_mempool, rx_consensus_to_mempool) = channel(CHANNEL_CAPACITY);
         let (tx_mempool_to_consensus, rx_mempool_to_consensus) = channel(CHANNEL_CAPACITY);
 
+        // channel for CrossTransactionVote between mempool and consensus
+        let (tx_ctx_vote, rx_ctx_vote) = channel(CHANNEL_CAPACITY);
+
         // Read the committee and secret key from file.
         let committee = Committee::read(committee_file)?;
         let secret = Secret::read(key_file)?;
@@ -47,7 +50,10 @@ impl Node {
                 shard_confirmation_addrs.insert(shard_id, *_confirm_addr);
             }
         }
-        info!("Node chooses ordering shard address {:?}", shard_confirmation_addrs);
+        info!(
+            "Node chooses ordering shard address {:?}",
+            shard_confirmation_addrs
+        );
 
         // Load default parameters if none are specified.
         let parameters = match parameters {
@@ -68,6 +74,7 @@ impl Node {
             parameters.mempool,
             store.clone(),
             rx_consensus_to_mempool,
+            tx_ctx_vote,
             tx_mempool_to_consensus,
         );
 
@@ -80,12 +87,17 @@ impl Node {
             signature_service,
             store,
             rx_mempool_to_consensus,
+            rx_ctx_vote,
             tx_consensus_to_mempool,
             tx_commit,
         );
 
         info!("Node {} successfully booted", name);
-        Ok(Self { commit: rx_commit, shard_info: committee.shard, shard_confirmation_addrs: shard_confirmation_addrs })
+        Ok(Self {
+            commit: rx_commit,
+            shard_info: committee.shard,
+            shard_confirmation_addrs: shard_confirmation_addrs,
+        })
     }
 
     pub fn print_key_file(filename: &str) -> Result<(), ConfigError> {
@@ -108,12 +120,14 @@ impl Node {
                     map_ebhash.insert(i.author, i.ebhash);
                     let confim_msg = ConfirmMessage::new(
                         i.shard_id,
-                        map_ebhash.clone(), 
+                        map_ebhash.clone(),
                         // i.round,    // corresponding execution shard's round
-                        _block.round, 
-                        i.ctx_hashes.clone(), 
+                        _block.round,
+                        i.ctx_hashes.clone(),
                         _block.aggregators.clone(),
-                        _block.signature.clone()).await;
+                        _block.signature.clone(),
+                    )
+                    .await;
                     confirm_msgs.insert(i.shard_id, confim_msg);
                 }
             }
@@ -123,10 +137,14 @@ impl Node {
                     .expect("fail to serialize the ConfirmMessage");
                 if let Some(_addr) = self.shard_confirmation_addrs.get(&shard).copied() {
                     sender.send(_addr, Into::into(message)).await;
-                    debug!("send a confirm message {:?} to the execution shard {}", confim_msg.clone(), shard);
+                    debug!(
+                        "send a confirm message {:?} to the execution shard {}",
+                        confim_msg.clone(),
+                        shard
+                    );
                 }
             }
-            
+
             info!("Node commits block {:?} successfully", _block); // {:?} means: display based on the Debug function
         }
     }

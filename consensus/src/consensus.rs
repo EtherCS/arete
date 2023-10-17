@@ -18,7 +18,7 @@ use serde::{Deserialize, Serialize};
 use std::error::Error;
 use store::Store;
 use tokio::sync::mpsc::{channel, Receiver, Sender};
-use types::{CBlock, ShardInfo};
+use types::{CBlock, CrossTransactionVote, ShardInfo};
 
 /// The default channel capacity for each channel of the consensus.
 pub const CHANNEL_CAPACITY: usize = 1_000;
@@ -48,6 +48,7 @@ impl Consensus {
         store: Store,
         // rx_mempool: Receiver<Digest>,
         rx_cblock: Receiver<CBlock>,
+        rx_ctx_vote: Receiver<CrossTransactionVote>,
         tx_mempool: Sender<ConsensusMempoolMessage>,
         tx_commit: Sender<OBlock>,
     ) {
@@ -116,6 +117,7 @@ impl Consensus {
             signature_service,
             rx_cblock,
             /* rx_message */ rx_proposer,
+            rx_ctx_vote,
             tx_loopback,
         );
 

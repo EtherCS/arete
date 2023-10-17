@@ -9,19 +9,15 @@ use ed25519_dalek::{Digest as _, Sha512};
 #[cfg(feature = "benchmark")]
 use log::info;
 use network::ReliableSender;
-use types::CBlock;
 #[cfg(feature = "benchmark")]
 use std::convert::TryInto as _;
 use std::net::SocketAddr;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::time::{sleep, Duration};
-
-#[cfg(test)]
-#[path = "tests/batch_maker_tests.rs"]
-pub mod batch_maker_tests;
+use types::CBlock;
 
 pub type Transaction = Vec<u8>;
-pub type Batch = Vec<Transaction>;  
+pub type Batch = Vec<Transaction>;
 
 /// Assemble clients transactions into batches.
 pub struct BatchMaker {
@@ -77,7 +73,7 @@ impl BatchMaker {
             tokio::select! {
                 // Receive transaction (CBlock).
                 Some(transaction) = self.rx_transaction.recv() => {
-                    // Broadcast to other peers and send it to consensus for further processing 
+                    // Broadcast to other peers and send it to consensus for further processing
                     #[cfg(feature = "benchmark")]
                     info!("Successfully receive cblock");
                     let serialize_cblock = bincode::serialize(&transaction)
@@ -112,8 +108,7 @@ impl BatchMaker {
         // ARETE: replace 'batch' with 'Transaction'
         // Only send the first transaction of the batch
         let tx = batch[0].clone();
-        let cblock: CBlock = bincode::deserialize(&tx)
-            .expect("fail to deserialize the CBlock");
+        let cblock: CBlock = bincode::deserialize(&tx).expect("fail to deserialize the CBlock");
         let message = MempoolMessage::CBlock(cblock);
         let serialized = bincode::serialize(&message).expect("Failed to serialize our own batch");
 

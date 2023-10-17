@@ -79,11 +79,16 @@ pub enum CertifyMessage {
 #[derive(Serialize, Deserialize, Default, Clone)]
 pub struct VoteResult {
     pub round: u64,
+    pub shards: Vec<u32>, // relevant execution shards for the results
     pub results: HashMap<Digest, u8>,
 }
 impl VoteResult {
-    pub async fn new(round: u64, results: HashMap<Digest, u8>) -> Self {
-        let vote_result = Self { round, results };
+    pub async fn new(round: u64, shards: Vec<u32>, results: HashMap<Digest, u8>) -> Self {
+        let vote_result = Self {
+            round,
+            shards,
+            results,
+        };
         vote_result
     }
 }
@@ -91,11 +96,25 @@ impl Hash for VoteResult {
     fn digest(&self) -> Digest {
         let mut hasher = Sha512::new();
         hasher.update(&self.round.to_le_bytes());
+        for x in &self.shards {
+            hasher.update(x.to_be_bytes());
+        }
         for (x, y) in &self.results {
             let serialized_data = bincode::serialize(&(x, y)).expect("Serialization failed");
             hasher.update(serialized_data);
         }
         Digest(hasher.finalize().as_slice()[..32].try_into().unwrap())
+    }
+}
+impl fmt::Debug for VoteResult {
+    fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
+        write!(
+            f,
+            "{}: vote result (order round {}, num of ctxs {})",
+            self.digest(),
+            self.round,
+            self.results.len(),
+        )
     }
 }
 

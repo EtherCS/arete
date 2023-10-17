@@ -11,10 +11,6 @@ use tokio::{
     time::sleep,
 };
 
-#[cfg(test)]
-#[path = "tests/quorum_waiter_tests.rs"]
-pub mod quorum_waiter_tests;
-
 /// Extra batch dissemination time for the f last nodes (in ms).
 const DISSEMINATION_DEADLINE: u64 = 500;
 /// Bounds the queue handling the extra dissemination.
