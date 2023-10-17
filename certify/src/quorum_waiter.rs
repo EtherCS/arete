@@ -2,7 +2,7 @@ use std::time::Duration;
 
 use crate::config::{ExecutionCommittee, Stake};
 // use crate::processor::SerializedEBlockMessage;
-use crypto::PublicKey;
+use crypto::{PublicKey, SignatureService, Hash};
 use futures::stream::futures_unordered::FuturesUnordered;
 use futures::stream::StreamExt as _;
 use network::CancelHandler;
@@ -37,8 +37,10 @@ pub struct QuorumVoteMessage {
 
 /// The QuorumWaiter waits for 2f authorities to acknowledge reception of a batch.
 pub struct QuorumWaiter {
-    // /// The node
-    // name: PublicKey,
+    /// The node
+    name: PublicKey,
+    /// The signature service
+    signature_service: SignatureService,
     // /// The execution shard information
     // shard_info: ShardInfo,
     /// The committee information.
@@ -54,8 +56,9 @@ pub struct QuorumWaiter {
 impl QuorumWaiter {
     /// Spawn a new QuorumWaiter.
     pub fn spawn(
-        // name: PublicKey,
+        name: PublicKey,
         // shard_info: ShardInfo,
+        signature_service: SignatureService,
         committee: ExecutionCommittee,
         stake: Stake,
         rx_message: Receiver<QuorumVoteMessage>,
@@ -63,8 +66,9 @@ impl QuorumWaiter {
     ) {
         tokio::spawn(async move {
             Self {
-                // name,
+                name,
                 // shard_info,
+                signature_service,
                 committee,
                 stake,
                 rx_message,
@@ -106,11 +110,15 @@ impl QuorumWaiter {
                             Self::waiter(handler, stake)
                         })
                         .collect();
-
+                    // Create my signature
+                    let mut signature_service = self.signature_service.clone();
+                    let signature = signature_service.request_signature(ctx_vote.digest()).await;
+                    let node_signature = NodeSignature::new(self.name, signature).await;
                     // Wait for the first (1-f_L) nodes to send back a Signature. Then we consider the vote results
                     // certified and we send it to the ordering shard 
                     let mut total_stake = self.stake;
                     let mut multisignatures: Vec<NodeSignature> = Vec::new();
+                    multisignatures.push(node_signature);
                     while let Some(VoteRespondMessage { certificate, stake }) = wait_for_quorum.next().await {
                         multisignatures.push(certificate);
                         total_stake += stake;

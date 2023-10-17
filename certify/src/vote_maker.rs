@@ -1,5 +1,5 @@
-use crate::{config::ExecutionCommittee, consensus::ConsensusMessage};
 use crate::quorum_waiter::QuorumVoteMessage;
+use crate::{config::ExecutionCommittee, consensus::ConsensusMessage};
 use bytes::Bytes;
 // #[cfg(feature = "benchmark")]
 // use crypto::Digest;
@@ -69,12 +69,13 @@ impl VoteMaker {
 
     /// Seal and broadcast the vote results.
     async fn seal(&mut self, ctx_vote: CrossTransactionVote) {
-        let message = ConsensusMessage::CrossTransactionVote(ctx_vote);
+        let message = ConsensusMessage::CrossTransactionVote(ctx_vote.clone());
         // Serialize the vote results.
         let serialized = bincode::serialize(&message).expect("Failed to serialize vote results");
 
         // Broadcast the vote results through the (consensus) network.
-        let (names, consensus_addresses): (Vec<_>, _) = self.committee
+        let (names, consensus_addresses): (Vec<_>, _) = self
+            .committee
             .broadcast_addresses(&self.name)
             .iter()
             .cloned()
@@ -83,9 +84,10 @@ impl VoteMaker {
         let handlers = self.network.broadcast(consensus_addresses, bytes).await;
 
         // Send the batch through the deliver channel for further processing.
+        let vote_serialized = bincode::serialize(&ctx_vote).expect("Failed to serialize vote results");
         self.tx_message
             .send(QuorumVoteMessage {
-                vote: serialized,
+                vote: vote_serialized,
                 handlers: names.into_iter().zip(handlers.into_iter()).collect(),
             })
             .await

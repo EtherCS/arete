@@ -185,6 +185,10 @@ impl Core {
         let digest = confirm_msg.digest();
         if !self.mempool_driver.verify(confirm_msg.clone()).await? {
             debug!("Processing of {} suspended: missing some EBlock", digest);
+            let votes = self.generate_vote(confirm_msg.ordered_ctxs).await;
+            let cross_tx_vote: CrossTransactionVote = CrossTransactionVote::new(self.shard_info.id, confirm_msg.order_round, votes.clone(), Vec::new()).await;
+            // Send it to vote_maker for collecting quorum of certificates
+            self.tx_order_ctx.send(cross_tx_vote).await.expect("Failed to send cross-transaction vote");
             self.round = confirm_msg.order_round;
             return Ok(());
         }

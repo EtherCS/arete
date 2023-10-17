@@ -128,8 +128,9 @@ impl Consensus {
 
         // Spawn the quorum_waiter
         QuorumWaiter::spawn(
-            // name,
+            name,
             // shard_info.clone(),
+            signature_service.clone(),
             committee.clone(),
             committee.stake(&name),
             rx_vote_quorum_waiter,
