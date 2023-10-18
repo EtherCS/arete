@@ -117,6 +117,7 @@ impl Node {
                         cmsg.ordered_ctxs.extend(i.ctx_hashes);
                     }
                 } else {
+                    debug!("ARETE trace: oblock {:?} get vote results {}", _block, _block.aggregators.clone().len());
                     let temp_block_creator = BlockCreator::new(i.author, i.ebhash).await;
                     let mut map_ebhash = Vec::new();
                     map_ebhash.push(temp_block_creator);

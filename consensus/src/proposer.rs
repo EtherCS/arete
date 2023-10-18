@@ -7,14 +7,14 @@ use futures::stream::futures_unordered::FuturesUnordered;
 use futures::stream::StreamExt as _;
 use log::{debug, info};
 use network::{CancelHandler, ReliableSender};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use tokio::sync::mpsc::{Receiver, Sender};
 use types::{CBlock, CBlockMeta, CrossTransactionVote, ShardInfo, VoteResult};
 
 #[derive(Debug)]
 pub enum ProposerMessage {
     Make(Round, QC, Option<TC>),
-    // Cleanup(Vec<Digest>),
+    CleanupCBlockMeta(Vec<CBlockMeta>),
     Cleanup(Vec<VoteResult>),
 }
 
@@ -29,7 +29,7 @@ pub struct Proposer {
     rx_ctx_vote: Receiver<CrossTransactionVote>,
     tx_loopback: Sender<OBlock>,
     // buffer: HashSet<Digest>,
-    shard_cblocks: HashMap<u32, Vec<CBlockMeta>>, // buffer for CBlocks
+    shard_cblocks: HashMap<u32, HashSet<CBlockMeta>>, // buffer for CBlocks
     vote_aggregation_trace: HashMap<u64, HashMap<Digest, u8>>, // <consensus_round, vote_results>
     aggregation_results: HashMap<u64, HashMap<Digest, u8>>, // vote results ready for making blocks
     network: ReliableSender,
@@ -92,6 +92,7 @@ impl Proposer {
                 // Now it receive all vote, and are ready for commit
                 self.aggregation_results
                     .insert(order_round, update_aggregation.clone());
+                debug!("ARETE trace: recieve all votes from shard for round {}", order_round);
                 self.vote_aggregation_trace.remove(&order_round);
             }
         } else {
@@ -110,11 +111,13 @@ impl Proposer {
         // ARETE TODO: current only consider execution shard 0 and shard 1
         let relevant_shards: Vec<u32> = vec![0, 1];
         let mut temp_aggregators = Vec::new();
-        for (temp_round, temp_vote_results) in self.vote_aggregation_trace.clone() {
+        for (temp_round, temp_vote_results) in self.aggregation_results.clone() {
+            // debug!("ARETE trace: now have vote results for round {}", temp_round);
             let temp_vote_result =
                 VoteResult::new(temp_round, relevant_shards.clone(), temp_vote_results).await;
             temp_aggregators.push(temp_vote_result);
         }
+        
         let block = OBlock::new(
             qc,
             tc,
@@ -125,6 +128,8 @@ impl Proposer {
             self.signature_service.clone(),
         )
         .await;
+
+        debug!("ARETE trace: for oblock {:?} add vote results {}", block, temp_aggregators.clone().len());
 
         if !block.payload.is_empty() {
             info!("Created {}", block);
@@ -197,15 +202,15 @@ impl Proposer {
                     ).await;
                     if self.shard_cblocks.contains_key(&cblock.shard_id) {
                         if let Some(vec_cbmeta) = self.shard_cblocks.get_mut(&cblock.shard_id) {
-                            vec_cbmeta.push(cblm);
+                            vec_cbmeta.insert(cblm);
                         }
                         else {
                             debug!("Cannot find cbmeta for shard {}", cblock.shard_id);
                         }
                     }
                     else {
-                        let mut temp_vec = Vec::new();
-                        temp_vec.push(cblm);
+                        let mut temp_vec = HashSet::new();
+                        temp_vec.insert(cblm);
                         self.shard_cblocks.insert(cblock.shard_id, temp_vec);
                     }
                 },
@@ -214,12 +219,21 @@ impl Proposer {
                     ProposerMessage::Make(round, qc, tc) => {
                         self.make_block(round, qc.clone(), tc.clone()).await;
                     },
+                    ProposerMessage::CleanupCBlockMeta(cblock_metas) => {
+                        for cblock_meta in &cblock_metas {
+                            if let Some(clean_cbmeta) = self.shard_cblocks.get_mut(&cblock_meta.shard_id) {
+                                clean_cbmeta.remove(cblock_meta);
+                            }
+                        }
+                        debug!("Clean shard CBlockMeta");
+                    },
                     ProposerMessage::Cleanup(_vote_results) => {
                         self.clean_aggregators(_vote_results).await;
                         debug!("Clean shard vote aggregation");
                     }
                 },
                 Some(ctx_vote) = self.rx_ctx_vote.recv() => {
+                    // debug!("ARETE trace: receive vote from shard {} for round {}", ctx_vote.shard_id, ctx_vote.order_round);
                     self.aggregate_execution(ctx_vote).await;
                 }
             }

@@ -2,14 +2,13 @@
 use crate::consensus::{ConsensusMessage, Round};
 use crate::error::{ConsensusError, ConsensusResult};
 use crate::mempool::MempoolDriver;
-// use crate::synchronizer::Synchronizer;
 use async_recursion::async_recursion;
-use crypto::Hash as _;
 use crypto::Digest;
-// use crypto::{Digest, PublicKey, SignatureService};
-// use ed25519_dalek::Digest as _;
-// use ed25519_dalek::Sha512;
-use log::{debug, error, info, warn};
+use crypto::Hash as _;
+// use crypto::{Digest, PublicKey};
+#[cfg(feature = "benchmark")]
+use log::info;
+use log::{debug, error, warn};
 // use network::SimpleSender;
 use std::collections::{HashMap, VecDeque};
 use store::Store;
@@ -46,7 +45,7 @@ impl Core {
         rx_message: Receiver<ConsensusMessage>,
         rx_loopback: Receiver<EBlock>,
         tx_order_ctx: Sender<CrossTransactionVote>, // send cross-shard transactions to vote_maker after execution
-        // tx_certify: Sender<CertifyMessage>,         // send certify vote message
+                                                    // tx_certify: Sender<CertifyMessage>,         // send certify vote message
     ) {
         tokio::spawn(async move {
             Self {
@@ -75,52 +74,19 @@ impl Core {
         self.store.write(key, value).await;
     }
 
-    async fn commit(&mut self, block: EBlock) -> ConsensusResult<()> {
-        // Ensure we commit the entire chain. This is needed after view-change.
-        let mut to_commit = VecDeque::new();
-        to_commit.push_front(block.clone());
-
-        // Save the last committed block.
-        // self.last_committed_round = block.round;
-
-        // Get shard id
-        let _s_id = self.shard_info.id;
-
-        // Send all the newly committed blocks to the node's application layer.
-        while let Some(block) = to_commit.pop_back() {
-            // if !block.payload.is_empty() {
-            info!("Committed {}", block);
-
-            // #[cfg(feature = "benchmark")]
-            // {
-            //     let b_round = block.round;
-            //     for x in &block.payload {
-            //         // NOTE: This log entry is used to compute performance.
-            //         info!("Shard {} Committed {} -> {:?}", _s_id, block, x);
-            //         info!(
-            //             "ARETE shard {} Committed {} -> {:?} in round {}",
-            //             _s_id, block, x, b_round
-            //         );
-            //     }
-            // }
-            // }
-            debug!("Committed {:?}", block);
-            // if let Err(e) = self.tx_commit.send(block).await {
-            //     warn!("Failed to send block through the commit channel: {}", e);
-            // }
-        }
-        Ok(())
-    }
+    // async fn commit(&mut self, block: EBlock) -> ConsensusResult<()> {
+    //     // Ensure we commit the entire chain. This is needed after view-change.
+    //     let mut to_commit = VecDeque::new();
+    //     to_commit.push_front(block.clone());
+    //     Ok(())
+    // }
 
     async fn generate_vote(&mut self, crosstxs: Vec<Digest>) -> HashMap<Digest, u8> {
         let mut vote = HashMap::new();
         for ctx in crosstxs {
             // ARETE TODO: execute ctx;
             // Assume all are successful now
-            vote.insert(
-                ctx,
-                1,
-            );
+            vote.insert(ctx, 1);
         }
         vote
     }
@@ -132,22 +98,25 @@ impl Core {
         // Store the block only if we have already processed all its ancestors.
         self.store_block(block).await;
 
-        self.commit(block.clone()).await?;
+        // self.commit(block.clone()).await?;
 
         Ok(())
     }
 
     #[async_recursion]
-    async fn process_confirm(&mut self, confirm_msg: ConfirmMessage,) -> ConsensusResult<()> {
-        debug!("Processing of {} have all EBlock", confirm_msg.digest());
+    async fn process_confirm(&mut self, confirm_msg: ConfirmMessage) -> ConsensusResult<()> {
+        let mut _to_commit: VecDeque<Digest> = VecDeque::new();
         // First handle the ordered intra-shard transactions
         for block_creator in confirm_msg.block_hashes.clone() {
             match self.store.read(block_creator.ebhash.to_vec()).await? {
                 Some(bytes) => {
-                    let block: EBlock = bincode::deserialize(&bytes).expect("Failed to deserialize EBlock");
+                    #[cfg(feature = "benchmark")]
+                    _to_commit.push_front(block_creator.ebhash);
+                    let block: EBlock =
+                        bincode::deserialize(&bytes).expect("Failed to deserialize EBlock");
                     self.store_block(&block).await;
-                    self.commit(block.clone()).await?;
-                },
+                    // self.commit(block.clone()).await?;
+                }
                 None => {
                     // if let Err(e) = self.inner_channel.send(block.clone()).await {
                     //     panic!("Failed to send request to synchronizer: {}", e);
@@ -158,11 +127,35 @@ impl Core {
         }
         // Then, handle the ordered cross-shard transactions
         let votes = self.generate_vote(confirm_msg.ordered_ctxs).await;
-        let cross_tx_vote: CrossTransactionVote = CrossTransactionVote::new(self.shard_info.id, confirm_msg.order_round, votes.clone(), Vec::new()).await;
+        let cross_tx_vote: CrossTransactionVote = CrossTransactionVote::new(
+            self.shard_info.id,
+            confirm_msg.order_round,
+            votes.clone(),
+            Vec::new(),
+        )
+        .await;
         // Send it to vote_maker for collecting quorum of certificates
-        self.tx_order_ctx.send(cross_tx_vote).await.expect("Failed to send cross-transaction vote");
+        self.tx_order_ctx
+            .send(cross_tx_vote)
+            .await
+            .expect("Failed to send cross-transaction vote");
 
         self.round = confirm_msg.order_round;
+
+        // Get shard id
+        let _s_id = self.shard_info.id;
+        // Print for performance calculation
+        #[cfg(feature = "benchmark")]
+        {
+            while let Some(block_digest) = _to_commit.pop_back() {
+                info!("Shard {} Committed -> {:?}", _s_id, block_digest);
+                info!(
+                    "ARETE shard {} Committed -> {:?} in round {}",
+                    _s_id, block_digest, confirm_msg.order_round
+                );
+            }
+        }
+
         Ok(())
     }
 
@@ -170,27 +163,33 @@ impl Core {
         &mut self,
         confirm_msg: ConfirmMessage,
     ) -> ConsensusResult<()> {
-        // ARETE TODO: commit cross-shard transactions
-        #[cfg(feature = "benchmark")]
-        {
-        info!(
-            "ARETE shard {} commit blocks for ordering round {}",
-            confirm_msg.shard_id, confirm_msg.order_round
-        );
-        for i in &confirm_msg.votes {
-            info!("ARETE shard {} commit ctxs for ordering round {}",
-            confirm_msg.shard_id, i.round);
+        // ARETE TODO: commit voted cross-shard transactions
+        if !confirm_msg.clone().votes.is_empty() {
+            debug!("ARETE trace: receive vote reulst num {}", confirm_msg.clone().votes.len());
+            for vote in confirm_msg.clone().votes {
+                for (result, _) in vote.results {
+                    debug!("ARETE trace: commit ctx hash {:?}", result);
+                }
+            }
         }
-        }
-
+        
         let digest = confirm_msg.digest();
         if !self.mempool_driver.verify(confirm_msg.clone()).await? {
             debug!("Processing of {} suspended: missing some EBlock", digest);
             let votes = self.generate_vote(confirm_msg.ordered_ctxs).await;
-            let cross_tx_vote: CrossTransactionVote = CrossTransactionVote::new(self.shard_info.id, confirm_msg.order_round, votes.clone(), Vec::new()).await;
+            let cross_tx_vote: CrossTransactionVote = CrossTransactionVote::new(
+                self.shard_info.id,
+                confirm_msg.order_round,
+                votes.clone(),
+                Vec::new(),
+            )
+            .await;
             // Send it to vote_maker for collecting quorum of certificates
-            self.tx_order_ctx.send(cross_tx_vote).await.expect("Failed to send cross-transaction vote");
-            self.round = confirm_msg.order_round;
+            self.tx_order_ctx
+                .send(cross_tx_vote)
+                .await
+                .expect("Failed to send cross-transaction vote");
+            // self.round = confirm_msg.order_round;
             return Ok(());
         }
         // Otherwise, have all EBlocks, and execute
@@ -203,7 +202,7 @@ impl Core {
         loop {
             let result = tokio::select! {
                 Some(message) = self.rx_message.recv() => match message {
-                    ConsensusMessage::ExecutionBlock(block) => self.process_block(&block).await,   
+                    ConsensusMessage::ExecutionBlock(block) => self.process_block(&block).await,
                     ConsensusMessage::ConfirmMsg(confirm_message) => self.handle_confirmation_message(confirm_message).await,
                     _ => panic!("Unexpected protocol message")
                 },

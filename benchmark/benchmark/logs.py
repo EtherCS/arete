@@ -463,18 +463,18 @@ class ShardLogParser:
 
         liveness_threshold = float(search(r'Liveness threshold is: (\d+.\d+|\d+)', log).group(1))
         
-        tmp = findall(r'\[(.*Z) .* Shard (\d+) Created B\d+ -> ([^ ]+=)', log)
+        tmp = findall(r'\[(.*Z) .* Shard (\d+) Created EB\d+ -> ([^ ]+=)', log)
         tmp = [(s, d, self._to_posix(t)) for t, s, d in tmp]
         proposals = self._merge_proposals_results([tmp])
 
-        tmp = findall(r'\[(.*Z) .* Shard (\d+) Committed B\d+ -> ([^ ]+=)', log)
+        tmp = findall(r'\[(.*Z) .* Shard (\d+) Committed -> ([^ ]+=)', log)
         tmp = [(s, d, self._to_posix(t)) for t, s, d in tmp]
         commits = self._merge_commits_results([tmp])
         shard_one_commits = self._merge_shard_one_commits_results([tmp])
         
         # batch_digest is picked by the ordering shard
         # arete_commits_to_round[batch_digest] = executed_batch_round
-        tmp = findall(r'\[(.*Z) .* ARETE shard (\d+) Committed B\d+ -> ([^ ]+=) in round (\d+)', log)
+        tmp = findall(r'\[(.*Z) .* ARETE shard (\d+) Committed -> ([^ ]+=) in round (\d+)', log)
         tmp = [(s, d, r, self._to_posix(t)) for t, s, d, r in tmp]
         arete_commits_to_round = self._merge_arete_round_results([tmp])
         

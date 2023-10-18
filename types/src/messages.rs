@@ -273,7 +273,7 @@ impl fmt::Debug for EBlock {
 
 impl fmt::Display for EBlock {
     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
-        write!(f, "EB{}", self.digest())
+        write!(f, "EB{}", self.round)
     }
 }
 

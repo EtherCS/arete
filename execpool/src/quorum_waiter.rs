@@ -7,6 +7,8 @@ use ed25519_dalek::Digest as _;
 use ed25519_dalek::Sha512;
 use futures::stream::futures_unordered::FuturesUnordered;
 use futures::stream::StreamExt as _;
+#[cfg(feature = "benchmark")]
+use log::info;
 use network::CancelHandler;
 use std::convert::TryInto;
 use tokio::{
@@ -156,6 +158,10 @@ impl QuorumWaiter {
                                 hash_ctxs.clone(),
                                 multisignatures.clone(),
                             ).await;
+                            #[cfg(feature = "benchmark")] {
+                                // NOTE: This log entry is used to compute performance.
+                                info!("Shard {} Created {} -> {:?}", self.shard_info.id, eblock, eblock.digest());
+                            }
                             self.tx_cblock
                                 .send(cblock)
                                 .await

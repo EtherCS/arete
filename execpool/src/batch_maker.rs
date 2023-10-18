@@ -2,8 +2,10 @@ use crate::mempool::MempoolMessage;
 use crate::quorum_waiter::QuorumWaiterMessage;
 use bytes::Bytes;
 #[cfg(feature = "benchmark")]
-use crypto::Hash;
+use crypto::{Digest, Hash};
 use crypto::{PublicKey, SignatureService};
+#[cfg(feature = "benchmark")]
+use ed25519_dalek::{Digest as _, Sha512};
 #[cfg(feature = "benchmark")]
 use log::info;
 use network::ReliableSender;
@@ -12,7 +14,7 @@ use std::convert::TryInto as _;
 use std::net::SocketAddr;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::time::{sleep, Duration, Instant};
-use types::{EBlock, Transaction, ShardInfo, Round};
+use types::{EBlock, Round, ShardInfo, Transaction};
 
 // #[cfg(test)]
 // #[path = "tests/batch_maker_tests.rs"]
@@ -133,19 +135,28 @@ impl BatchMaker {
         self.current_batch_size = 0;
         let batch: Vec<_> = self.current_batch.drain(..).collect();
         let ctx_num = (batch.len() as f32 * self.ratio_cross_shard_txs).floor() as usize;
-        let intratxs = &batch[0..ctx_num].to_vec();
-        let crosstxs= &batch[ctx_num..batch.len()].to_vec();
+        let intratxs = &batch[ctx_num..batch.len()].to_vec();
+        let crosstxs = &batch[0..ctx_num].to_vec();
         // ARETE: use Transactions to create a EBlock
-        let eblock = EBlock::new(self.shard_info.id, self.name, EXECUTION_ROUND, intratxs.clone(), crosstxs.clone(), self.signature_service.clone()).await;
+        let eblock = EBlock::new(
+            self.shard_info.id,
+            self.name,
+            EXECUTION_ROUND,
+            intratxs.clone(),
+            crosstxs.clone(),
+            self.signature_service.clone(),
+        )
+        .await;
         let message = MempoolMessage::EBlock(eblock.clone());
-        let serialized = bincode::serialize(&message).expect("Failed to serialize our own MempoolMessage EBlock");
+        let serialized = bincode::serialize(&message)
+            .expect("Failed to serialize our own MempoolMessage EBlock");
 
         #[cfg(feature = "benchmark")]
         {
             // NOTE: This is one extra hash that is only needed to print the following log entries.
             let digest = eblock.digest();
-
-            for id in tx_ids {
+            let id_ctx_num = (tx_ids.len() as f32 * self.ratio_cross_shard_txs).floor() as usize;
+            for id in tx_ids[id_ctx_num..tx_ids.len()].to_vec() {
                 // NOTE: This log entry is used to compute performance.
                 info!(
                     "Batch {:?} contains sample tx {}",
@@ -153,6 +164,26 @@ impl BatchMaker {
                     u64::from_be_bytes(id)
                 );
             }
+
+            let id_vec = tx_ids[0..id_ctx_num].to_vec();
+            let ctx_vec = crosstxs[0..id_ctx_num].to_vec();
+            for (&id, ctx) in id_vec.iter().zip(ctx_vec.iter()) {
+                // cross-shard transaction ids.
+                info!(
+                    "Batch {:?} contains sample cross tx {} hash {:?}",
+                    digest,
+                    u64::from_be_bytes(id),
+                    Digest(Sha512::digest(&ctx).as_slice()[..32].try_into().unwrap())
+                );
+            }
+            // for ctx in &crosstxs[0..id_ctx_num].to_vec() {
+            //     // cross-shard transaction ids transfer to digest
+            //     info!(
+            //         "Batch {:?} contains sample cross tx hash {:?}",
+            //         digest,
+            //         Digest(Sha512::digest(&ctx).as_slice()[..32].try_into().unwrap())
+            //     );
+            // }
 
             // NOTE: This log entry is used to compute performance.
             info!("Batch {:?} contains {} B", digest, size);
@@ -164,7 +195,8 @@ impl BatchMaker {
         let handlers = self.network.broadcast(addresses, bytes).await;
 
         // Send the batch through the deliver channel for further processing.
-        let eblock_serialized = bincode::serialize(&eblock).expect("Failed to serialize our own EBlock");
+        let eblock_serialized =
+            bincode::serialize(&eblock).expect("Failed to serialize our own EBlock");
         self.tx_message
             .send(QuorumWaiterMessage {
                 batch: eblock_serialized,

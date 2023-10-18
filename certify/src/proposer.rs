@@ -5,7 +5,7 @@
 // use crypto::{Digest, PublicKey, SignatureService};
 // use futures::stream::futures_unordered::FuturesUnordered;
 // use futures::stream::StreamExt as _;
-use log::debug;
+// use log::{debug, info};
 // use network::{CancelHandler, ReliableSender};
 // use std::collections::HashSet;
 use tokio::sync::mpsc::{Receiver, Sender};
@@ -23,12 +23,12 @@ pub struct Proposer {
     // committee: ExecutionCommittee,
     // shard_info: ShardInfo,
     // signature_service: SignatureService,
-    rx_mempool: Receiver<CBlock>,   // receive certificate block from execpool
-    tx_certify: Sender<CertifyMessage>,     // send the received certificate block to executor.analyze_block()
-    // rx_message: Receiver<ProposerMessage>,
-    // tx_loopback: Sender<EBlock>,
-    // buffer: HashSet<Digest>,
-    // network: ReliableSender,
+    rx_mempool: Receiver<CBlock>, // receive certificate block from execpool
+    tx_certify: Sender<CertifyMessage>, // send the received certificate block to executor.analyze_block()
+                                        // rx_message: Receiver<ProposerMessage>,
+                                        // tx_loopback: Sender<EBlock>,
+                                        // buffer: HashSet<Digest>,
+                                        // network: ReliableSender,
 }
 
 impl Proposer {
@@ -139,7 +139,7 @@ impl Proposer {
                         // self.buffer.insert(digest);
                     //}
                     self.tx_certify.send(CertifyMessage::CBlock(cblock.clone())).await.expect("Failed send cblock");
-                    debug!("Send a certificate block {:?} to the ordering shard", cblock);
+                    // debug!("Send a certificate block {:?} to the ordering shard", cblock);
                 },
                 // I am the leader now
                 // Some(message) = self.rx_message.recv() => match message {
