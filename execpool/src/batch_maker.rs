@@ -2,10 +2,8 @@ use crate::mempool::MempoolMessage;
 use crate::quorum_waiter::QuorumWaiterMessage;
 use bytes::Bytes;
 #[cfg(feature = "benchmark")]
-use crypto::Digest;
+use crypto::Hash;
 use crypto::{PublicKey, SignatureService};
-#[cfg(feature = "benchmark")]
-use ed25519_dalek::{Digest as _, Sha512};
 #[cfg(feature = "benchmark")]
 use log::info;
 use network::ReliableSender;
@@ -145,11 +143,7 @@ impl BatchMaker {
         #[cfg(feature = "benchmark")]
         {
             // NOTE: This is one extra hash that is only needed to print the following log entries.
-            let digest = Digest(
-                Sha512::digest(&serialized).as_slice()[..32]
-                    .try_into()
-                    .unwrap(),
-            );
+            let digest = eblock.digest();
 
             for id in tx_ids {
                 // NOTE: This log entry is used to compute performance.

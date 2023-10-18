@@ -108,20 +108,6 @@ impl Synchronizer {
                             .expect("Failed to measure time")
                             .as_millis();
 
-                        // let mut missing = Vec::new();
-                        // if !self.pending.contains_key(&digest) {
-
-                        // }
-                        // for digest in digests {
-                        //     // Ensure we do not send twice the same sync request.
-                        //     if self.pending.contains_key(&digest) {
-                        //         continue;
-                        //     }
-
-                        //     // Register the digest as missing.
-                        //     missing.push(digest.clone());
-                        //     debug!("Requesting sync for batch {}", digest);
-
                         // Add the digest to the waiter.
                         let deliver = digest.clone();
                         let (tx_cancel, rx_cancel) = channel(1);

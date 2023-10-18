@@ -286,7 +286,7 @@ impl MessageHandler for ConfirmationMsgReceiverHandler {
         #[cfg(feature = "benchmark")]
         {
             info!("executor receives confirm msg {:?}", confirm_msg);
-            
+
             info!(
                 "ARETE shard {} commit blocks for ordering round {}",
                 confirm_msg.shard_id, confirm_msg.order_round

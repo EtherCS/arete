@@ -54,13 +54,11 @@ impl Helper {
             };
 
             // Reply to the request (the best we can).
-            // for digest in digests {
             match self.store.read(digest.to_vec()).await {
                 Ok(Some(data)) => self.network.send(address, Bytes::from(data)).await,
                 Ok(None) => (),
                 Err(e) => error!("{}", e),
             }
-            // }
         }
     }
 }

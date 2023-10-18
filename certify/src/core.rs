@@ -139,6 +139,7 @@ impl Core {
 
     #[async_recursion]
     async fn process_confirm(&mut self, confirm_msg: ConfirmMessage,) -> ConsensusResult<()> {
+        debug!("Processing of {} have all EBlock", confirm_msg.digest());
         // First handle the ordered intra-shard transactions
         for block_creator in confirm_msg.block_hashes.clone() {
             match self.store.read(block_creator.ebhash.to_vec()).await? {

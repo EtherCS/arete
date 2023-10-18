@@ -41,8 +41,10 @@ impl MempoolDriver {
     }
 
     pub async fn verify(&mut self, confirm_msg: ConfirmMessage) -> ConsensusResult<bool> {
+        let mut missing: bool = false;
         for block_creator in &confirm_msg.block_hashes {
             if self.store.read(block_creator.ebhash.to_vec()).await?.is_none() {
+                missing = true;
                 // missing this eblock
                 let message = ExecutionMempoolMessage::Synchronize(block_creator.ebhash.clone(), block_creator.author.clone());
                 self.tx_mempool
@@ -56,7 +58,12 @@ impl MempoolDriver {
                     .expect("Failed to send message to payload waiter");
             }
         }
-
+        if missing {
+            return Ok(false);
+        }
+        else {
+            return Ok(true);
+        }
 
         // let mut missing = Vec::new();
         // for (author, hash) in &confirm_msg.block_hashes {
@@ -79,8 +86,6 @@ impl MempoolDriver {
         //     .send(PayloadWaiterMessage::Wait(missing, Box::new(block)))
         //     .await
         //     .expect("Failed to send message to payload waiter");
-
-        Ok(false)
     }
 
     // pub async fn cleanup(&mut self, round: Round) {
