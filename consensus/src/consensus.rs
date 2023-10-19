@@ -115,6 +115,7 @@ impl Consensus {
             committee.clone(),
             shard_info.clone(),
             signature_service,
+            parameters.cblock_batch_size,
             rx_cblock,
             /* rx_message */ rx_proposer,
             rx_ctx_vote,

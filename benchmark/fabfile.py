@@ -76,8 +76,9 @@ def localShard(ctx):
     }
     node_params = {
         "consensus": {
-            "timeout_delay": 1_000,
+            "timeout_delay": 3_000,
             "sync_retry_delay": 10_000,
+            "cblock_batch_size": 100,
         },
         "mempool": {
             "gc_depth": 50,

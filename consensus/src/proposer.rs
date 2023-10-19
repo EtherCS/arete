@@ -23,6 +23,7 @@ pub struct Proposer {
     committee: Committee,
     shard_info: ShardInfo,
     signature_service: SignatureService,
+    cblock_batch_size: u64,
     // rx_mempool: Receiver<Digest>,
     rx_cblock: Receiver<CBlock>,
     rx_message: Receiver<ProposerMessage>,
@@ -41,6 +42,7 @@ impl Proposer {
         committee: Committee,
         shard_info: ShardInfo,
         signature_service: SignatureService,
+        cblock_batch_size: u64,
         // rx_mempool: Receiver<Digest>,
         rx_cblock: Receiver<CBlock>,
         rx_message: Receiver<ProposerMessage>,
@@ -53,6 +55,7 @@ impl Proposer {
                 committee,
                 shard_info,
                 signature_service,
+                cblock_batch_size,
                 rx_cblock,
                 rx_message,
                 rx_ctx_vote,
@@ -92,7 +95,6 @@ impl Proposer {
                 // Now it receive all vote, and are ready for commit
                 self.aggregation_results
                     .insert(order_round, update_aggregation.clone());
-                debug!("ARETE trace: recieve all votes from shard for round {}", order_round);
                 self.vote_aggregation_trace.remove(&order_round);
             }
         } else {
@@ -106,18 +108,22 @@ impl Proposer {
         let mut merge_cblockmeta = Vec::new();
         for vec_cblockmeta in self.shard_cblocks.values() {
             merge_cblockmeta.extend(vec_cblockmeta.clone());
+            // limit the size of a new OBlock, prevent timeout due to large data
+            if merge_cblockmeta.len() >= self.cblock_batch_size as usize {
+                break;
+            }
         }
+        // debug!("ARETE trace: cblock size is {}", merge_cblockmeta.len());
         // Get vote results that have ready aggregated
         // ARETE TODO: current only consider execution shard 0 and shard 1
         let relevant_shards: Vec<u32> = vec![0, 1];
         let mut temp_aggregators = Vec::new();
         for (temp_round, temp_vote_results) in self.aggregation_results.clone() {
-            // debug!("ARETE trace: now have vote results for round {}", temp_round);
             let temp_vote_result =
                 VoteResult::new(temp_round, relevant_shards.clone(), temp_vote_results).await;
             temp_aggregators.push(temp_vote_result);
         }
-        
+
         let block = OBlock::new(
             qc,
             tc,
@@ -129,7 +135,11 @@ impl Proposer {
         )
         .await;
 
-        debug!("ARETE trace: for oblock {:?} add vote results {}", block, temp_aggregators.clone().len());
+        // debug!(
+        //     "ARETE trace: for oblock {:?} add vote results {}",
+        //     block,
+        //     temp_aggregators.clone().len()
+        // );
 
         if !block.payload.is_empty() {
             info!("Created {}", block);
@@ -203,9 +213,6 @@ impl Proposer {
                     if self.shard_cblocks.contains_key(&cblock.shard_id) {
                         if let Some(vec_cbmeta) = self.shard_cblocks.get_mut(&cblock.shard_id) {
                             vec_cbmeta.insert(cblm);
-                        }
-                        else {
-                            debug!("Cannot find cbmeta for shard {}", cblock.shard_id);
                         }
                     }
                     else {

@@ -164,14 +164,14 @@ impl Core {
         confirm_msg: ConfirmMessage,
     ) -> ConsensusResult<()> {
         // ARETE TODO: commit voted cross-shard transactions
-        if !confirm_msg.clone().votes.is_empty() {
-            debug!("ARETE trace: receive vote reulst num {}", confirm_msg.clone().votes.len());
-            for vote in confirm_msg.clone().votes {
-                for (result, _) in vote.results {
-                    debug!("ARETE trace: commit ctx hash {:?}", result);
-                }
-            }
-        }
+        // if !confirm_msg.clone().votes.is_empty() {
+        //     debug!("ARETE trace: receive vote reulst num {}", confirm_msg.clone().votes.len());
+        //     for vote in confirm_msg.clone().votes {
+        //         for (result, _) in vote.results {
+        //             debug!("ARETE trace: commit ctx hash {:?}", result);
+        //         }
+        //     }
+        // }
         
         let digest = confirm_msg.digest();
         if !self.mempool_driver.verify(confirm_msg.clone()).await? {
