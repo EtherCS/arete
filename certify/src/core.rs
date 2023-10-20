@@ -30,7 +30,6 @@ pub struct Core {
     // tx_certify: Sender<CertifyMessage>,
     round: Round,
     // network: SimpleSender,
-    commit_round: HashMap<u64, u8>,
 }
 
 impl Core {
@@ -63,7 +62,6 @@ impl Core {
                 // tx_certify,
                 round: 1,
                 // network: SimpleSender::new(),
-                commit_round: HashMap::new(),
             }
             .run()
             .await
@@ -143,7 +141,6 @@ impl Core {
             .expect("Failed to send cross-transaction vote");
 
         self.round = confirm_msg.order_round;
-        self.commit_round.insert(confirm_msg.order_round, 1);
         // Get shard id
         // let _s_id = self.shard_info.id;
         // Print for performance calculation
@@ -187,15 +184,11 @@ impl Core {
         #[cfg(feature = "benchmark")]
         {
             if !confirm_msg.clone().votes.is_empty() {
-                // Ensure this round has been committed
                 for vote_result in confirm_msg.clone().votes {
-                    if self.commit_round.contains_key(&vote_result.round) {
-                        info!(
-                            "Shard {} Committed Vote in round {}",
-                            self.shard_info.id, vote_result.round,
-                        );
-                    }
-                    
+                    info!(
+                        "Shard {} Committed Vote in round {}",
+                        self.shard_info.id, vote_result.round,
+                    );
                 }
             }
         }
@@ -237,7 +230,6 @@ impl Core {
                 .await
                 .expect("Failed to send cross-transaction vote");
             // self.round = confirm_msg.order_round;
-            self.commit_round.insert(confirm_msg.order_round, 1);
             return Ok(());
         }
         // Otherwise, have all EBlocks, and execute

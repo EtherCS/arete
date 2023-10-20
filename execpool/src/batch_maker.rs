@@ -2,10 +2,8 @@ use crate::mempool::MempoolMessage;
 use crate::quorum_waiter::QuorumWaiterMessage;
 use bytes::Bytes;
 #[cfg(feature = "benchmark")]
-use crypto::{Digest, Hash};
+use crypto::Hash;
 use crypto::{PublicKey, SignatureService};
-#[cfg(feature = "benchmark")]
-use ed25519_dalek::{Digest as _, Sha512};
 #[cfg(feature = "benchmark")]
 use log::info;
 use network::ReliableSender;
@@ -164,27 +162,6 @@ impl BatchMaker {
                     u64::from_be_bytes(id)
                 );
             }
-
-            let id_vec = tx_ids[0..id_ctx_num].to_vec();
-            let ctx_vec = crosstxs[0..id_ctx_num].to_vec();
-            for (&id, ctx) in id_vec.iter().zip(ctx_vec.iter()) {
-                // cross-shard transaction ids.
-                info!(
-                    "Batch {:?} contains sample cross tx {} hash {:?}",
-                    digest,
-                    u64::from_be_bytes(id),
-                    Digest(Sha512::digest(&ctx).as_slice()[..32].try_into().unwrap())
-                );
-            }
-            // for ctx in &crosstxs[0..id_ctx_num].to_vec() {
-            //     // cross-shard transaction ids transfer to digest
-            //     info!(
-            //         "Batch {:?} contains sample cross tx hash {:?}",
-            //         digest,
-            //         Digest(Sha512::digest(&ctx).as_slice()[..32].try_into().unwrap())
-            //     );
-            // }
-
             // NOTE: This log entry is used to compute performance.
             info!("Batch {:?} contains {} B", digest, size);
         }

@@ -384,10 +384,10 @@ class ShardLogParser:
         digest_to_time = {}
         for x in input:
             for s, d, r, t in x:
-                if int(s) == 0:
-                    if not d in digest_to_time or digest_to_time[d] > t:
-                        digest_to_time[d] = t
-                        merged[d] = r
+                # if int(s) == 0:
+                if not d in digest_to_time or digest_to_time[d] > t:
+                    digest_to_time[d] = t
+                    merged[d] = r
         return merged
     
     # <vote_round, timestamp>
@@ -396,9 +396,9 @@ class ShardLogParser:
         merged = {}
         for x in input:
             for s, r, t in x:
-                if int(s) == 0:
-                    if not r in merged or merged[r] > t:
-                        merged[r] = t
+                # if int(s) == 0:
+                if not r in merged or merged[r] > t:
+                    merged[r] = t
         return merged
     
     def _merge_shard_one_commits_results(self, input):
@@ -712,7 +712,7 @@ class ShardLogParser:
         end_time = max(self.vote_round_timestamp.values())
         for sent, received in zip(self.sent_samples, self.received_samples):
             for tx_id, batch_id in received.items():
-                if batch_id in self.shard_one_commits:
+                if batch_id in self.shard_one_commits and batch_id in self.digest_rounds:
                     if not tx_id in sent:
                         continue
                     # We dont consider itx with timestamp after ctx
@@ -738,7 +738,6 @@ class ShardLogParser:
                             start = sent[tx_id]
                             end = self.vote_round_timestamp[int_tx_round]
                             latency += [end-start]
-        # print("cross latency has", len(latency))
         return mean(latency) if latency else 0
                     
     # Compared sharding protocols: adopt a lock-based protocol
@@ -861,21 +860,21 @@ class ShardLogParser:
             f' Mempool max batch delay: {mempool_max_batch_delay:,} ms\n'
             '\n'
             ' + RESULTS:\n'
-            f' SOTA Sharding:\n'
+            # f' ARETE:\n'
             f' Consensus TPS: {round(consensus_tps):,} tx/s\n'
             f' Consensus BPS: {round(consensus_bps):,} B/s\n'
             f' End-to-end TPS: {round(end_to_end_tps):,} tx/s\n'
             f' End-to-end BPS: {round(end_to_end_bps):,} B/s\n'
             f' End-to-end intra latency: {round(end_to_end_intra_latency):,} ms\n'
             f' End-to-end cross latency: {round(end_to_end_cross_latency):,} ms\n'
-            '\n'
-            f' ARETE (ours):\n'
-            f' Consensus TPS: {round(arete_consensus_tps):,} tx/s\n'
-            f' Consensus BPS: {round(arete_consensus_bps):,} B/s\n'
-            f' End-to-end TPS: {round(arete_end_to_end_tps):,} tx/s\n'
-            f' End-to-end BPS: {round(arete_end_to_end_bps):,} B/s\n'
-            f' End-to-end arete intra latency: {round(arete_end_to_end_intra_latency):,} ms\n'
-            f' End-to-end arete cross latency: {round(arete_end_to_end_cross_latency):,} ms\n'
+            # '\n'
+            # f' ARETE (ours):\n'
+            # f' Consensus TPS: {round(arete_consensus_tps):,} tx/s\n'
+            # f' Consensus BPS: {round(arete_consensus_bps):,} B/s\n'
+            # f' End-to-end TPS: {round(arete_end_to_end_tps):,} tx/s\n'
+            # f' End-to-end BPS: {round(arete_end_to_end_bps):,} B/s\n'
+            # f' End-to-end arete intra latency: {round(arete_end_to_end_intra_latency):,} ms\n'
+            # f' End-to-end arete cross latency: {round(arete_end_to_end_cross_latency):,} ms\n'
             '-----------------------------------------\n'
         )
 
