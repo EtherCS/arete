@@ -77,7 +77,7 @@ impl Proposer {
     }
 
     async fn clean_aggregators(&mut self, commit_rounds: Vec<VoteResult>) {
-        debug!("Clean {} vote aggregations", commit_rounds.len());
+        // debug!("Clean vote aggregations, it has {}", self.aggregation_results.len());
         for vote_result in commit_rounds {
             self.aggregation_results.remove(&vote_result.round);
         }
@@ -113,7 +113,8 @@ impl Proposer {
                 break;
             }
         }
-        // debug!("ARETE trace: cblock size is {}", merge_cblockmeta.len());
+        debug!("ARETE trace: aggregation_results size {}", self.aggregation_results.clone().len());
+        debug!("ARETE trace: merge_cblockmeta size {}", merge_cblockmeta.len());
         // Get vote results that have ready aggregated
         // ARETE TODO: current only consider execution shard 0 and shard 1
         let relevant_shards: Vec<u32> = vec![0, 1];
@@ -202,7 +203,7 @@ impl Proposer {
                 // ARETE: here, every node receive the transaction (CBlock) due to mempool's broadcast
                 // Update its local Map[shard_id, if_receive_CBlock]
                 Some(cblock) = self.rx_cblock.recv() => {
-                    debug!("Consensus proposer receive CBlock {:?}", cblock);
+                    // debug!("Consensus proposer receive CBlock {:?}", cblock);
                     let cblm = CBlockMeta::new(
                         cblock.shard_id,
                         cblock.author,
@@ -232,11 +233,11 @@ impl Proposer {
                                 clean_cbmeta.remove(cblock_meta);
                             }
                         }
-                        debug!("Clean shard CBlockMeta");
+                        // debug!("Clean shard CBlockMeta");
                     },
                     ProposerMessage::Cleanup(_vote_results) => {
                         self.clean_aggregators(_vote_results).await;
-                        debug!("Clean shard vote aggregation");
+                        // debug!("Clean shard vote aggregation");
                     }
                 },
                 Some(ctx_vote) = self.rx_ctx_vote.recv() => {

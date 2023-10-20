@@ -1,8 +1,8 @@
 use crate::config::Export as _;
 use crate::config::{Committee, ConfigError, Parameters, Secret};
 use consensus::{Consensus, OBlock};
-use crypto::SignatureService;
-use log::{debug, info};
+use crypto::{Signature, SignatureService};
+use log::{debug, error, info};
 use mempool::Mempool;
 use network::SimpleSender;
 use rand::seq::IteratorRandom;
@@ -10,16 +10,17 @@ use std::collections::HashMap;
 use std::net::SocketAddr;
 use store::Store;
 use tokio::sync::mpsc::{channel, Receiver};
-use types::{ConfirmMessage, ShardInfo, BlockCreator};
+use types::{BlockCreator, ConfirmMessage, ShardInfo};
 
 /// The default channel capacity for this module.
 pub const CHANNEL_CAPACITY: usize = 1_000;
+pub const CONNECTIONS_NODES: usize = 3;
 
 // Node is the replica in the ordering shard
 pub struct Node {
     pub commit: Receiver<OBlock>,
     pub shard_info: ShardInfo,
-    pub shard_confirmation_addrs: HashMap<u32, SocketAddr>,
+    pub shard_confirmation_addrs: HashMap<u32, Vec<SocketAddr>>,
 }
 
 impl Node {
@@ -43,11 +44,22 @@ impl Node {
         let secret_key = secret.secret;
 
         // Pick one comfirmation address for each execution shard
-        let mut shard_confirmation_addrs = HashMap::new();
+        let mut shard_confirmation_addrs: HashMap<u32, Vec<SocketAddr>> = HashMap::new();
         for (shard_id, map_addrs) in committee.executor_confirmation_addresses {
-            if let Some(name_addr) = map_addrs.iter().choose(&mut rand::thread_rng()) {
-                let (_name, _confirm_addr) = name_addr;
-                shard_confirmation_addrs.insert(shard_id, *_confirm_addr);
+            let mut sample_addresses = Vec::new();
+            let addrs: Vec<_> = map_addrs.values().cloned().collect();
+            if addrs.len() >= CONNECTIONS_NODES {
+                let random_addrs = addrs
+                    .iter()
+                    .clone()
+                    .choose_multiple(&mut rand::thread_rng(), CONNECTIONS_NODES);
+                sample_addresses.extend(random_addrs.clone());
+                shard_confirmation_addrs.insert(shard_id, sample_addresses);
+            } else {
+                error!(
+                    "The execution shard should has at least {} nodes",
+                    CONNECTIONS_NODES
+                );
             }
         }
         info!(
@@ -108,6 +120,8 @@ impl Node {
         let mut sender = SimpleSender::new();
         while let Some(_block) = self.commit.recv().await {
             let mut confirm_msgs: HashMap<u32, ConfirmMessage> = HashMap::new();
+            let heartbeat_sig: Signature = _block.signature.clone();
+            let heartbeat_round: u64 = _block.round;
             for i in _block.payload.clone() {
                 // multiple blocks are packed for shard i.shard_id
                 if confirm_msgs.contains_key(&i.shard_id) {
@@ -117,7 +131,12 @@ impl Node {
                         cmsg.ordered_ctxs.extend(i.ctx_hashes);
                     }
                 } else {
-                    // debug!("ARETE trace: oblock {:?} get vote results {}", _block, _block.aggregators.clone().len());
+                    debug!(
+                        "ARETE trace: oblock for shard {} in round {} get vote results {}",
+                        i.shard_id,
+                        _block.round,
+                        _block.aggregators.clone().len()
+                    );
                     let temp_block_creator = BlockCreator::new(i.author, i.ebhash).await;
                     let mut map_ebhash = Vec::new();
                     map_ebhash.push(temp_block_creator);
@@ -138,8 +157,8 @@ impl Node {
             for (shard, confim_msg) in &confirm_msgs {
                 let message = bincode::serialize(&confim_msg.clone())
                     .expect("fail to serialize the ConfirmMessage");
-                if let Some(_addr) = self.shard_confirmation_addrs.get(&shard).copied() {
-                    sender.send(_addr, Into::into(message)).await;
+                if let Some(_addrs) = self.shard_confirmation_addrs.get(&shard) {
+                    sender.broadcast(_addrs.clone(), Into::into(message)).await;
                     debug!(
                         "send a confirm message {:?} to the execution shard {}",
                         confim_msg.clone(),
@@ -147,7 +166,30 @@ impl Node {
                     );
                 }
             }
-
+            // For cross-shard transaction test.
+            // Currently, we dont ask the ordering shard to maintain a table
+            // for tracing relevant shards who are responsible for voting an ordering round
+            for heartbeat_shard in 0..2 {
+                let heartbeat_confirm_msg = ConfirmMessage::new(
+                    3,
+                    Vec::new(),
+                    heartbeat_round,
+                    Vec::new(),
+                    Vec::new(),
+                    heartbeat_sig.clone(),
+                )
+                .await;
+                let message = bincode::serialize(&heartbeat_confirm_msg.clone())
+                    .expect("fail to serialize the ConfirmMessage");
+                if let Some(_addrs) = self.shard_confirmation_addrs.get(&heartbeat_shard) {
+                    sender.broadcast(_addrs.clone(), Into::into(message)).await;
+                    debug!(
+                        "send a heartbeat confirm message {:?} to the execution shard {}",
+                        heartbeat_confirm_msg.clone(),
+                        heartbeat_shard
+                    );
+                }
+            }
             info!("Node commits block {:?} successfully", _block); // {:?} means: display based on the Debug function
         }
     }

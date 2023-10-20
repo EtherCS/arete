@@ -105,12 +105,13 @@ impl fmt::Debug for OBlock {
     fn fmt(&self, f: &mut fmt::Formatter) -> Result<(), fmt::Error> {
         write!(
             f,
-            "{}: B({}, {}, {:?}, num of cblocks {})",
+            "{}: B({}, {}, {:?}, num of cblocks {}, num of aggregators {})",
             self.digest(),
             self.author,
             self.round,
             self.qc,
             self.payload.len(),
+            self.aggregators.len(),
         )
     }
 }

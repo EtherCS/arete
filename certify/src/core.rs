@@ -30,6 +30,7 @@ pub struct Core {
     // tx_certify: Sender<CertifyMessage>,
     round: Round,
     // network: SimpleSender,
+    commit_round: HashMap<u64, u8>,
 }
 
 impl Core {
@@ -62,6 +63,7 @@ impl Core {
                 // tx_certify,
                 round: 1,
                 // network: SimpleSender::new(),
+                commit_round: HashMap::new(),
             }
             .run()
             .await
@@ -103,7 +105,7 @@ impl Core {
         Ok(())
     }
 
-    #[async_recursion]
+    // #[async_recursion]
     async fn process_confirm(&mut self, confirm_msg: ConfirmMessage) -> ConsensusResult<()> {
         let mut _to_commit: VecDeque<Digest> = VecDeque::new();
         // First handle the ordered intra-shard transactions
@@ -141,17 +143,21 @@ impl Core {
             .expect("Failed to send cross-transaction vote");
 
         self.round = confirm_msg.order_round;
-
+        self.commit_round.insert(confirm_msg.order_round, 1);
         // Get shard id
-        let _s_id = self.shard_info.id;
+        // let _s_id = self.shard_info.id;
         // Print for performance calculation
+
         #[cfg(feature = "benchmark")]
         {
             while let Some(block_digest) = _to_commit.pop_back() {
-                info!("Shard {} Committed -> {:?}", _s_id, block_digest);
+                info!(
+                    "Shard {} Committed EBlock in round {} -> {:?}",
+                    self.shard_info.id, confirm_msg.order_round, block_digest
+                );
                 info!(
                     "ARETE shard {} Committed -> {:?} in round {}",
-                    _s_id, block_digest, confirm_msg.order_round
+                    self.shard_info.id, block_digest, confirm_msg.order_round
                 );
             }
         }
@@ -164,15 +170,56 @@ impl Core {
         confirm_msg: ConfirmMessage,
     ) -> ConsensusResult<()> {
         // ARETE TODO: commit voted cross-shard transactions
-        // if !confirm_msg.clone().votes.is_empty() {
-        //     debug!("ARETE trace: receive vote reulst num {}", confirm_msg.clone().votes.len());
-        //     for vote in confirm_msg.clone().votes {
-        //         for (result, _) in vote.results {
-        //             debug!("ARETE trace: commit ctx hash {:?}", result);
-        //         }
-        //     }
-        // }
-        
+        let confirm_digest = confirm_msg.clone().digest();
+        if !self.store.read(confirm_digest.to_vec()).await?.is_none() {
+            // we have already handle this round message
+            debug!(
+                "ARETE trace: we already handle this round message {}",
+                confirm_msg
+            );
+            return Ok(());
+        }
+
+        let value =
+            bincode::serialize(&confirm_msg.clone()).expect("Failed to serialize confirm message");
+        self.store.write(confirm_digest.to_vec(), value).await;
+
+        #[cfg(feature = "benchmark")]
+        {
+            if !confirm_msg.clone().votes.is_empty() {
+                // Ensure this round has been committed
+                for vote_result in confirm_msg.clone().votes {
+                    if self.commit_round.contains_key(&vote_result.round) {
+                        info!(
+                            "Shard {} Committed Vote in round {}",
+                            self.shard_info.id, vote_result.round,
+                        );
+                    }
+                    
+                }
+            }
+        }
+        if confirm_msg.shard_id != self.shard_info.id {
+            // Respond this heartbeat confirmation message with vote
+            debug!(
+                "ARETE trace: receive a heartbeat message in round {}",
+                confirm_msg.order_round
+            );
+            let cross_tx_vote: CrossTransactionVote = CrossTransactionVote::new(
+                self.shard_info.id,
+                confirm_msg.order_round,
+                HashMap::new(),
+                Vec::new(),
+            )
+            .await;
+            // Send it to vote_maker for collecting quorum of certificates
+            self.tx_order_ctx
+                .send(cross_tx_vote)
+                .await
+                .expect("Failed to send cross-transaction vote");
+            return Ok(());
+        }
+
         let digest = confirm_msg.digest();
         if !self.mempool_driver.verify(confirm_msg.clone()).await? {
             debug!("Processing of {} suspended: missing some EBlock", digest);
@@ -190,6 +237,7 @@ impl Core {
                 .await
                 .expect("Failed to send cross-transaction vote");
             // self.round = confirm_msg.order_round;
+            self.commit_round.insert(confirm_msg.order_round, 1);
             return Ok(());
         }
         // Otherwise, have all EBlocks, and execute
