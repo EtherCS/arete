@@ -2,7 +2,7 @@ use crate::config::Export as _;
 use crate::config::{Committee, ConfigError, Parameters, Secret};
 use certify::{EBlock, Consensus};
 use crypto::{SignatureService, Hash};
-use log::{debug, info};
+use log::info;
 use execpool::Mempool;
 use rand::seq::IteratorRandom;
 use store::Store;
@@ -113,8 +113,8 @@ impl Executor {
                 .expect("fail to serialize the CBlock");
             sender.send(self.ordering_addr, Into::into(message)).await;
 
-            debug!("send a certificate block {:?} to the ordering shard", certify_block.clone());
-            info!("Executor commits block {:?} successfully", _block); // {:?} means: display based on the Debug function
+            // debug!("send a certificate block {:?} to the ordering shard", certify_block.clone());
+            // info!("Executor commits block {:?} successfully", _block); // {:?} means: display based on the Debug function
         }
         Ok(())
     }

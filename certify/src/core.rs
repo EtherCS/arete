@@ -12,7 +12,9 @@ use async_recursion::async_recursion;
 use bytes::Bytes;
 use crypto::Hash as _;
 use crypto::{PublicKey, SignatureService};
-use log::{debug, error, info, warn};
+#[cfg(feature = "benchmark")] 
+use log::info;
+use log::{error, warn};
 use network::SimpleSender;
 use std::cmp::max;
 use std::collections::VecDeque;
@@ -147,18 +149,18 @@ impl Core {
         // Send all the newly committed blocks to the node's application layer.
         while let Some(block) = to_commit.pop_back() {
             if !block.payload.is_empty() {
-                info!("Committed {}", block);
+                // info!("Committed {}", block);
 
                 #[cfg(feature = "benchmark")] {
                     let b_round = block.round;
                     for x in &block.payload {
                         // NOTE: This log entry is used to compute performance.
-                        info!("Shard {} Committed {} -> {:?}", _s_id, block, x);
+                        // info!("Shard {} Committed {} -> {:?}", _s_id, block, x);
                         info!("ARETE shard {} Committed {} -> {:?} in round {}", _s_id, block, x, b_round);
                     }
                 }
             }
-            debug!("Committed {:?}", block);
+            // debug!("Committed {:?}", block);
             if let Err(e) = self.tx_commit.send(block).await {
                 warn!("Failed to send block through the commit channel: {}", e);
             }
@@ -186,13 +188,13 @@ impl Core {
             self.signature_service.clone(),
         )
         .await;
-        debug!("Created {:?}", timeout);
+        // debug!("Created {:?}", timeout);
 
         // Reset the timer.
         self.timer.reset();
 
         // Broadcast the timeout message.
-        debug!("Broadcasting {:?}", timeout);
+        // debug!("Broadcasting {:?}", timeout);
         let addresses = self
             .committee
             .broadcast_addresses(&self.name)
@@ -211,7 +213,7 @@ impl Core {
 
     #[async_recursion]
     async fn handle_vote(&mut self, vote: &Vote) -> ConsensusResult<()> {
-        debug!("Processing {:?}", vote);
+        // debug!("Processing {:?}", vote);
         if vote.round < self.round {
             return Ok(());
         }
@@ -221,7 +223,7 @@ impl Core {
 
         // Add the new vote to our aggregator and see if we have a quorum.
         if let Some(qc) = self.aggregator.add_vote(vote.clone())? {
-            debug!("Assembled {:?}", qc);
+            // debug!("Assembled {:?}", qc);
 
             // Process the QC.
             self.process_qc(&qc).await;
@@ -235,7 +237,7 @@ impl Core {
     }
 
     async fn handle_timeout(&mut self, timeout: &Timeout) -> ConsensusResult<()> {
-        debug!("Processing {:?}", timeout);
+        // debug!("Processing {:?}", timeout);
         if timeout.round < self.round {
             return Ok(());
         }
@@ -248,13 +250,13 @@ impl Core {
 
         // Add the new vote to our aggregator and see if we have a quorum.
         if let Some(tc) = self.aggregator.add_timeout(timeout.clone())? {
-            debug!("Assembled {:?}", tc);
+            // debug!("Assembled {:?}", tc);
 
             // Try to advance the round.
             self.advance_round(tc.round).await;
 
             // Broadcast the TC.
-            debug!("Broadcasting {:?}", tc);
+            // debug!("Broadcasting {:?}", tc);
             let addresses = self
                 .committee
                 .broadcast_addresses(&self.name)
@@ -283,7 +285,7 @@ impl Core {
         // Reset the timer and advance round.
         self.timer.reset();
         self.round = round + 1;
-        debug!("Moved to round {}", self.round);
+        // debug!("Moved to round {}", self.round);
 
         // Cleanup the vote aggregator.
         self.aggregator.cleanup(&self.round);
@@ -318,7 +320,7 @@ impl Core {
 
     #[async_recursion]
     async fn process_block(&mut self, block: &EBlock) -> ConsensusResult<()> {
-        debug!("Processing {:?}", block);
+        // debug!("Processing {:?}", block);
 
         // Let's see if we have the last three ancestors of the block, that is:
         //      b0 <- |qc0; b1| <- |qc1; block|
@@ -328,7 +330,7 @@ impl Core {
         let (b0, b1) = match self.synchronizer.get_ancestors(block).await? {
             Some(ancestors) => ancestors,
             None => {
-                debug!("Processing of {} suspended: missing parent", block.digest());
+                // debug!("Processing of {} suspended: missing parent", block.digest());
                 return Ok(());
             }
         };
@@ -354,12 +356,12 @@ impl Core {
 
         // See if we can vote for this block.
         if let Some(vote) = self.make_vote(block).await {
-            debug!("Created {:?}", vote);
+            // debug!("Created {:?}", vote);
             let next_leader = self.leader_elector.get_leader(self.round + 1);
             if next_leader == self.name {
                 self.handle_vote(&vote).await?;
             } else {
-                debug!("Sending {:?} to {}", vote, next_leader);
+                // debug!("Sending {:?} to {}", vote, next_leader);
                 let address = self
                     .committee
                     .address(&next_leader)
@@ -399,7 +401,7 @@ impl Core {
         // Let's see if we have the block's data. If we don't, the mempool
         // will get it and then make us resume processing this block.
         if !self.mempool_driver.verify(block.clone()).await? {
-            debug!("Processing of {} suspended: missing payload", digest);
+            // debug!("Processing of {} suspended: missing payload", digest);
             return Ok(());
         }
 
@@ -419,12 +421,12 @@ impl Core {
         Ok(())
     }
 
-    async fn handle_confirmation_message(&mut self, confirm_msg: ConfirmMessage) -> ConsensusResult<()> {
+    async fn handle_confirmation_message(&mut self, _confirm_msg: ConfirmMessage) -> ConsensusResult<()> {
         #[cfg(feature = "benchmark")] 
         // {
-        info!("ARETE shard {} commit anchor block for execution round {}", confirm_msg.shard_id, confirm_msg.round);
+        info!("ARETE shard {} commit anchor block for execution round {}", _confirm_msg.shard_id, _confirm_msg.round);
         // }
-        debug!("receive a confirm message from peer {:?}", confirm_msg);
+        // debug!("receive a confirm message from peer {:?}", confirm_msg);
         Ok(())
     }
 

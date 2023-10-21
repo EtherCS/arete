@@ -64,19 +64,19 @@ def localShard(ctx):
     """Run benchmarks on localhost"""
     bench_params = {
         "faults": 0.0,
-        "nodes": 4,
-        "rate": 1_000,
+        "nodes": 90,
+        "rate": 2_000,
         "tx_size": 512,
         "cross_shard_ratio": 0.2,
         "duration": 120,
         "liveness_threshold": 0.4,
         "shard_faults": 0.0,
-        "shard_num": 2,
-        "shard_sizes": 5,  # could be different shard size [4, 8, ...]
+        "shard_num": 4,
+        "shard_sizes": 20,  # could be different shard size [4, 8, ...]
     }
     node_params = {
         "consensus": {
-            "timeout_delay": 1_000,
+            "timeout_delay": 4_000,
             "sync_retry_delay": 10_000,
         },
         "mempool": {

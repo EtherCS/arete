@@ -6,7 +6,7 @@ use std::convert::TryInto;
 use store::Store;
 use tokio::sync::mpsc::{Receiver, Sender};
 use types::CBlock;
-use log::{debug, warn};
+use log::warn;
 
 #[cfg(test)]
 #[path = "tests/processor_tests.rs"]
@@ -37,7 +37,7 @@ impl Processor {
                     Ok(MempoolMessage::Batch(..)) => {},
                     Ok(MempoolMessage::BatchRequest(_missing, _requestor)) => {},
                     Ok(MempoolMessage::CBlock(tx)) => {
-                        debug!("Mempool processor get a CBlock {:?}", tx);
+                        // debug!("Mempool processor get a CBlock {:?}", tx);
                         // Hash the batch.
                         let digest = Digest(Sha512::digest(&batch).as_slice()[..32].try_into().unwrap());
 

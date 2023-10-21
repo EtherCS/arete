@@ -88,7 +88,7 @@ impl Proposer {
         debug!("Created {:?}", block);
 
         // Broadcast our new block.
-        debug!("Broadcasting {:?}", block);
+        // debug!("Broadcasting {:?}", block);
         let (names, addresses): (Vec<_>, _) = self
             .committee
             .broadcast_addresses(&self.name)

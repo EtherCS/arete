@@ -116,7 +116,7 @@ impl Proposer {
         debug!("Created {:?}", block);
 
         // Broadcast our new block.
-        debug!("Broadcasting {:?}", block);
+        // debug!("Broadcasting {:?}", block);
         let (names, addresses): (Vec<_>, _) = self
             .committee
             .broadcast_addresses(&self.name)
@@ -165,9 +165,9 @@ impl Proposer {
                 // ARETE: here, every node receive the transaction (CBlock) due to mempool's broadcast
                 // Update its local Map[shard_id, if_receive_CBlock]
                 Some(cblock) = self.rx_cblock.recv() => {
-                    debug!("Consensus proposer receive CBlock {:?}", cblock);
+                    // debug!("Consensus proposer receive CBlock {:?}", cblock);
                     if !self.max_shard_rounds.contains_key(&cblock.shard_id) {
-                        debug!("Receive the first or a larger CBlock from shard {}, new round {}", cblock.shard_id, cblock.round);
+                        // debug!("Receive the first or a larger CBlock from shard {}, new round {}", cblock.shard_id, cblock.round);
                         let cblm = CBlockMeta::new(
                             cblock.shard_id,
                             cblock.round,
@@ -178,7 +178,7 @@ impl Proposer {
                     }
                     else if let Some(tp_round) = self.max_shard_rounds.get(&cblock.shard_id).copied() {
                         if tp_round < cblock.round {
-                            debug!("Receive the first or a larger CBlock from shard {}, new round {}", cblock.shard_id, cblock.round);
+                            // debug!("Receive the first or a larger CBlock from shard {}, new round {}", cblock.shard_id, cblock.round);
                             let cblm = CBlockMeta::new(
                                 cblock.shard_id,
                                 cblock.round,
@@ -197,7 +197,7 @@ impl Proposer {
                     },
                     ProposerMessage::Cleanup(_cbmetas) => {
                         self.update_map(_cbmetas).await;
-                        debug!("Clean shard CBlockMeta");
+                        // debug!("Clean shard CBlockMeta");
                     }
                 }
             }

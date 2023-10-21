@@ -317,15 +317,15 @@ class ShardLogParser:
         self.timeouts = max(timeouts)
 
         # Check whether clients missed their target rate.
-        if self.misses != 0:
-            Print.warn(
-                f'Clients missed their target rate {self.misses:,} time(s)'
-            )
+        # if self.misses != 0:
+        #     Print.warn(
+        #         f'Clients missed their target rate {self.misses:,} time(s)'
+        #     )
 
         # Check whether the executors timed out.
         # Note that executors are expected to time out once at the beginning.
-        if self.timeouts > 2:
-            Print.warn(f'Executors timed out {self.timeouts:,} time(s)')
+        # if self.timeouts > 2:
+        #     Print.warn(f'Executors timed out {self.timeouts:,} time(s)')
 
     def _merge_results(self, input):
         # Keep the earliest timestamp.
@@ -467,14 +467,17 @@ class ShardLogParser:
         tmp = [(s, d, self._to_posix(t)) for t, s, d in tmp]
         proposals = self._merge_proposals_results([tmp])
 
-        tmp = findall(r'\[(.*Z) .* Shard (\d+) Committed B\d+ -> ([^ ]+=)', log)
-        tmp = [(s, d, self._to_posix(t)) for t, s, d in tmp]
-        commits = self._merge_commits_results([tmp])
-        shard_one_commits = self._merge_shard_one_commits_results([tmp])
+        # tmp = findall(r'\[(.*Z) .* Shard (\d+) Committed B\d+ -> ([^ ]+=)', log)
+        # tmp = [(s, d, self._to_posix(t)) for t, s, d in tmp]
+        # commits = self._merge_commits_results([tmp])
+        # shard_one_commits = self._merge_shard_one_commits_results([tmp])
         
         # batch_digest is picked by the ordering shard
         # arete_commits_to_round[batch_digest] = executed_batch_round
         tmp = findall(r'\[(.*Z) .* ARETE shard (\d+) Committed B\d+ -> ([^ ]+=) in round (\d+)', log)
+        tmp_commits = [(s, d, self._to_posix(t)) for t, s, d, _ in tmp]
+        commits = self._merge_commits_results([tmp_commits])
+        shard_one_commits = self._merge_shard_one_commits_results([tmp_commits])
         tmp = [(s, d, r, self._to_posix(t)) for t, s, d, r in tmp]
         arete_commits_to_round = self._merge_arete_round_results([tmp])
         
@@ -723,17 +726,17 @@ class ShardLogParser:
         return mean(latency) if latency else 0
 
     def result(self):
-        consensus_latency = self._consensus_latency() * 1000
+        # consensus_latency = self._consensus_latency() * 1000
         consensus_tps, consensus_bps, _ = self._consensus_throughput()
         end_to_end_tps, end_to_end_bps, duration = self._end_to_end_throughput()
         end_to_end_intra_latency = self._end_to_end_intra_latency() * 1000
         end_to_end_cross_latency = self._end_to_end_cross_latency() * 1000
         
-        arete_consensus_latency = self._avg_consensus_interval() * 1000
-        arete_consensus_tps, arete_consensus_bps, _ = self._arete_consensus_throughput()
-        arete_end_to_end_tps, arete_end_to_end_bps, arete_duration = self._end_to_end_arete_throughput()
-        arete_end_to_end_intra_latency = self._arete_end_to_end_intra_latency() * 1000
-        arete_end_to_end_cross_latency = self._arete_end_to_end_cross_latency() * 1000
+        # arete_consensus_latency = self._avg_consensus_interval() * 1000
+        # arete_consensus_tps, arete_consensus_bps, _ = self._arete_consensus_throughput()
+        # arete_end_to_end_tps, arete_end_to_end_bps, arete_duration = self._end_to_end_arete_throughput()
+        # arete_end_to_end_intra_latency = self._arete_end_to_end_intra_latency() * 1000
+        # arete_end_to_end_cross_latency = self._arete_end_to_end_cross_latency() * 1000
 
         consensus_timeout_delay = self.configs[0]['consensus']['certify_timeout_delay']
         consensus_sync_retry_delay = self.configs[0]['consensus']['certify_sync_retry_delay']
@@ -769,21 +772,21 @@ class ShardLogParser:
             f' Mempool max batch delay: {mempool_max_batch_delay:,} ms\n'
             '\n'
             ' + RESULTS:\n'
-            f' SOTA Sharding:\n'
+            f' Benchmark Sharding:\n'
             f' Consensus TPS: {round(consensus_tps):,} tx/s\n'
             f' Consensus BPS: {round(consensus_bps):,} B/s\n'
             f' End-to-end TPS: {round(end_to_end_tps):,} tx/s\n'
             f' End-to-end BPS: {round(end_to_end_bps):,} B/s\n'
             f' End-to-end intra latency: {round(end_to_end_intra_latency):,} ms\n'
             f' End-to-end cross latency: {round(end_to_end_cross_latency):,} ms\n'
-            '\n'
-            f' ARETE (ours):\n'
-            f' Consensus TPS: {round(arete_consensus_tps):,} tx/s\n'
-            f' Consensus BPS: {round(arete_consensus_bps):,} B/s\n'
-            f' End-to-end TPS: {round(arete_end_to_end_tps):,} tx/s\n'
-            f' End-to-end BPS: {round(arete_end_to_end_bps):,} B/s\n'
-            f' End-to-end arete intra latency: {round(arete_end_to_end_intra_latency):,} ms\n'
-            f' End-to-end arete cross latency: {round(arete_end_to_end_cross_latency):,} ms\n'
+            # '\n'
+            # f' ARETE (ours):\n'
+            # f' Consensus TPS: {round(arete_consensus_tps):,} tx/s\n'
+            # f' Consensus BPS: {round(arete_consensus_bps):,} B/s\n'
+            # f' End-to-end TPS: {round(arete_end_to_end_tps):,} tx/s\n'
+            # f' End-to-end BPS: {round(arete_end_to_end_bps):,} B/s\n'
+            # f' End-to-end arete intra latency: {round(arete_end_to_end_intra_latency):,} ms\n'
+            # f' End-to-end arete cross latency: {round(arete_end_to_end_cross_latency):,} ms\n'
             '-----------------------------------------\n'
         )
 
