@@ -320,10 +320,10 @@ class ShardLogParser:
         self.timeouts = max(timeouts)
 
         # Check whether clients missed their target rate.
-        if self.misses != 0:
-            Print.warn(
-                f'Clients missed their target rate {self.misses:,} time(s)'
-            )
+        # if self.misses != 0:
+        #     Print.warn(
+        #         f'Clients missed their target rate {self.misses:,} time(s)'
+        #     )
 
         # Check whether the executors timed out.
         # Note that executors are expected to time out once at the beginning.

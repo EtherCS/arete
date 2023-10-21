@@ -3,7 +3,7 @@ use bytes::Bytes;
 use crypto::PublicKey;
 use futures::stream::futures_unordered::FuturesUnordered;
 use futures::stream::StreamExt as _;
-use log::debug;
+// use log::debug;
 use network::{CancelHandler, ReliableSender};
 use std::net::SocketAddr;
 use tokio::sync::mpsc::{Receiver, Sender};
@@ -45,7 +45,7 @@ impl ConfirmExecutor {
 
     /// Broadcast the confirmation message to other executors.
     async fn broadcast_confirm_msg(&mut self, confirm_msg: ConfirmMessage) {
-        debug!("Broadcasting confirmation msg {:?}", confirm_msg);
+        // debug!("Broadcasting confirmation msg {:?}", confirm_msg);
         let (names, addresses): (Vec<_>, Vec<SocketAddr>) = self
             .committee
             .broadcast_addresses(&self.name)

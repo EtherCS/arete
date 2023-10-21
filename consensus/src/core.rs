@@ -172,13 +172,13 @@ impl Core {
             self.signature_service.clone(),
         )
         .await;
-        debug!("Created {:?}", timeout);
+        // debug!("Created {:?}", timeout);
 
         // Reset the timer.
         self.timer.reset();
 
         // Broadcast the timeout message.
-        debug!("Broadcasting {:?}", timeout);
+        // debug!("Broadcasting {:?}", timeout);
         let addresses = self
             .committee
             .broadcast_addresses(&self.name)
@@ -197,7 +197,7 @@ impl Core {
 
     #[async_recursion]
     async fn handle_vote(&mut self, vote: &Vote) -> ConsensusResult<()> {
-        debug!("Processing {:?}", vote);
+        // debug!("Processing {:?}", vote);
         if vote.round < self.round {
             return Ok(());
         }
@@ -207,7 +207,7 @@ impl Core {
 
         // Add the new vote to our aggregator and see if we have a quorum.
         if let Some(qc) = self.aggregator.add_vote(vote.clone())? {
-            debug!("Assembled {:?}", qc);
+            // debug!("Assembled {:?}", qc);
 
             // Process the QC.
             self.process_qc(&qc).await;
@@ -234,13 +234,13 @@ impl Core {
 
         // Add the new vote to our aggregator and see if we have a quorum.
         if let Some(tc) = self.aggregator.add_timeout(timeout.clone())? {
-            debug!("Assembled {:?}", tc);
+            // debug!("Assembled {:?}", tc);
 
             // Try to advance the round.
             self.advance_round(tc.round).await;
 
             // Broadcast the TC.
-            debug!("Broadcasting {:?}", tc);
+            // debug!("Broadcasting {:?}", tc);
             let addresses = self
                 .committee
                 .broadcast_addresses(&self.name)
@@ -317,7 +317,7 @@ impl Core {
 
     #[async_recursion]
     async fn process_block(&mut self, block: &OBlock) -> ConsensusResult<()> {
-        debug!("Processing {:?}", block);
+        // debug!("Processing {:?}", block);
 
         // Let's see if we have the last three ancestors of the block, that is:
         //      b0 <- |qc0; b1| <- |qc1; block|
@@ -327,7 +327,7 @@ impl Core {
         let (b0, b1) = match self.synchronizer.get_ancestors(block).await? {
             Some(ancestors) => ancestors,
             None => {
-                debug!("Processing of {} suspended: missing parent", block.digest());
+                // debug!("Processing of {} suspended: missing parent", block.digest());
                 return Ok(());
             }
         };
@@ -353,12 +353,12 @@ impl Core {
 
         // See if we can vote for this block.
         if let Some(vote) = self.make_vote(block).await {
-            debug!("Created {:?}", vote);
+            // debug!("Created {:?}", vote);
             let next_leader = self.leader_elector.get_leader(self.round + 1);
             if next_leader == self.name {
                 self.handle_vote(&vote).await?;
             } else {
-                debug!("Sending {:?} to {}", vote, next_leader);
+                // debug!("Sending {:?} to {}", vote, next_leader);
                 let address = self
                     .committee
                     .address(&next_leader)
@@ -398,7 +398,7 @@ impl Core {
         // Let's see if we have the block's data. If we don't, the mempool
         // will get it and then make us resume processing this block.
         if !self.mempool_driver.verify(block.clone()).await? {
-            debug!("Processing of {} suspended: missing payload", digest);
+            // debug!("Processing of {} suspended: missing payload", digest);
             return Ok(());
         }
 

@@ -132,10 +132,10 @@ impl Core {
                     "Shard {} Committed EBlock in round {} -> {:?}",
                     self.shard_info.id, confirm_msg.order_round, block_digest
                 );
-                info!(
-                    "ARETE shard {} Committed -> {:?} in round {}",
-                    self.shard_info.id, block_digest, confirm_msg.order_round
-                );
+                // info!(
+                //     "ARETE shard {} Committed -> {:?} in round {}",
+                //     self.shard_info.id, block_digest, confirm_msg.order_round
+                // );
             }
         }
 
@@ -147,10 +147,10 @@ impl Core {
         let cross_tx_vote: CrossTransactionVote;
         if confirm_msg.shard_id != self.shard_info.id {
             // Respond this heartbeat confirmation message with vote
-            debug!(
-                "ARETE trace: receive a heartbeat message in round {}",
-                confirm_msg.order_round
-            );
+            // debug!(
+            //     "ARETE trace: receive a heartbeat message in round {}",
+            //     confirm_msg.order_round
+            // );
             cross_tx_vote = CrossTransactionVote::new(
                 self.shard_info.id,
                 confirm_msg.order_round,
