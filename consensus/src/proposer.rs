@@ -77,7 +77,8 @@ impl Proposer {
     }
 
     async fn clean_aggregators(&mut self, commit_rounds: Vec<VoteResult>) {
-        // debug!("Clean vote aggregations, it has {}", self.aggregation_results.len());
+        // debug!("Clean vote aggregations {:?}", self.aggregation_results);
+        // debug!("Clean vote aggregation rounds {:?}", commit_rounds);
         for vote_result in commit_rounds {
             self.aggregation_results.remove(&vote_result.round);
         }
@@ -106,6 +107,12 @@ impl Proposer {
     async fn make_block(&mut self, round: Round, qc: QC, tc: Option<TC>) {
         // Generate a new block.
         let mut merge_cblockmeta = Vec::new();
+        // Ordering policy: pick as more execution shards as possible
+        for first_cblockmeta in self.shard_cblocks.values() {
+            if let Some(first) = first_cblockmeta.iter().next() {
+                merge_cblockmeta.push(first.clone());
+            }
+        } 
         for vec_cblockmeta in self.shard_cblocks.values() {
             merge_cblockmeta.extend(vec_cblockmeta.clone());
             // limit the size of a new OBlock, prevent timeout due to large data
@@ -119,9 +126,13 @@ impl Proposer {
         // ARETE TODO: current only consider execution shard 0 and shard 1
         let relevant_shards: Vec<u32> = vec![0, 1];
         let mut temp_aggregators = Vec::new();
-        for (temp_round, temp_vote_results) in self.aggregation_results.clone() {
+        for (temp_round, _) in self.aggregation_results.clone() {
+            // ARETE TODO: map cross-shard transaction digest to commit/abort
+            // Maybe use bitmap or other data compression technologies 
             let temp_vote_result =
-                VoteResult::new(temp_round, relevant_shards.clone(), temp_vote_results).await;
+                VoteResult::new(temp_round, relevant_shards.clone(), HashMap::new()).await;
+            // let temp_vote_result =
+                // VoteResult::new(temp_round, relevant_shards.clone(), temp_vote_results.clone()).await;
             temp_aggregators.push(temp_vote_result);
         }
 
