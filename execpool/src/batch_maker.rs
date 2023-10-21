@@ -106,6 +106,7 @@ impl BatchMaker {
                     if !self.current_batch.is_empty() {
                         self.seal().await;
                     }
+                    // Control the sending rate to the ordering shard
                     timer.as_mut().reset(Instant::now() + Duration::from_millis(self.max_batch_delay));
                 }
             }

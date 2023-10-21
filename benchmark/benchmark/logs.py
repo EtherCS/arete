@@ -384,10 +384,10 @@ class ShardLogParser:
         digest_to_time = {}
         for x in input:
             for s, d, r, t in x:
-                # if int(s) == 0:
-                if not d in digest_to_time or digest_to_time[d] > t:
-                    digest_to_time[d] = t
-                    merged[d] = r
+                if int(s) == 0:
+                    if not d in digest_to_time or digest_to_time[d] > t:
+                        digest_to_time[d] = t
+                        merged[d] = r
         return merged
     
     # <vote_round, timestamp>
@@ -396,9 +396,9 @@ class ShardLogParser:
         merged = {}
         for x in input:
             for s, r, t in x:
-                # if int(s) == 0:
-                if not r in merged or merged[r] > t:
-                    merged[r] = t
+                if int(s) == 0:
+                    if not r in merged or merged[r] > t:
+                        merged[r] = t
         return merged
     
     def _merge_shard_one_commits_results(self, input):
@@ -709,19 +709,23 @@ class ShardLogParser:
     
     def _test_end_to_end_intra_latency(self):
         latency = []
-        end_time = max(self.vote_round_timestamp.values())
+        if len(self.vote_round_timestamp.values()) == 0:
+            Print.warn('cannot capture the confirmation of cross-shard transactions')
+            # return mean(latency) if latency else 0
+        # end_time = max(self.vote_round_timestamp.values())
         for sent, received in zip(self.sent_samples, self.received_samples):
             for tx_id, batch_id in received.items():
                 if batch_id in self.shard_one_commits and batch_id in self.digest_rounds:
                     if not tx_id in sent:
                         continue
                     # We dont consider itx with timestamp after ctx
-                    if float(self.shard_one_commits[batch_id]) > float(end_time):
-                        continue
+                    # if float(self.shard_one_commits[batch_id]) > float(end_time):
+                    #     continue
                     # assert tx_id in sent  # We receive txs that we sent.
                     start = sent[tx_id]
                     end = self.shard_one_commits[batch_id]
                     latency += [end-start]
+        # print("intra shard latency", len(latency))
         return mean(latency) if latency else 0
     
     def _test_end_to_end_cross_latency(self):
@@ -738,6 +742,7 @@ class ShardLogParser:
                             start = sent[tx_id]
                             end = self.vote_round_timestamp[int_tx_round]
                             latency += [end-start]
+        # print("cross shard latency", len(latency))
         return mean(latency) if latency else 0
                     
     # Compared sharding protocols: adopt a lock-based protocol

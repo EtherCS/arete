@@ -2,7 +2,7 @@ use crate::mempool::MempoolMessage;
 use crypto::Digest;
 use ed25519_dalek::Digest as _;
 use ed25519_dalek::Sha512;
-use log::{debug, warn};
+use log::warn;
 use std::convert::TryInto;
 use store::Store;
 use tokio::sync::mpsc::{Receiver, Sender};
@@ -33,7 +33,7 @@ impl Processor {
                     Ok(MempoolMessage::Batch(..)) => {}
                     Ok(MempoolMessage::BatchRequest(_missing, _requestor)) => {}
                     Ok(MempoolMessage::CBlock(tx)) => {
-                        debug!("Mempool processor get a CBlock {:?}", tx);
+                        // debug!("Mempool processor get a CBlock {:?}", tx);
                         // Hash the batch.
                         let digest =
                             Digest(Sha512::digest(&batch).as_slice()[..32].try_into().unwrap());
@@ -43,6 +43,7 @@ impl Processor {
 
                         tx_cblock.send(tx).await.expect("Failed to send cblock");
                     }
+                    Ok(MempoolMessage::CrossTransactionVote(..)) => {}
                     Err(e) => warn!("Serialization error: {}", e),
                 }
 

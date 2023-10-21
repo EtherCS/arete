@@ -1,8 +1,10 @@
 use crate::config::Export as _;
 use crate::config::{Committee, ConfigError, Parameters, Secret};
 use consensus::{Consensus, OBlock};
-use crypto::{Signature, SignatureService};
-use log::{debug, error, info};
+#[cfg(feature = "benchmark")]
+use crypto::Signature;
+use crypto::SignatureService;
+use log::{error, info};
 use mempool::Mempool;
 use network::SimpleSender;
 use rand::seq::IteratorRandom;
@@ -14,7 +16,7 @@ use types::{BlockCreator, ConfirmMessage, ShardInfo};
 
 /// The default channel capacity for this module.
 pub const CHANNEL_CAPACITY: usize = 1_000;
-pub const CONNECTIONS_NODES: usize = 3;
+pub const CONNECTIONS_NODES: usize = 1;
 
 // Node is the replica in the ordering shard
 pub struct Node {
@@ -120,8 +122,6 @@ impl Node {
         let mut sender = SimpleSender::new();
         while let Some(_block) = self.commit.recv().await {
             let mut confirm_msgs: HashMap<u32, ConfirmMessage> = HashMap::new();
-            let heartbeat_sig: Signature = _block.signature.clone();
-            let heartbeat_round: u64 = _block.round;
             for i in _block.payload.clone() {
                 // multiple blocks are packed for shard i.shard_id
                 if confirm_msgs.contains_key(&i.shard_id) {
@@ -131,12 +131,12 @@ impl Node {
                         cmsg.ordered_ctxs.extend(i.ctx_hashes);
                     }
                 } else {
-                    debug!(
-                        "ARETE trace: oblock for shard {} in round {} get vote results {}",
-                        i.shard_id,
-                        _block.round,
-                        _block.aggregators.clone().len()
-                    );
+                    // debug!(
+                    //     "ARETE trace: oblock for shard {} in round {} get vote results {}",
+                    //     i.shard_id,
+                    //     _block.round,
+                    //     _block.aggregators.clone().len()
+                    // );
                     let temp_block_creator = BlockCreator::new(i.author, i.ebhash).await;
                     let mut map_ebhash = Vec::new();
                     map_ebhash.push(temp_block_creator);
@@ -159,35 +159,39 @@ impl Node {
                     .expect("fail to serialize the ConfirmMessage");
                 if let Some(_addrs) = self.shard_confirmation_addrs.get(&shard) {
                     sender.broadcast(_addrs.clone(), Into::into(message)).await;
-                    debug!(
-                        "send a confirm message {:?} to the execution shard {}",
-                        confim_msg.clone(),
-                        shard
-                    );
+                    // debug!(
+                    //     "send a confirm message {:?} to the execution shard {}",
+                    //     confim_msg.clone(),
+                    //     shard
+                    // );
                 }
             }
             // For cross-shard transaction test.
             // Currently, we dont ask the ordering shard to maintain a table
             // for tracing relevant shards who are responsible for voting an ordering round
-            for heartbeat_shard in 0..2 {
-                let heartbeat_confirm_msg = ConfirmMessage::new(
-                    3,
-                    Vec::new(),
-                    heartbeat_round,
-                    Vec::new(),
-                    Vec::new(),
-                    heartbeat_sig.clone(),
-                )
-                .await;
-                let message = bincode::serialize(&heartbeat_confirm_msg.clone())
-                    .expect("fail to serialize the ConfirmMessage");
-                if let Some(_addrs) = self.shard_confirmation_addrs.get(&heartbeat_shard) {
-                    sender.broadcast(_addrs.clone(), Into::into(message)).await;
-                    debug!(
-                        "send a heartbeat confirm message {:?} to the execution shard {}",
-                        heartbeat_confirm_msg.clone(),
-                        heartbeat_shard
-                    );
+            #[cfg(feature = "benchmark")]{
+                let heartbeat_sig: Signature = _block.signature.clone();
+                let heartbeat_round: u64 = _block.round;
+                for heartbeat_shard in 0..2 {
+                    let heartbeat_confirm_msg = ConfirmMessage::new(
+                        3,
+                        Vec::new(),
+                        heartbeat_round,
+                        Vec::new(),
+                        Vec::new(),
+                        heartbeat_sig.clone(),
+                    )
+                    .await;
+                    let message = bincode::serialize(&heartbeat_confirm_msg.clone())
+                        .expect("fail to serialize the ConfirmMessage");
+                    if let Some(_addrs) = self.shard_confirmation_addrs.get(&heartbeat_shard) {
+                        sender.broadcast(_addrs.clone(), Into::into(message)).await;
+                        // debug!(
+                        //     "send a heartbeat confirm message {:?} to the execution shard {}",
+                        //     heartbeat_confirm_msg.clone(),
+                        //     heartbeat_shard
+                        // );
+                    }
                 }
             }
             info!("Node commits block {:?} successfully", _block); // {:?} means: display based on the Debug function

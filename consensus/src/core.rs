@@ -12,7 +12,7 @@ use async_recursion::async_recursion;
 use bytes::Bytes;
 use crypto::Hash as _;
 use crypto::{PublicKey, SignatureService};
-use log::{debug, error, info, warn};
+use log::{debug, error, warn};
 use network::SimpleSender;
 use std::cmp::max;
 use std::collections::VecDeque;
@@ -136,13 +136,13 @@ impl Core {
         // Send all the newly committed blocks to the node's application layer.
         while let Some(block) = to_commit.pop_back() {
             if !block.payload.is_empty() {
-                info!("Committed {}", block);
+                // info!("Committed {}", block);
 
-                #[cfg(feature = "benchmark")]
-                for x in &block.payload {
-                    // NOTE: This log entry is used to compute performance.
-                    info!("Committed {} -> {:?}", block, x);
-                }
+                // #[cfg(feature = "benchmark")]
+                // for x in &block.payload {
+                //     // NOTE: This log entry is used to compute performance.
+                //     info!("Committed {} -> {:?}", block, x);
+                // }
             }
             debug!("Committed {:?}", block);
             if let Err(e) = self.tx_commit.send(block).await {
@@ -221,7 +221,7 @@ impl Core {
     }
 
     async fn handle_timeout(&mut self, timeout: &Timeout) -> ConsensusResult<()> {
-        debug!("Processing {:?}", timeout);
+        // debug!("Processing {:?}", timeout);
         if timeout.round < self.round {
             return Ok(());
         }
