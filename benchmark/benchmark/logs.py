@@ -293,11 +293,14 @@ class ShardLogParser:
                 results = p.map(self._parse_executors, executors)
         except (ValueError, IndexError) as e:
             raise ParseError(f'Failed to parse executor logs: {e}')
-        self.liveness_threshold, proposals, commits, shard_one_commits, arete_commits_to_round, arete_rounds_to_timestamp, sizes, self.received_samples, timeouts, self.configs \
+        self.liveness_threshold, proposals, commits, shard_one_commits, arete_commits_to_round, arete_rounds_to_timestamp, sizes, self.received_samples, timeouts, self.configs, digest_rounds, vote_round_timestamp \
             = zip(*results)
         self.proposals = self._merge_results([x.items() for x in proposals])
         self.commits = self._merge_results([x.items() for x in commits])
         self.shard_one_commits = self._merge_results([x.items() for x in shard_one_commits])
+        self.digest_rounds = self._update_digest_rounds_results([x.items() for x in digest_rounds])
+        self.vote_round_timestamp = self._update_vote_round_timestamp_results([x.items() for x in vote_round_timestamp])
+        
         # self.arete_commits_to_round -> dict{string: string}
         self.arete_commits_to_round = self._get_dict_merge_arete_round_results([x.items() for x in arete_commits_to_round])
         
@@ -336,6 +339,24 @@ class ShardLogParser:
                     merged[k] = v
         return merged
     
+    def _update_digest_rounds_results(self, input):
+        # Keep the earliest timestamp.
+        merged = {}
+        for x in input:
+            for k, v in x:
+                if not k in merged:
+                    merged[k] = int(v)
+        return merged
+    
+    def _update_vote_round_timestamp_results(self, input):
+        # Keep the earliest timestamp.
+        merged = {}
+        for x in input:
+            for k, v in x:
+                if not int(k) in merged or merged[int(k)] > v:
+                    merged[int(k)] = v
+        return merged
+    
     def _merge_proposals_results(self, input):
         # Keep the earliest timestamp.
         merged = {}
@@ -355,6 +376,31 @@ class ShardLogParser:
                     if not k in merged or merged[k] > v:
                         merged[k] = v
         return merged
+    
+    # <ctx_block_digest, commit_round>
+    def _merge_digest_to_rounds_results(self, input):
+        # Keep the earliest timestamp.
+        merged = {}
+        digest_to_time = {}
+        for x in input:
+            for s, d, r, t in x:
+                if int(s) == 0:
+                    if not d in digest_to_time or digest_to_time[d] > t:
+                        digest_to_time[d] = t
+                        merged[d] = r
+        return merged
+    
+    # <vote_round, timestamp>
+    def _merge_vote_round_to_timestamp_results(self, input):
+        # Keep the earliest timestamp.
+        merged = {}
+        for x in input:
+            for s, r, t in x:
+                if int(s) == 0:
+                    if not r in merged or merged[r] > t:
+                        merged[r] = t
+        return merged
+    
     def _merge_shard_one_commits_results(self, input):
         # Keep the earliest timestamp.
         merged = {}
@@ -463,21 +509,28 @@ class ShardLogParser:
 
         liveness_threshold = float(search(r'Liveness threshold is: (\d+.\d+|\d+)', log).group(1))
         
-        tmp = findall(r'\[(.*Z) .* Shard (\d+) Created B\d+ -> ([^ ]+=)', log)
+        tmp = findall(r'\[(.*Z) .* Shard (\d+) Created EB\d+ -> ([^ ]+=)', log)
         tmp = [(s, d, self._to_posix(t)) for t, s, d in tmp]
         proposals = self._merge_proposals_results([tmp])
 
-        # tmp = findall(r'\[(.*Z) .* Shard (\d+) Committed B\d+ -> ([^ ]+=)', log)
-        # tmp = [(s, d, self._to_posix(t)) for t, s, d in tmp]
-        # commits = self._merge_commits_results([tmp])
-        # shard_one_commits = self._merge_shard_one_commits_results([tmp])
+        tmp = findall(r'\[(.*Z) .* Shard (\d+) Committed EBlock in round (\d+) -> ([^ ]+=)', log)
+        tmp_commit = [(s, d, self._to_posix(t)) for t, s, _, d in tmp]
+        commits = self._merge_commits_results([tmp_commit])
+        tmp_round = [(s, d, r, self._to_posix(t)) for t, s, r, d in tmp]
+        # <ctx_block_digest, commit_round>
+        digest_rounds = self._merge_digest_to_rounds_results([tmp_round])
+        # print("digest_rounds is", digest_rounds)
+        shard_one_commits = self._merge_shard_one_commits_results([tmp_commit])
+        
+        tmp = findall(r'\[(.*Z) .* Shard (\d+) Committed Vote in round (\d+)', log)
+        tmp_vote = [(s, r, self._to_posix(t)) for t, s, r in tmp]
+        # <vote_round, timestamp>
+        vote_round_timestamp = self._merge_vote_round_to_timestamp_results([tmp_vote])
+        # print("vote_round_timestamp has", len(vote_round_timestamp))
         
         # batch_digest is picked by the ordering shard
         # arete_commits_to_round[batch_digest] = executed_batch_round
-        tmp = findall(r'\[(.*Z) .* ARETE shard (\d+) Committed B\d+ -> ([^ ]+=) in round (\d+)', log)
-        tmp_commits = [(s, d, self._to_posix(t)) for t, s, d, _ in tmp]
-        commits = self._merge_commits_results([tmp_commits])
-        shard_one_commits = self._merge_shard_one_commits_results([tmp_commits])
+        tmp = findall(r'\[(.*Z) .* ARETE shard (\d+) Committed -> ([^ ]+=) in round (\d+)', log)
         tmp = [(s, d, r, self._to_posix(t)) for t, s, d, r in tmp]
         arete_commits_to_round = self._merge_arete_round_results([tmp])
         
@@ -527,7 +580,7 @@ class ShardLogParser:
         }
 
         # return proposals, commits, sizes, samples, timeouts, configs, block_intervals
-        return liveness_threshold, proposals, commits, shard_one_commits, arete_commits_to_round, arete_rounds_to_timestamp, sizes, samples, timeouts, configs
+        return liveness_threshold, proposals, commits, shard_one_commits, arete_commits_to_round, arete_rounds_to_timestamp, sizes, samples, timeouts, configs, digest_rounds, vote_round_timestamp
 
     def _to_posix(self, string):
         x = datetime.fromisoformat(string.replace('Z', '+00:00'))
@@ -654,6 +707,44 @@ class ShardLogParser:
                     latency += [end-start]
         return mean(latency) if latency else 0
     
+    def _test_end_to_end_intra_latency(self):
+        latency = []
+        if len(self.vote_round_timestamp.values()) == 0:
+            Print.warn('cannot capture the confirmation of cross-shard transactions')
+            # return mean(latency) if latency else 0
+        # end_time = max(self.vote_round_timestamp.values())
+        for sent, received in zip(self.sent_samples, self.received_samples):
+            for tx_id, batch_id in received.items():
+                if batch_id in self.shard_one_commits and batch_id in self.digest_rounds:
+                    if not tx_id in sent:
+                        continue
+                    # We dont consider itx with timestamp after ctx
+                    # if float(self.shard_one_commits[batch_id]) > float(end_time):
+                    #     continue
+                    # assert tx_id in sent  # We receive txs that we sent.
+                    start = sent[tx_id]
+                    end = self.shard_one_commits[batch_id]
+                    latency += [end-start]
+        # print("intra shard latency", len(latency))
+        return mean(latency) if latency else 0
+    
+    def _test_end_to_end_cross_latency(self):
+        latency = []
+        for sent, received in zip(self.sent_samples, self.received_samples):
+            for tx_id, batch_id in received.items():
+                if batch_id in self.commits:
+                    if not tx_id in sent:
+                        continue
+                    if batch_id in self.digest_rounds:
+                        tx_round = self.digest_rounds[batch_id]
+                        int_tx_round = int(tx_round)
+                        if int_tx_round in self.vote_round_timestamp:
+                            start = sent[tx_id]
+                            end = self.vote_round_timestamp[int_tx_round]
+                            latency += [end-start]
+        # print("cross shard latency", len(latency))
+        return mean(latency) if latency else 0
+                    
     # Compared sharding protocols: adopt a lock-based protocol
     def _end_to_end_cross_latency(self):
         latency = []
@@ -729,14 +820,16 @@ class ShardLogParser:
         # consensus_latency = self._consensus_latency() * 1000
         consensus_tps, consensus_bps, _ = self._consensus_throughput()
         end_to_end_tps, end_to_end_bps, duration = self._end_to_end_throughput()
-        end_to_end_intra_latency = self._end_to_end_intra_latency() * 1000
-        end_to_end_cross_latency = self._end_to_end_cross_latency() * 1000
+        # end_to_end_intra_latency = self._end_to_end_intra_latency() * 1000
+        # end_to_end_cross_latency = self._end_to_end_cross_latency() * 1000
+        end_to_end_intra_latency = self._test_end_to_end_intra_latency() * 1000
+        end_to_end_cross_latency = self._test_end_to_end_cross_latency() * 1000
         
-        # arete_consensus_latency = self._avg_consensus_interval() * 1000
-        # arete_consensus_tps, arete_consensus_bps, _ = self._arete_consensus_throughput()
-        # arete_end_to_end_tps, arete_end_to_end_bps, arete_duration = self._end_to_end_arete_throughput()
-        # arete_end_to_end_intra_latency = self._arete_end_to_end_intra_latency() * 1000
-        # arete_end_to_end_cross_latency = self._arete_end_to_end_cross_latency() * 1000
+        arete_consensus_latency = self._avg_consensus_interval() * 1000
+        arete_consensus_tps, arete_consensus_bps, _ = self._arete_consensus_throughput()
+        arete_end_to_end_tps, arete_end_to_end_bps, arete_duration = self._end_to_end_arete_throughput()
+        arete_end_to_end_intra_latency = self._arete_end_to_end_intra_latency() * 1000
+        arete_end_to_end_cross_latency = self._arete_end_to_end_cross_latency() * 1000
 
         consensus_timeout_delay = self.configs[0]['consensus']['certify_timeout_delay']
         consensus_sync_retry_delay = self.configs[0]['consensus']['certify_sync_retry_delay']
@@ -772,7 +865,7 @@ class ShardLogParser:
             f' Mempool max batch delay: {mempool_max_batch_delay:,} ms\n'
             '\n'
             ' + RESULTS:\n'
-            f' Benchmark Sharding:\n'
+            f' ARETE:\n'
             f' Consensus TPS: {round(consensus_tps):,} tx/s\n'
             f' Consensus BPS: {round(consensus_bps):,} B/s\n'
             f' End-to-end TPS: {round(end_to_end_tps):,} tx/s\n'

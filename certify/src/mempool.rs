@@ -1,27 +1,30 @@
-use crate::consensus::{Round, CHANNEL_CAPACITY};
-use crate::error::{ConsensusError, ConsensusResult};
-use crate::messages::EBlock;
+// use crate::consensus::{Round, CHANNEL_CAPACITY};
+use crate::consensus::CHANNEL_CAPACITY;
+// use crate::error::{ConsensusError, ConsensusResult};
+use crate::error::ConsensusResult;
+// use crate::messages::EBlock;
 use crypto::Digest;
 use crypto::Hash as _;
-use futures::future::try_join_all;
+// use futures::future::try_join_all;
 use futures::stream::futures_unordered::FuturesUnordered;
 use futures::stream::StreamExt as _;
 use log::error;
-use execpool::ConsensusMempoolMessage;
+use execpool::ExecutionMempoolMessage;
 use std::collections::HashMap;
 use store::Store;
 use tokio::sync::mpsc::{channel, Receiver, Sender};
+use types::{EBlock, ConfirmMessage};
 
 pub struct MempoolDriver {
     store: Store,
-    tx_mempool: Sender<ConsensusMempoolMessage>,
+    tx_mempool: Sender<ExecutionMempoolMessage>,
     tx_payload_waiter: Sender<PayloadWaiterMessage>,
 }
 
 impl MempoolDriver {
     pub fn new(
         store: Store,
-        tx_mempool: Sender<ConsensusMempoolMessage>,
+        tx_mempool: Sender<ExecutionMempoolMessage>,
         tx_loopback: Sender<EBlock>,
     ) -> Self {
         let (tx_payload_waiter, rx_payload_waiter) = channel(CHANNEL_CAPACITY);
@@ -37,51 +40,73 @@ impl MempoolDriver {
         }
     }
 
-    pub async fn verify(&mut self, block: EBlock) -> ConsensusResult<bool> {
-        let mut missing = Vec::new();
-        for x in &block.payload {
-            if self.store.read(x.to_vec()).await?.is_none() {
-                missing.push(x.clone());
+    pub async fn verify(&mut self, confirm_msg: ConfirmMessage) -> ConsensusResult<bool> {
+        let mut missing: bool = false;
+        for block_creator in &confirm_msg.block_hashes {
+            if self.store.read(block_creator.ebhash.to_vec()).await?.is_none() {
+                missing = true;
+                // missing this eblock
+                let message = ExecutionMempoolMessage::Synchronize(block_creator.ebhash.clone(), block_creator.author.clone());
+                self.tx_mempool
+                    .send(message)
+                    .await
+                    .expect("Failed to send sync message");
+
+                self.tx_payload_waiter
+                    .send(PayloadWaiterMessage::Wait(block_creator.ebhash.clone()))
+                    .await
+                    .expect("Failed to send message to payload waiter");
             }
         }
-
-        if missing.is_empty() {
+        if missing {
+            return Ok(false);
+        }
+        else {
             return Ok(true);
         }
 
-        let message = ConsensusMempoolMessage::Synchronize(missing.clone(), block.author);
-        self.tx_mempool
-            .send(message)
-            .await
-            .expect("Failed to send sync message");
+        // let mut missing = Vec::new();
+        // for (author, hash) in &confirm_msg.block_hashes {
+        //     if self.store.read(x.to_vec()).await?.is_none() {
+        //         missing.push(x.clone());
+        //     }
+        // }
 
-        self.tx_payload_waiter
-            .send(PayloadWaiterMessage::Wait(missing, Box::new(block)))
-            .await
-            .expect("Failed to send message to payload waiter");
+        // if missing.is_empty() {
+        //     return Ok(true);
+        // }
 
-        Ok(false)
+        // let message = ExecutionMempoolMessage::Synchronize(missing.clone(), block.author);
+        // self.tx_mempool
+        //     .send(message)
+        //     .await
+        //     .expect("Failed to send sync message");
+
+        // self.tx_payload_waiter
+        //     .send(PayloadWaiterMessage::Wait(missing, Box::new(block)))
+        //     .await
+        //     .expect("Failed to send message to payload waiter");
     }
 
-    pub async fn cleanup(&mut self, round: Round) {
-        // Cleanup the mempool.
-        self.tx_mempool
-            .send(ConsensusMempoolMessage::Cleanup(round))
-            .await
-            .expect("Failed to send cleanup message");
+    // pub async fn cleanup(&mut self, round: Round) {
+    //     // Cleanup the mempool.
+    //     self.tx_mempool
+    //         .send(ExecutionMempoolMessage::Cleanup(round))
+    //         .await
+    //         .expect("Failed to send cleanup message");
 
-        // Cleanup the payload waiter.
-        self.tx_payload_waiter
-            .send(PayloadWaiterMessage::Cleanup(round))
-            .await
-            .expect("Failed to send cleanup message");
-    }
+    //     // Cleanup the payload waiter.
+    //     // self.tx_payload_waiter
+    //     //     .send(PayloadWaiterMessage::Cleanup(round))
+    //     //     .await
+    //     //     .expect("Failed to send cleanup message");
+    // }
 }
 
 #[derive(Debug)]
 enum PayloadWaiterMessage {
-    Wait(Vec<Digest>, Box<EBlock>),
-    Cleanup(Round),
+    Wait(Digest),
+    // Cleanup(Round),
 }
 
 struct PayloadWaiter {
@@ -109,17 +134,18 @@ impl PayloadWaiter {
 
     async fn waiter(
         mut missing: Vec<(Digest, Store)>,
-        deliver: Box<EBlock>,
+        // deliver: EBlock,
         mut handler: Receiver<()>,
     ) -> ConsensusResult<Option<Box<EBlock>>> {
-        let waiting: Vec<_> = missing
+        let _: Vec<_> = missing
             .iter_mut()
             .map(|(x, y)| y.notify_read(x.to_vec()))
             .collect();
+        // check if our store has the eblock
         tokio::select! {
-            result = try_join_all(waiting) => {
-                result.map(|_| Some(deliver)).map_err(ConsensusError::from)
-            }
+            // result = try_join_all(waiting) => {
+            //     result.map(|_| Some(deliver)).map_err(ConsensusError::from)
+            // }
             _ = handler.recv() => Ok(None),
         }
     }
@@ -132,27 +158,28 @@ impl PayloadWaiter {
         loop {
             tokio::select! {
                 Some(message) = self.rx_message.recv() => match message {
-                    PayloadWaiterMessage::Wait(missing, block) => {
-                        let block_digest = block.digest();
+                    PayloadWaiterMessage::Wait(missing) => {
+                        let block_digest = missing.clone();
 
                         if pending.contains_key(&block_digest) {
                             continue;
                         }
 
                         let (tx_cancel, rx_cancel) = channel(1);
-                        pending.insert(block_digest, (block.round, tx_cancel));
-                        let wait_for = missing.iter().cloned().map(|x| (x, store_copy.clone())).collect();
-                        let fut = Self::waiter(wait_for, block, rx_cancel);
+                        pending.insert(block_digest, (1, tx_cancel));
+                        let wait_for = vec![(missing.clone(), store_copy.clone())];
+                        // = missing.iter().cloned().map(|x| (x, store_copy.clone())).collect();
+                        let fut = Self::waiter(wait_for, rx_cancel);
                         waiting.push(fut);
                     },
-                    PayloadWaiterMessage::Cleanup(mut round) => {
-                        for (r, handler) in pending.values() {
-                            if r <= &round {
-                                let _ = handler.send(()).await;
-                            }
-                        }
-                        pending.retain(|_, (r, _)| r > &mut round);
-                    }
+                    // PayloadWaiterMessage::Cleanup(mut round) => {
+                    //     for (r, handler) in pending.values() {
+                    //         if r <= &round {
+                    //             let _ = handler.send(()).await;
+                    //         }
+                    //     }
+                    //     pending.retain(|_, (r, _)| r > &mut round);
+                    // }
                 },
                 Some(result) = waiting.next() => {
                     match result {

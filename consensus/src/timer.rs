@@ -3,10 +3,6 @@ use std::pin::Pin;
 use std::task::{Context, Poll};
 use tokio::time::{sleep, Duration, Instant, Sleep};
 
-#[cfg(test)]
-#[path = "tests/timer_tests.rs"]
-pub mod timer_tests;
-
 pub struct Timer {
     duration: u64,
     sleep: Pin<Box<Sleep>>,

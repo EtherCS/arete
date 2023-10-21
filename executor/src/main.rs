@@ -86,10 +86,10 @@ async fn main() {
         } => match Executor::new(&committee, &keys, &store, parameters).await {
             Ok(mut executor) => {
                 tokio::spawn(async move {
-                    let _ = executor.analyze_block().await;
+                    let _ = executor.send_certificate_message().await;
                 })
                 .await
-                .expect("Failed to analyze committed blocks");
+                .expect("Failed to send certificate message to the ordering shard");
             }
             Err(e) => error!("{}", e),
         },
@@ -161,9 +161,9 @@ fn deploy_testbed(executors: u16) -> Result<Vec<JoinHandle<()>>, Box<dyn std::er
 
             Ok(tokio::spawn(async move {
                 match Executor::new(committee_file, &key_file, &store_path, None).await {
-                    Ok(mut executor) => {
+                    Ok(_) => {
                         // Sink the commit channel.
-                        while executor.commit.recv().await.is_some() {}
+                        // while executor.commit.recv().await.is_some() {}
                     }
                     Err(e) => error!("{}", e),
                 }

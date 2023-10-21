@@ -69,8 +69,7 @@ impl ExecutionCommittee {
     // need (1-liveness_threshold)*total_stake
     pub fn quorum_threshold(&self) -> Stake {
         let total_votes: Stake = self.authorities.values().map(|x| x.stake).sum();
-        // ((1.0-self.liveness_threshold).floor() as u32) * total_votes + 1
-        ((1.0-self.liveness_threshold) * total_votes as f32).ceil() as u32
+        ((1.0-self.liveness_threshold) * total_votes as f32).floor() as u32 + 1
     }
 
     pub fn address(&self, name: &PublicKey) -> Option<SocketAddr> {

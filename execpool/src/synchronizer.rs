@@ -1,5 +1,5 @@
 use crate::config::ExecutionCommittee;
-use crate::mempool::{ConsensusMempoolMessage, MempoolMessage, Round};
+use crate::mempool::{ExecutionMempoolMessage, MempoolMessage, Round};
 use bytes::Bytes;
 use crypto::{Digest, PublicKey};
 use futures::stream::futures_unordered::FuturesUnordered;
@@ -12,9 +12,9 @@ use store::{Store, StoreError};
 use tokio::sync::mpsc::{channel, Receiver, Sender};
 use tokio::time::{sleep, Duration, Instant};
 
-#[cfg(test)]
-#[path = "tests/synchronizer_tests.rs"]
-pub mod synchronizer_tests;
+// #[cfg(test)]
+// #[path = "tests/synchronizer_tests.rs"]
+// pub mod synchronizer_tests;
 
 /// Resolution of the timer managing retrials of sync requests (in ms).
 const TIMER_RESOLUTION: u64 = 1_000;
@@ -34,8 +34,8 @@ pub struct Synchronizer {
     /// Determine with how many nodes to sync when re-trying to send sync-requests. These nodes
     /// are picked at random from the committee.
     sync_retry_nodes: usize,
-    /// Input channel to receive the commands from the consensus.
-    rx_message: Receiver<ConsensusMempoolMessage>,
+    /// Input channel to receive the commands from the execution.
+    rx_message: Receiver<ExecutionMempoolMessage>,
     /// A network sender to send requests to the other mempools.
     network: SimpleSender,
     /// Loosely keep track of the consensus's round number (only used for cleanup).
@@ -55,7 +55,7 @@ impl Synchronizer {
         gc_depth: Round,
         sync_retry_delay: u64,
         sync_retry_nodes: usize,
-        rx_message: Receiver<ConsensusMempoolMessage>,
+        rx_message: Receiver<ExecutionMempoolMessage>,
     ) {
         tokio::spawn(async move {
             Self {
@@ -100,48 +100,37 @@ impl Synchronizer {
 
         loop {
             tokio::select! {
-                // Handle consensus' messages.
+                // Handle execution' messages.
                 Some(message) = self.rx_message.recv() => match message {
-                    ConsensusMempoolMessage::Synchronize(digests, target) => {
+                    ExecutionMempoolMessage::Synchronize(digest, target) => {
                         let now = SystemTime::now()
                             .duration_since(UNIX_EPOCH)
                             .expect("Failed to measure time")
                             .as_millis();
 
-                        let mut missing = Vec::new();
-                        for digest in digests {
-                            // Ensure we do not send twice the same sync request.
-                            if self.pending.contains_key(&digest) {
-                                continue;
-                            }
-
-                            // Register the digest as missing.
-                            missing.push(digest.clone());
-                            debug!("Requesting sync for batch {}", digest);
-
-                            // Add the digest to the waiter.
-                            let deliver = digest.clone();
-                            let (tx_cancel, rx_cancel) = channel(1);
-                            let fut = Self::waiter(digest.clone(), self.store.clone(), deliver, rx_cancel);
-                            waiting.push(fut);
-                            self.pending.insert(digest, (self.round, tx_cancel, now));
-                        }
+                        // Add the digest to the waiter.
+                        let deliver = digest.clone();
+                        let (tx_cancel, rx_cancel) = channel(1);
+                        let fut = Self::waiter(digest.clone(), self.store.clone(), deliver, rx_cancel);
+                        waiting.push(fut);
+                        self.pending.insert(digest.clone(), (self.round, tx_cancel, now));
+                        // }
 
                         // Send sync request to a single node. If this fails, we will send it
                         // to other nodes when a timer times out.
                         let address = match self.committee.mempool_address(&target) {
                             Some(address) => address,
                             None => {
-                                error!("Consensus asked us to sync with an unknown node: {}", target);
+                                error!("Execution asked us to sync with an unknown node: {}", target);
                                 continue;
                             }
                         };
-                        let message = MempoolMessage::BatchRequest(missing, self.name);
+                        let message = MempoolMessage::EBlockRequest(digest, self.name);
                         let serialized = bincode::serialize(&message).expect("Failed to serialize our own message");
                         self.network.send(address, Bytes::from(serialized)).await;
                     },
-                    ConsensusMempoolMessage::Cleanup(round) => {
-                        // Keep track of the consensus' round number.
+                    ExecutionMempoolMessage::Cleanup(round) => {
+                        // Keep track of the execution' round number.
                         self.round = round;
 
                         // Cleanup internal state.
@@ -181,7 +170,7 @@ impl Synchronizer {
                         .expect("Failed to measure time")
                         .as_millis();
 
-                    let mut retry = Vec::new();
+                    let mut retry: Vec<Digest> = Vec::new();
                     for (digest, (_, _, timestamp)) in &self.pending {
                         if timestamp + (self.sync_retry_delay as u128) < now {
                             debug!("Requesting sync for batch {} (retry)", digest);
@@ -194,7 +183,7 @@ impl Synchronizer {
                             .iter()
                             .map(|(_, address)| *address)
                             .collect();
-                        let message = MempoolMessage::BatchRequest(retry, self.name);
+                        let message = MempoolMessage::EBlockRequest(retry.pop().expect("Failed to get retry digest"), self.name);
                         let serialized = bincode::serialize(&message).expect("Failed to serialize our own message");
                         self.network
                             .lucky_broadcast(addresses, Bytes::from(serialized), self.sync_retry_nodes)

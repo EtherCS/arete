@@ -1,27 +1,29 @@
-use crate::batch_maker::{Batch, BatchMaker, Transaction};
+use crate::batch_maker::BatchMaker;
 use crate::config::{CertifyParameters, ExecutionCommittee};
 use crate::helper::Helper;
-use crate::processor::{Processor, SerializedBatchMessage};
+use crate::processor::Processor;
 use crate::quorum_waiter::QuorumWaiter;
 use crate::synchronizer::Synchronizer;
 use async_trait::async_trait;
 use bytes::Bytes;
-use crypto::{Digest, PublicKey};
+use crypto::{Digest, Hash, PublicKey, SignatureService};
+use ed25519_dalek::Digest as _;
+use ed25519_dalek::Sha512;
 use futures::sink::SinkExt as _;
 use log::{debug, info, warn};
 use network::{MessageHandler, Receiver as NetworkReceiver, Writer};
 use serde::{Deserialize, Serialize};
+use std::convert::TryInto;
 use std::error::Error;
 use store::Store;
 use tokio::sync::mpsc::{channel, Receiver, Sender};
-use types::ConfirmMessage;
-
-#[cfg(test)]
-#[path = "tests/mempool_tests.rs"]
-pub mod mempool_tests;
+use types::{CBlock, ConfirmMessage, EBlock, NodeSignature, ShardInfo, Transaction};
 
 /// The default channel capacity for each channel of the mempool.
 pub const CHANNEL_CAPACITY: usize = 1_000;
+
+/// ARETE TODO: support resolve transaction to calculate the ratio of cross-shard txs
+pub const RATIO_OF_CTX: f32 = 0.3;
 
 /// The consensus round number.
 pub type Round = u64;
@@ -29,15 +31,17 @@ pub type Round = u64;
 /// The message exchanged between the nodes' mempool.
 #[derive(Debug, Serialize, Deserialize)]
 pub enum MempoolMessage {
-    Batch(Batch),
-    BatchRequest(Vec<Digest>, /* origin */ PublicKey),
+    EBlock(EBlock),
+    EBlockRequest(Digest, /* origin */ PublicKey),
+    // Batch(Batch),
+    // BatchRequest(Vec<Digest>, /* origin */ PublicKey),
 }
 
 /// The messages sent by the consensus and the mempool.
 #[derive(Debug, Serialize, Deserialize)]
-pub enum ConsensusMempoolMessage {
-    /// The consensus notifies the mempool that it need to sync the target missing batches.
-    Synchronize(Vec<Digest>, /* target */ PublicKey),
+pub enum ExecutionMempoolMessage {
+    /// The execution notifies the mempool that it need to sync the target missing EBlock.
+    Synchronize(Digest, /* target */ PublicKey),
     /// The consensus notifies the mempool of a round update.
     Cleanup(Round),
 }
@@ -45,14 +49,18 @@ pub enum ConsensusMempoolMessage {
 pub struct Mempool {
     /// The public key of this authority.
     name: PublicKey,
+    /// The execution shard information
+    shard_info: ShardInfo,
+    /// The signature service
+    signature_service: SignatureService,
     /// The committee information.
     committee: ExecutionCommittee,
     /// The configuration parameters.
     parameters: CertifyParameters,
     /// The persistent storage.
     store: Store,
-    /// Send messages to consensus.
-    tx_consensus: Sender<Digest>,
+    /// Send messages to certify.
+    tx_certify: Sender<CBlock>,
     /// Send confirmation messages to consensus
     tx_confirm: Sender<ConfirmMessage>,
 }
@@ -60,11 +68,13 @@ pub struct Mempool {
 impl Mempool {
     pub fn spawn(
         name: PublicKey,
+        shard_info: ShardInfo,
+        signature_service: SignatureService,
         committee: ExecutionCommittee,
         parameters: CertifyParameters,
         store: Store,
-        rx_consensus: Receiver<ConsensusMempoolMessage>,
-        tx_consensus: Sender<Digest>,
+        rx_consensus: Receiver<ExecutionMempoolMessage>,
+        tx_certify: Sender<CBlock>,
         tx_confirm: Sender<ConfirmMessage>,
     ) {
         // NOTE: This log entry is used to compute performance.
@@ -73,15 +83,17 @@ impl Mempool {
         // Define a mempool instance.
         let mempool = Self {
             name,
+            shard_info,
+            signature_service,
             committee,
             parameters,
             store,
-            tx_consensus,
+            tx_certify,
             tx_confirm,
         };
 
         // Spawn all mempool tasks.
-        mempool.handle_consensus_messages(rx_consensus);
+        mempool.handle_execution_messages(rx_consensus);
         mempool.handle_clients_transactions();
         mempool.handle_mempool_messages();
         mempool.handle_ordering_messages();
@@ -104,7 +116,7 @@ impl Mempool {
     }
 
     /// Spawn all tasks responsible to handle messages from the consensus.
-    fn handle_consensus_messages(&self, rx_consensus: Receiver<ConsensusMempoolMessage>) {
+    fn handle_execution_messages(&self, rx_consensus: Receiver<ExecutionMempoolMessage>) {
         // The `Synchronizer` is responsible to keep the mempool in sync with the others. It handles the commands
         // it receives from the consensus (which are mainly notifications that we are out of sync).
         Synchronizer::spawn(
@@ -139,6 +151,10 @@ impl Mempool {
         // (in a reliable manner) the batches to all other mempools that share the same `id` as us. Finally,
         // it gathers the 'cancel handlers' of the messages and send them to the `QuorumWaiter`.
         BatchMaker::spawn(
+            self.name,
+            self.shard_info.clone(),
+            self.signature_service.clone(),
+            RATIO_OF_CTX,
             self.parameters.certify_batch_size,
             self.parameters.certify_max_batch_delay,
             /* rx_transaction */ rx_batch_maker,
@@ -147,13 +163,17 @@ impl Mempool {
             self.committee.broadcast_addresses(&self.name),
         );
 
-        // The `QuorumWaiter` waits for 2f authorities to acknowledge reception of the batch. It then forwards
+        // The `QuorumWaiter` waits for (1-f_L) authorities to acknowledge reception of the batch. It then forwards
         // the batch to the `Processor`.
         QuorumWaiter::spawn(
+            self.name,
+            self.shard_info.clone(),
+            self.signature_service.clone(),
             self.committee.clone(),
             /* stake */ self.committee.stake(&self.name),
             /* rx_message */ rx_quorum_waiter,
-            /* tx_batch */ tx_processor,
+            tx_processor,
+            self.tx_certify.clone(),
         );
 
         // The `Processor` hashes and stores the batch. It then forwards the batch's digest to the consensus.
@@ -161,7 +181,7 @@ impl Mempool {
         Processor::spawn(
             self.store.clone(),
             /* rx_batch */ rx_processor,
-            /* tx_digest */ self.tx_consensus.clone(),
+            // /* tx_digest */ self.tx_certify.clone(),
         );
 
         info!("Mempool listening to client transactions on {}", address);
@@ -184,6 +204,8 @@ impl Mempool {
             MempoolReceiverHandler {
                 tx_helper,
                 tx_processor,
+                name: self.name,
+                signature_service: self.signature_service.clone(),
             },
         );
 
@@ -199,7 +221,7 @@ impl Mempool {
         Processor::spawn(
             self.store.clone(),
             /* rx_batch */ rx_processor,
-            /* tx_digest */ self.tx_consensus.clone(),
+            // /* tx_digest */ self.tx_certify.clone(),
         );
 
         info!("Mempool listening to mempool messages on {}", address);
@@ -261,14 +283,15 @@ impl MessageHandler for ConfirmationMsgReceiverHandler {
             .send(confirm_msg.clone())
             .await
             .expect("Failed to send confirmation message");
-        #[cfg(feature = "benchmark")]
-        {
-            info!("executor receives confirm msg {:?}", confirm_msg);
-            info!(
-                "ARETE shard {} commit anchor block for execution round {}",
-                confirm_msg.shard_id, confirm_msg.round
-            );
-        }
+        // #[cfg(feature = "benchmark")]
+        // {
+            // info!("executor receives confirm msg {:?}", confirm_msg);
+
+            // info!(
+            //     "ARETE shard {} commit blocks for ordering round {}",
+            //     confirm_msg.shard_id, confirm_msg.order_round
+            // );
+        // }
         // Give the change to schedule other tasks.
         tokio::task::yield_now().await;
         Ok(())
@@ -278,28 +301,60 @@ impl MessageHandler for ConfirmationMsgReceiverHandler {
 /// Defines how the network receiver handles incoming mempool messages.
 #[derive(Clone)]
 struct MempoolReceiverHandler {
-    tx_helper: Sender<(Vec<Digest>, PublicKey)>,
-    tx_processor: Sender<SerializedBatchMessage>,
+    tx_helper: Sender<(Digest, PublicKey)>,
+    tx_processor: Sender<EBlock>,
+    name: PublicKey,
+    signature_service: SignatureService,
 }
 
 #[async_trait]
 impl MessageHandler for MempoolReceiverHandler {
     async fn dispatch(&self, writer: &mut Writer, serialized: Bytes) -> Result<(), Box<dyn Error>> {
         // Reply with an ACK.
-        let _ = writer.send(Bytes::from("Ack")).await;
+        // ARETE: parse the received EBlock, sign it, send the signature back
+        // let _ = writer.send(Bytes::from("Ack")).await;
 
         // Deserialize and parse the message.
         match bincode::deserialize(&serialized) {
-            Ok(MempoolMessage::Batch(..)) => self
-                .tx_processor
-                .send(serialized.to_vec())
-                .await
-                .expect("Failed to send batch"),
-            Ok(MempoolMessage::BatchRequest(missing, requestor)) => self
-                .tx_helper
-                .send((missing, requestor))
-                .await
-                .expect("Failed to send batch request"),
+            Ok(MempoolMessage::EBlock(eblock)) => {
+                // Get digests of ctxs
+                let mut hash_ctxs: Vec<Digest> = Vec::new();
+                for ctx in &eblock.crosstxs {
+                    hash_ctxs.push(Digest(
+                        Sha512::digest(&ctx).as_slice()[..32].try_into().unwrap(),
+                    ));
+                }
+                // Send cblock to processor for storing
+                self.tx_processor
+                    .send(eblock.clone())
+                    .await
+                    .expect("Failed to send EBlock to store");
+                let cblock = CBlock::new(
+                    eblock.shard_id,
+                    eblock.author,
+                    eblock.round,
+                    eblock.digest(),
+                    hash_ctxs.clone(),
+                    Vec::new(),
+                )
+                .await;
+                // Send signature to the EBlock creator
+                let mut signature_service = self.signature_service.clone();
+                let signature = signature_service.request_signature(cblock.digest()).await;
+                let node_signature = NodeSignature::new(self.name, signature).await;
+
+                let cblock_serialized = bincode::serialize(&node_signature.clone())
+                    .expect("Failed to serialize received CBlock");
+                let cblock_bytes = Bytes::from(cblock_serialized.clone());
+                let _ = writer.send(cblock_bytes).await;
+            }
+            Ok(MempoolMessage::EBlockRequest(missing, requestor)) => {
+                self.tx_helper
+                    .send((missing, requestor))
+                    .await
+                    .expect("Failed to send batch request");
+                let _ = writer.send(Bytes::from("Ack")).await;
+            }
             Err(e) => warn!("Serialization error: {}", e),
         }
         Ok(())

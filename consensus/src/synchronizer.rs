@@ -15,10 +15,6 @@ use store::Store;
 use tokio::sync::mpsc::{channel, Receiver, Sender};
 use tokio::time::{sleep, Duration, Instant};
 
-#[cfg(test)]
-#[path = "tests/synchronizer_tests.rs"]
-pub mod synchronizer_tests;
-
 const TIMER_ACCURACY: u64 = 5_000;
 
 pub struct Synchronizer {

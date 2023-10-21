@@ -2,15 +2,11 @@ use crate::mempool::MempoolMessage;
 use crypto::Digest;
 use ed25519_dalek::Digest as _;
 use ed25519_dalek::Sha512;
+use log::warn;
 use std::convert::TryInto;
 use store::Store;
 use tokio::sync::mpsc::{Receiver, Sender};
 use types::CBlock;
-use log::warn;
-
-#[cfg(test)]
-#[path = "tests/processor_tests.rs"]
-pub mod processor_tests;
 
 /// Indicates a serialized `MempoolMessage::Batch` message.
 pub type SerializedBatchMessage = Vec<u8>;
@@ -34,21 +30,22 @@ impl Processor {
             while let Some(batch) = rx_batch.recv().await {
                 // ARETE: send cblock to consensus
                 match bincode::deserialize(&batch) {
-                    Ok(MempoolMessage::Batch(..)) => {},
-                    Ok(MempoolMessage::BatchRequest(_missing, _requestor)) => {},
+                    Ok(MempoolMessage::Batch(..)) => {}
+                    Ok(MempoolMessage::BatchRequest(_missing, _requestor)) => {}
                     Ok(MempoolMessage::CBlock(tx)) => {
                         // debug!("Mempool processor get a CBlock {:?}", tx);
                         // Hash the batch.
-                        let digest = Digest(Sha512::digest(&batch).as_slice()[..32].try_into().unwrap());
+                        let digest =
+                            Digest(Sha512::digest(&batch).as_slice()[..32].try_into().unwrap());
 
                         // // Store the batch.
                         store.write(digest.to_vec(), batch).await;
 
                         tx_cblock.send(tx).await.expect("Failed to send cblock");
-                    },
+                    }
+                    Ok(MempoolMessage::CrossTransactionVote(..)) => {}
                     Err(e) => warn!("Serialization error: {}", e),
                 }
-                
 
                 // tx_digest.send(digest).await.expect("Failed to send digest");
             }

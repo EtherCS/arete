@@ -78,6 +78,7 @@ def localShard(ctx):
         "consensus": {
             "timeout_delay": 4_000,
             "sync_retry_delay": 10_000,
+            "cblock_batch_size": 500,
         },
         "mempool": {
             "gc_depth": 50,
@@ -96,8 +97,8 @@ def localShard(ctx):
             "certify_gc_depth": 50,
             "certify_sync_retry_delay": 5_000,
             "certify_sync_retry_nodes": 3,
-            "certify_batch_size": 15_000,
-            "certify_max_batch_delay": 10,
+            "certify_batch_size": 40_000,
+            "certify_max_batch_delay": 500,   # sending ratio to the ordering shard (ms)
         },
     }
     try:
@@ -193,6 +194,7 @@ def remote(ctx):
         "consensus": {
             "timeout_delay": 1_000,
             "sync_retry_delay": 10_000,
+            "cblock_batch_size": 500,
         },
         "mempool": {
             "gc_depth": 50,
@@ -212,7 +214,7 @@ def remote(ctx):
             "certify_sync_retry_delay": 5_000,
             "certify_sync_retry_nodes": 3,
             "certify_batch_size": 15_000,
-            "certify_max_batch_delay": 10,
+            "certify_max_batch_delay": 100,
         },
     }
     try:

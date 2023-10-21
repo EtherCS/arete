@@ -12,6 +12,7 @@ pub type EpochNumber = u128;
 pub struct Parameters {
     pub timeout_delay: u64,
     pub sync_retry_delay: u64,
+    pub cblock_batch_size: u64,
 }
 
 impl Default for Parameters {
@@ -19,6 +20,7 @@ impl Default for Parameters {
         Self {
             timeout_delay: 5_000,
             sync_retry_delay: 10_000,
+            cblock_batch_size: 100,
         }
     }
 }
@@ -28,6 +30,7 @@ impl Parameters {
         // NOTE: These log entries are used to compute performance.
         info!("Timeout delay set to {} rounds", self.timeout_delay);
         info!("Sync retry delay set to {} ms", self.sync_retry_delay);
+        info!("CBlock batch size set to {}", self.cblock_batch_size);
     }
 }
 

@@ -2,21 +2,20 @@ use crate::config::{Committee, Stake};
 use crate::consensus::{ConsensusMessage, Round};
 use crate::messages::{OBlock, QC, TC};
 use bytes::Bytes;
-use crypto::{Hash, PublicKey, SignatureService};
+use crypto::{Digest, PublicKey, SignatureService};
 use futures::stream::futures_unordered::FuturesUnordered;
 use futures::stream::StreamExt as _;
 use log::{debug, info};
 use network::{CancelHandler, ReliableSender};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use tokio::sync::mpsc::{Receiver, Sender};
-use types::{CBlock, CBlockMeta, ShardInfo};
-use std::convert::TryFrom;
+use types::{CBlock, CBlockMeta, CrossTransactionVote, ShardInfo, VoteResult};
 
 #[derive(Debug)]
 pub enum ProposerMessage {
     Make(Round, QC, Option<TC>),
-    // Cleanup(Vec<Digest>),
-    Cleanup(Vec<CBlockMeta>),
+    CleanupCBlockMeta(Vec<CBlockMeta>),
+    Cleanup(Vec<VoteResult>),
 }
 
 pub struct Proposer {
@@ -24,13 +23,16 @@ pub struct Proposer {
     committee: Committee,
     shard_info: ShardInfo,
     signature_service: SignatureService,
+    cblock_batch_size: u64,
     // rx_mempool: Receiver<Digest>,
     rx_cblock: Receiver<CBlock>,
     rx_message: Receiver<ProposerMessage>,
+    rx_ctx_vote: Receiver<CrossTransactionVote>,
     tx_loopback: Sender<OBlock>,
     // buffer: HashSet<Digest>,
-    shard_rounds: HashMap<u32, CBlockMeta>, // maintain a map recording [execution_shard_id, max_received_round]
-    max_shard_rounds: HashMap<u32, u64>,    // use it to avoid receiving old CBlocks
+    shard_cblocks: HashMap<u32, HashSet<CBlockMeta>>, // buffer for CBlocks
+    vote_aggregation_trace: HashMap<u64, HashMap<Digest, u8>>, // <consensus_round, vote_results>
+    aggregation_results: HashMap<u64, HashMap<Digest, u8>>, // vote results ready for making blocks
     network: ReliableSender,
 }
 
@@ -40,9 +42,11 @@ impl Proposer {
         committee: Committee,
         shard_info: ShardInfo,
         signature_service: SignatureService,
+        cblock_batch_size: u64,
         // rx_mempool: Receiver<Digest>,
         rx_cblock: Receiver<CBlock>,
         rx_message: Receiver<ProposerMessage>,
+        rx_ctx_vote: Receiver<CrossTransactionVote>,
         tx_loopback: Sender<OBlock>,
     ) {
         tokio::spawn(async move {
@@ -51,11 +55,14 @@ impl Proposer {
                 committee,
                 shard_info,
                 signature_service,
+                cblock_batch_size,
                 rx_cblock,
                 rx_message,
+                rx_ctx_vote,
                 tx_loopback,
-                shard_rounds: HashMap::new(),
-                max_shard_rounds: HashMap::new(),
+                shard_cblocks: HashMap::new(),
+                vote_aggregation_trace: HashMap::new(),
+                aggregation_results: HashMap::new(),
                 network: ReliableSender::new(),
             }
             .run()
@@ -69,40 +76,82 @@ impl Proposer {
         deliver
     }
 
-    async fn update_map(&mut self, payload: Vec<CBlockMeta>) {
-        for cbmeta in payload {
-            if let Some(max_round) = self.max_shard_rounds.get(&cbmeta.shard_id).copied() {
-                if max_round < cbmeta.round {
-                    self.max_shard_rounds.insert(cbmeta.shard_id, cbmeta.round);
+    async fn clean_aggregators(&mut self, commit_rounds: Vec<VoteResult>) {
+        // debug!("Clean vote aggregations {:?}", self.aggregation_results);
+        // debug!("Clean vote aggregation rounds {:?}", commit_rounds);
+        for vote_result in commit_rounds {
+            self.aggregation_results.remove(&vote_result.round);
+        }
+    }
+
+    async fn aggregate_execution(&mut self, ctx_vote: CrossTransactionVote) {
+        let order_round = ctx_vote.order_round;
+        if self.vote_aggregation_trace.contains_key(&order_round) {
+            // ARETE TODO: support cross-shard execution
+            // Current: assume all are successful
+            if let Some(update_aggregation) = self.vote_aggregation_trace.get_mut(&order_round) {
+                for (_, value) in update_aggregation.iter_mut() {
+                    *value = 1;
                 }
+                // Now it receive all vote, and are ready for commit
+                self.aggregation_results
+                    .insert(order_round, update_aggregation.clone());
+                self.vote_aggregation_trace.remove(&order_round);
             }
-            if let Some(s_round) = self.shard_rounds.get(&cbmeta.shard_id) {
-                if s_round.round <= cbmeta.round {
-                    self.shard_rounds.remove(&cbmeta.shard_id);
-                }
-            }
+        } else {
+            self.vote_aggregation_trace
+                .insert(order_round, ctx_vote.votes.clone());
         }
     }
 
     async fn make_block(&mut self, round: Round, qc: QC, tc: Option<TC>) {
-        let shard_num = usize::try_from(self.shard_info.number).unwrap();
-        loop {
-            // wait
-            if self.max_shard_rounds.len() <= shard_num {
+        // Generate a new block.
+        let mut merge_cblockmeta = Vec::new();
+        // Ordering policy: pick as more execution shards as possible
+        for first_cblockmeta in self.shard_cblocks.values() {
+            if let Some(first) = first_cblockmeta.iter().next() {
+                merge_cblockmeta.push(first.clone());
+            }
+        } 
+        for vec_cblockmeta in self.shard_cblocks.values() {
+            merge_cblockmeta.extend(vec_cblockmeta.clone());
+            // limit the size of a new OBlock, prevent timeout due to large data
+            if merge_cblockmeta.len() >= self.cblock_batch_size as usize {
                 break;
             }
         }
-        // Generate a new block.
+        debug!("ARETE trace: aggregation_results size {}", self.aggregation_results.clone().len());
+        debug!("ARETE trace: merge_cblockmeta size {}", merge_cblockmeta.len());
+        // Get vote results that have ready aggregated
+        // ARETE TODO: current only consider execution shard 0 and shard 1
+        let relevant_shards: Vec<u32> = vec![0, 1];
+        let mut temp_aggregators = Vec::new();
+        for (temp_round, _) in self.aggregation_results.clone() {
+            // ARETE TODO: map cross-shard transaction digest to commit/abort
+            // Maybe use bitmap or other data compression technologies 
+            let temp_vote_result =
+                VoteResult::new(temp_round, relevant_shards.clone(), HashMap::new()).await;
+            // let temp_vote_result =
+                // VoteResult::new(temp_round, relevant_shards.clone(), temp_vote_results.clone()).await;
+            temp_aggregators.push(temp_vote_result);
+        }
+
         let block = OBlock::new(
             qc,
             tc,
             self.name,
             round,
-            /* payload */ self.shard_rounds.values().cloned().collect(),
-            HashMap::new(), // TODO: cross-shard execution
+            /* payload */ merge_cblockmeta,
+            temp_aggregators.clone(), // TODO: cross-shard execution
             self.signature_service.clone(),
         )
         .await;
+
+        // debug!(
+        //     "ARETE trace: for oblock {:?} add vote results {}",
+        //     block,
+        //     temp_aggregators.clone().len()
+        // );
 
         if !block.payload.is_empty() {
             info!("Created {}", block);
@@ -166,39 +215,45 @@ impl Proposer {
                 // Update its local Map[shard_id, if_receive_CBlock]
                 Some(cblock) = self.rx_cblock.recv() => {
                     // debug!("Consensus proposer receive CBlock {:?}", cblock);
-                    if !self.max_shard_rounds.contains_key(&cblock.shard_id) {
-                        // debug!("Receive the first or a larger CBlock from shard {}, new round {}", cblock.shard_id, cblock.round);
-                        let cblm = CBlockMeta::new(
-                            cblock.shard_id,
-                            cblock.round,
-                            cblock.digest(),
-                        ).await;
-                        self.shard_rounds.insert(cblock.shard_id, cblm);
-                        self.max_shard_rounds.insert(cblock.shard_id, cblock.round);
-                    }
-                    else if let Some(tp_round) = self.max_shard_rounds.get(&cblock.shard_id).copied() {
-                        if tp_round < cblock.round {
-                            // debug!("Receive the first or a larger CBlock from shard {}, new round {}", cblock.shard_id, cblock.round);
-                            let cblm = CBlockMeta::new(
-                                cblock.shard_id,
-                                cblock.round,
-                                cblock.digest(),
-                            ).await;
-                            self.shard_rounds.insert(cblock.shard_id, cblm);
-                            self.max_shard_rounds.insert(cblock.shard_id, cblock.round);
+                    let cblm = CBlockMeta::new(
+                        cblock.shard_id,
+                        cblock.author,
+                        cblock.round,
+                        cblock.ebhash,
+                        cblock.ctx_hashes,
+                    ).await;
+                    if self.shard_cblocks.contains_key(&cblock.shard_id) {
+                        if let Some(vec_cbmeta) = self.shard_cblocks.get_mut(&cblock.shard_id) {
+                            vec_cbmeta.insert(cblm);
                         }
+                    }
+                    else {
+                        let mut temp_vec = HashSet::new();
+                        temp_vec.insert(cblm);
+                        self.shard_cblocks.insert(cblock.shard_id, temp_vec);
                     }
                 },
                 // Receive a proposer message, becoming the leader of this round
-                // Check if receiving at least CBlock from every execution shard
                 Some(message) = self.rx_message.recv() => match message {
                     ProposerMessage::Make(round, qc, tc) => {
                         self.make_block(round, qc.clone(), tc.clone()).await;
                     },
-                    ProposerMessage::Cleanup(_cbmetas) => {
-                        self.update_map(_cbmetas).await;
+                    ProposerMessage::CleanupCBlockMeta(cblock_metas) => {
+                        for cblock_meta in &cblock_metas {
+                            if let Some(clean_cbmeta) = self.shard_cblocks.get_mut(&cblock_meta.shard_id) {
+                                clean_cbmeta.remove(cblock_meta);
+                            }
+                        }
                         // debug!("Clean shard CBlockMeta");
+                    },
+                    ProposerMessage::Cleanup(_vote_results) => {
+                        self.clean_aggregators(_vote_results).await;
+                        // debug!("Clean shard vote aggregation");
                     }
+                },
+                Some(ctx_vote) = self.rx_ctx_vote.recv() => {
+                    // debug!("ARETE trace: receive vote from shard {} for round {}", ctx_vote.shard_id, ctx_vote.order_round);
+                    self.aggregate_execution(ctx_vote).await;
                 }
             }
         }

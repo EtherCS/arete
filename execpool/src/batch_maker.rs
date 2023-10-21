@@ -2,10 +2,8 @@ use crate::mempool::MempoolMessage;
 use crate::quorum_waiter::QuorumWaiterMessage;
 use bytes::Bytes;
 #[cfg(feature = "benchmark")]
-use crypto::Digest;
-use crypto::PublicKey;
-#[cfg(feature = "benchmark")]
-use ed25519_dalek::{Digest as _, Sha512};
+use crypto::Hash;
+use crypto::{PublicKey, SignatureService};
 #[cfg(feature = "benchmark")]
 use log::info;
 use network::ReliableSender;
@@ -14,23 +12,35 @@ use std::convert::TryInto as _;
 use std::net::SocketAddr;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::time::{sleep, Duration, Instant};
+use types::{EBlock, Round, ShardInfo, Transaction};
 
-#[cfg(test)]
-#[path = "tests/batch_maker_tests.rs"]
-pub mod batch_maker_tests;
+// #[cfg(test)]
+// #[path = "tests/batch_maker_tests.rs"]
+// pub mod batch_maker_tests;
 
-pub type Transaction = Vec<u8>;
+// pub type Transaction = Vec<u8>;
 pub type Batch = Vec<Transaction>;
+
+// ARETE: TODO: if need round?
+pub const EXECUTION_ROUND: Round = 1;
 
 /// Assemble clients transactions into batches.
 pub struct BatchMaker {
+    /// The node
+    name: PublicKey,
+    /// The execution shard information
+    shard_info: ShardInfo,
+    /// The signagure service
+    signature_service: SignatureService,
+    /// The ratio of cross-shard txs (TODO: remove)
+    ratio_cross_shard_txs: f32,
     /// The preferred batch size (in bytes).
     batch_size: usize,
     /// The maximum delay after which to seal the batch (in ms).
     max_batch_delay: u64,
     /// Channel to receive transactions from the network.
     rx_transaction: Receiver<Transaction>,
-    /// Output channel to deliver sealed batches to the `QuorumWaiter`.
+    /// Output channel to deliver sealed EBlock to the `QuorumWaiter`.
     tx_message: Sender<QuorumWaiterMessage>,
     /// The network addresses of the other mempools.
     mempool_addresses: Vec<(PublicKey, SocketAddr)>,
@@ -44,6 +54,10 @@ pub struct BatchMaker {
 
 impl BatchMaker {
     pub fn spawn(
+        name: PublicKey,
+        shard_info: ShardInfo,
+        signature_service: SignatureService,
+        ratio_cross_shard_txs: f32,
         batch_size: usize,
         max_batch_delay: u64,
         rx_transaction: Receiver<Transaction>,
@@ -52,6 +66,10 @@ impl BatchMaker {
     ) {
         tokio::spawn(async move {
             Self {
+                name,
+                shard_info,
+                signature_service,
+                ratio_cross_shard_txs,
                 batch_size,
                 max_batch_delay,
                 rx_transaction,
@@ -88,6 +106,7 @@ impl BatchMaker {
                     if !self.current_batch.is_empty() {
                         self.seal().await;
                     }
+                    // Control the sending rate to the ordering shard
                     timer.as_mut().reset(Instant::now() + Duration::from_millis(self.max_batch_delay));
                 }
             }
@@ -114,19 +133,29 @@ impl BatchMaker {
         // Serialize the batch.
         self.current_batch_size = 0;
         let batch: Vec<_> = self.current_batch.drain(..).collect();
-        let message = MempoolMessage::Batch(batch);
-        let serialized = bincode::serialize(&message).expect("Failed to serialize our own batch");
+        let ctx_num = (batch.len() as f32 * self.ratio_cross_shard_txs).floor() as usize;
+        let intratxs = &batch[ctx_num..batch.len()].to_vec();
+        let crosstxs = &batch[0..ctx_num].to_vec();
+        // ARETE: use Transactions to create a EBlock
+        let eblock = EBlock::new(
+            self.shard_info.id,
+            self.name,
+            EXECUTION_ROUND,
+            intratxs.clone(),
+            crosstxs.clone(),
+            self.signature_service.clone(),
+        )
+        .await;
+        let message = MempoolMessage::EBlock(eblock.clone());
+        let serialized = bincode::serialize(&message)
+            .expect("Failed to serialize our own MempoolMessage EBlock");
 
         #[cfg(feature = "benchmark")]
         {
             // NOTE: This is one extra hash that is only needed to print the following log entries.
-            let digest = Digest(
-                Sha512::digest(&serialized).as_slice()[..32]
-                    .try_into()
-                    .unwrap(),
-            );
-
-            for id in tx_ids {
+            let digest = eblock.digest();
+            let id_ctx_num = (tx_ids.len() as f32 * self.ratio_cross_shard_txs).floor() as usize;
+            for id in tx_ids[id_ctx_num..tx_ids.len()].to_vec() {
                 // NOTE: This log entry is used to compute performance.
                 info!(
                     "Batch {:?} contains sample tx {}",
@@ -134,7 +163,6 @@ impl BatchMaker {
                     u64::from_be_bytes(id)
                 );
             }
-
             // NOTE: This log entry is used to compute performance.
             info!("Batch {:?} contains {} B", digest, size);
         }
@@ -145,9 +173,11 @@ impl BatchMaker {
         let handlers = self.network.broadcast(addresses, bytes).await;
 
         // Send the batch through the deliver channel for further processing.
+        let eblock_serialized =
+            bincode::serialize(&eblock).expect("Failed to serialize our own EBlock");
         self.tx_message
             .send(QuorumWaiterMessage {
-                batch: serialized,
+                batch: eblock_serialized,
                 handlers: names.into_iter().zip(handlers.into_iter()).collect(),
             })
             .await

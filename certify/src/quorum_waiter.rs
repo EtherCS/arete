@@ -1,43 +1,36 @@
 use std::time::Duration;
 
 use crate::config::{ExecutionCommittee, Stake};
-use crate::processor::SerializedEBlockMessage;
-use crypto::{Digest, Hash, PublicKey, SignatureService};
-use ed25519_dalek::Digest as _;
-use ed25519_dalek::Sha512;
+// use crate::processor::SerializedEBlockMessage;
+use crypto::{PublicKey, SignatureService, Hash};
 use futures::stream::futures_unordered::FuturesUnordered;
 use futures::stream::StreamExt as _;
-#[cfg(feature = "benchmark")]
-use log::info;
 use network::CancelHandler;
-use std::convert::TryInto;
 use tokio::{
     sync::mpsc::{Receiver, Sender},
     time::sleep,
 };
-use types::{CBlock, EBlock, NodeSignature, ShardInfo};
-
-// #[cfg(test)]
-// #[path = "tests/quorum_waiter_tests.rs"]
-// pub mod quorum_waiter_tests;
+use types::{NodeSignature, CrossTransactionVote, CertifyMessage};
 
 /// Extra batch dissemination time for the f last nodes (in ms).
 const DISSEMINATION_DEADLINE: u64 = 500;
 /// Bounds the queue handling the extra dissemination.
 const DISSEMINATION_QUEUE_MAX: usize = 10_000;
 
+pub type SerializedVoteMessage = Vec<u8>;
+
 #[derive(Debug)]
-pub struct EBlockRespondMessage {
-    /// The (publcKey, signagure) of the sender on the EBlock.
+pub struct VoteRespondMessage {
+    /// The (publcKey, signagure) of the sender on the vote results.
     pub certificate: NodeSignature,
     /// The stake of the sender.
     pub stake: Stake,
 }
 
 #[derive(Debug)]
-pub struct QuorumWaiterMessage {
+pub struct QuorumVoteMessage {
     /// A serialized `MempoolMessage::Batch` message.
-    pub batch: SerializedEBlockMessage,
+    pub vote: SerializedVoteMessage,
     /// The cancel handlers to receive the acknowledgements of our broadcast.
     pub handlers: Vec<(PublicKey, CancelHandler)>,
 }
@@ -46,44 +39,40 @@ pub struct QuorumWaiterMessage {
 pub struct QuorumWaiter {
     /// The node
     name: PublicKey,
-    /// The execution shard information
-    shard_info: ShardInfo,
     /// The signature service
     signature_service: SignatureService,
+    // /// The execution shard information
+    // shard_info: ShardInfo,
     /// The committee information.
     committee: ExecutionCommittee,
     /// The stake of this authority.
     stake: Stake,
     /// Input Channel to receive commands.
-    rx_message: Receiver<QuorumWaiterMessage>,
-    /// Send EBlock to processor for storing
-    tx_processor: Sender<EBlock>,
-    /// Channel to deliver CBlock for which we have enough acknowledgements.
-    tx_cblock: Sender<CBlock>,
+    rx_message: Receiver<QuorumVoteMessage>,
+    /// Channel to deliver vote results to the ordering shard for which we have enough acknowledgements.
+    tx_certify: Sender<CertifyMessage>,
 }
 
 impl QuorumWaiter {
     /// Spawn a new QuorumWaiter.
     pub fn spawn(
         name: PublicKey,
-        shard_info: ShardInfo,
+        // shard_info: ShardInfo,
         signature_service: SignatureService,
         committee: ExecutionCommittee,
         stake: Stake,
-        rx_message: Receiver<QuorumWaiterMessage>,
-        tx_processor: Sender<EBlock>,
-        tx_cblock: Sender<CBlock>,
+        rx_message: Receiver<QuorumVoteMessage>,
+        tx_certify: Sender<CertifyMessage>,
     ) {
         tokio::spawn(async move {
             Self {
                 name,
-                shard_info,
+                // shard_info,
                 signature_service,
                 committee,
                 stake,
                 rx_message,
-                tx_processor,
-                tx_cblock,
+                tx_certify,
             }
             .run()
             .await;
@@ -91,11 +80,11 @@ impl QuorumWaiter {
     }
 
     /// Helper function. It waits for a future to complete and then delivers a value.
-    async fn waiter(wait_for: CancelHandler, deliver: Stake) -> EBlockRespondMessage {
+    async fn waiter(wait_for: CancelHandler, deliver: Stake) -> VoteRespondMessage {
         let byte_certificate = wait_for.await.expect("error handler");
         let certificate: NodeSignature =
             bincode::deserialize(&byte_certificate).expect("fail to deserialize certificate");
-        EBlockRespondMessage {
+            VoteRespondMessage {
             certificate: certificate,
             stake: deliver,
         }
@@ -111,15 +100,9 @@ impl QuorumWaiter {
 
         loop {
             tokio::select! {
-                Some(QuorumWaiterMessage { batch, handlers }) = self.rx_message.recv() => {
-                    let eblock: EBlock = bincode::deserialize(&batch).expect("fail to deserialize eblock");
-                    // Send this EBlock to processor for storing
-                    self.tx_processor.send(eblock.clone()).await.expect("Failed to send EBlock to processor");
-                    // Collect signatures to create CBlock
-                    let mut hash_ctxs: Vec<Digest> = Vec::new();
-                    for ctx in &eblock.crosstxs {
-                        hash_ctxs.push(Digest(Sha512::digest(&ctx).as_slice()[..32].try_into().unwrap()));
-                    }
+                Some(QuorumVoteMessage { vote, handlers }) = self.rx_message.recv() => {
+                    let ctx_vote: CrossTransactionVote = bincode::deserialize(&vote).expect("fail to deserialize vote result");
+                    // Collect signatures to create the vote results
                     let mut wait_for_quorum: FuturesUnordered<_> = handlers
                         .into_iter()
                         .map(|(name, handler)| {
@@ -127,45 +110,29 @@ impl QuorumWaiter {
                             Self::waiter(handler, stake)
                         })
                         .collect();
-
-                    // Wait for the first (1-f_L) nodes to send back an Ack. Then we consider the batch
-                    // delivered and we send its digest to the consensus (that will include it into
-                    // the dag). This should reduce the amount of synching.
-                    let my_cblock = CBlock::new(
-                        eblock.shard_id,
-                        eblock.author,
-                        eblock.round,
-                        eblock.digest(),
-                        hash_ctxs.clone(),
-                        Vec::new(),
-                    ).await;
-                    // create my signature
+                    // Create my signature
                     let mut signature_service = self.signature_service.clone();
-                    let signature = signature_service.request_signature(my_cblock.digest()).await;
+                    let signature = signature_service.request_signature(ctx_vote.digest()).await;
                     let node_signature = NodeSignature::new(self.name, signature).await;
+                    // Wait for the first (1-f_L) nodes to send back a Signature. Then we consider the vote results
+                    // certified and we send it to the ordering shard 
                     let mut total_stake = self.stake;
                     let mut multisignatures: Vec<NodeSignature> = Vec::new();
                     multisignatures.push(node_signature);
-                    while let Some(EBlockRespondMessage { certificate, stake }) = wait_for_quorum.next().await {
+                    while let Some(VoteRespondMessage { certificate, stake }) = wait_for_quorum.next().await {
                         multisignatures.push(certificate);
                         total_stake += stake;
                         if total_stake >= self.committee.quorum_threshold() {
-                            let cblock = CBlock::new(
-                                self.shard_info.id,
-                                self.name,
-                                0,
-                                eblock.digest(),
-                                hash_ctxs.clone(),
+                            let certified_vote = CrossTransactionVote::new(
+                                ctx_vote.shard_id,
+                                ctx_vote.order_round,
+                                ctx_vote.votes.clone(),
                                 multisignatures.clone(),
                             ).await;
-                            #[cfg(feature = "benchmark")] {
-                                // NOTE: This log entry is used to compute performance.
-                                info!("Shard {} Created {} -> {:?}", self.shard_info.id, eblock, eblock.digest());
-                            }
-                            self.tx_cblock
-                                .send(cblock)
+                            self.tx_certify
+                                .send(CertifyMessage::CtxVote(certified_vote))
                                 .await
-                                .expect("Failed to deliver cblock");
+                                .expect("Failed to deliver certified vote results");
                             break;
                         }
                     }

@@ -1,16 +1,10 @@
-use crypto::Digest;
-use ed25519_dalek::Digest as _;
-use ed25519_dalek::Sha512;
-use std::convert::TryInto;
+use crypto::Hash;
 use store::Store;
-use tokio::sync::mpsc::{Receiver, Sender};
+use tokio::sync::mpsc::Receiver;
+use types::EBlock;
 
-#[cfg(test)]
-#[path = "tests/processor_tests.rs"]
-pub mod processor_tests;
-
-/// Indicates a serialized `MempoolMessage::Batch` message.
-pub type SerializedBatchMessage = Vec<u8>;
+/// Indicates a serialized `MempoolMessage::SerializedEBlockMessage` message.
+pub type SerializedEBlockMessage = Vec<u8>;
 
 /// Hashes and stores batches, it then outputs the batch's digest.
 pub struct Processor;
@@ -18,22 +12,22 @@ pub struct Processor;
 impl Processor {
     pub fn spawn(
         // The persistent storage.
+        // Store <Hash, EBlock>
         mut store: Store,
-        // Input channel to receive batches.
-        mut rx_batch: Receiver<SerializedBatchMessage>,
+        // Input channel to receive CBlock.
+        mut rx_eblock: Receiver<EBlock>,
         // Output channel to send out batches' digests.
-        tx_digest: Sender<Digest>,
+        // tx_to_certify_digest: Sender<CBlock>,
     ) {
         tokio::spawn(async move {
-            // Receive batch txs after certifying (get f+1 signatures)
-            while let Some(batch) = rx_batch.recv().await {
-                // Hash the batch.
-                let digest = Digest(Sha512::digest(&batch).as_slice()[..32].try_into().unwrap());
+            // Receive cblock after certifying (get f+1 signatures)
+            while let Some(eblock) = rx_eblock.recv().await {
+                // Hash the cblock.
+                let digest = eblock.digest();
+                let value = bincode::serialize(&eblock).expect("Failed to serialize cblock");
 
-                // Store the batch.
-                store.write(digest.to_vec(), batch).await;
-
-                tx_digest.send(digest).await.expect("Failed to send digest");
+                // Store the cblock.
+                store.write(digest.to_vec(), value).await;
             }
         });
     }
