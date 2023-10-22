@@ -17,7 +17,7 @@ use tokio_util::codec::{Framed, LengthDelimitedCodec};
     author,
     version,
     about,
-    long_about = "Benchmark client for HotStuff nodes."
+    long_about = "Benchmark client for ARETE nodes."
 )]
 
 struct Cli {

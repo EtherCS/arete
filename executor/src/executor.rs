@@ -90,7 +90,6 @@ impl Executor {
         );
 
         info!("Executor {} successfully booted", name);
-        // info!("Executor connects nodes with address {}", target);
         Ok(Self { certify: rx_certify, ordering_addr: target_addr, shard_id: shard_id})
     }
 
@@ -104,9 +103,6 @@ impl Executor {
             let message = bincode::serialize(&_cmsg.clone())
                 .expect("fail to serialize the CBlock");
             sender.send(self.ordering_addr, Into::into(message)).await;
-
-            // debug!("Executor send a certificate message {:?} to the ordering shard", _cmsg.clone());
-            // info!("Executor commits block {:?} successfully", _cmsg); // {:?} means: display based on the Debug function
         }
         Ok(())
     }
