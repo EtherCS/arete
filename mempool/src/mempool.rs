@@ -49,10 +49,6 @@ pub struct Mempool {
     parameters: Parameters,
     /// The persistent storage.
     store: Store,
-    /// Send messages to consensus.
-    // tx_consensus: Sender<Digest>,
-    /// Send vote results to consensus
-    // tx_ctx_vote: Sender<CrossTransactionVote>,
     /// Send cblock (consensus) to consensus.
     tx_cblock: Sender<CBlock>,
 }
@@ -113,7 +109,6 @@ impl Mempool {
     /// Spawn all tasks responsible to handle clients transactions.
     fn handle_clients_transactions(&self, tx_ctx_vote: Sender<CrossTransactionVote>) {
         let (tx_batch_maker, rx_batch_maker) = channel(CHANNEL_CAPACITY);
-        // let (tx_vote_maker, _rx_vote_maker) = channel(CHANNEL_CAPACITY);
         let (tx_quorum_waiter, rx_quorum_waiter) = channel(CHANNEL_CAPACITY);
         let (tx_processor, rx_processor) = channel(CHANNEL_CAPACITY);
         let (tx_mempool_ctx_vote, cx_mempool_ctx_vote) = channel(CHANNEL_CAPACITY);
@@ -160,7 +155,6 @@ impl Mempool {
         Processor::spawn(
             self.store.clone(),
             /* rx_batch */ rx_processor,
-            // /* tx_digest */ self.tx_consensus.clone(),
             /* tx_cblock */
             self.tx_cblock.clone(),
         );
@@ -201,7 +195,6 @@ impl Mempool {
         Processor::spawn(
             self.store.clone(),
             /* rx_batch */ rx_processor,
-            // /* tx_digest */ self.tx_consensus.clone(),
             /* tx_cblock */
             self.tx_cblock.clone(),
         );
@@ -214,7 +207,6 @@ impl Mempool {
 #[derive(Clone)]
 struct TxReceiverHandler {
     tx_batch_maker: Sender<CBlock>,
-    // tx_vote_maker: Sender<CrossTransactionVote>,
     tx_ctx_vote: Sender<CrossTransactionVote>,
     tx_mempool_ctx_vote: Sender<CrossTransactionVote>,
 }
@@ -247,15 +239,6 @@ impl MessageHandler for TxReceiverHandler {
             }
             Err(e) => warn!("Serialization error: {}", e),
         }
-
-        // let rec_block: CBlock = bincode::deserialize(&message.to_vec())
-        //     .expect("fail to deserialize the CBlock");
-        // info!("node receives msg {:?}, get shard id is {}", rec_block, rec_block.shard_id);
-        // // Send the transaction to the batch maker.
-        // self.tx_batch_maker
-        //     .send(rec_block)
-        //     .await
-        //     .expect("Failed to send transaction");
 
         // Give the change to schedule other tasks.
         tokio::task::yield_now().await;

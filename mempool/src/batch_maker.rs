@@ -1,16 +1,8 @@
 use crate::mempool::MempoolMessage;
 use crate::quorum_waiter::QuorumWaiterMessage;
 use bytes::Bytes;
-// #[cfg(feature = "benchmark")]
-// use crypto::Digest;
 use crypto::PublicKey;
-// #[cfg(feature = "benchmark")]
-// use ed25519_dalek::{Digest as _, Sha512};
-// #[cfg(feature = "benchmark")]
-// use log::info;
 use network::ReliableSender;
-// #[cfg(feature = "benchmark")]
-// use std::convert::TryInto as _;
 use std::net::SocketAddr;
 use tokio::sync::mpsc::{Receiver, Sender};
 use tokio::time::{sleep, Duration};
@@ -26,7 +18,6 @@ pub struct BatchMaker {
     /// The maximum delay after which to seal the batch (in ms).
     max_batch_delay: u64,
     /// Channel to receive transactions (cblock) from the network.
-    // rx_transaction: Receiver<Transaction>,
     rx_transaction: Receiver<CBlock>,
     /// receive vote from transaction channel
     rx_vote_tx: Receiver<CrossTransactionVote>,
@@ -78,8 +69,6 @@ impl BatchMaker {
                 // Receive transaction (CBlock).
                 Some(transaction) = self.rx_transaction.recv() => {
                     // Broadcast to other peers and send it to consensus for further processing
-                    // #[cfg(feature = "benchmark")]
-                    // info!("Successfully receive cblock");
                     let serialize_cblock = bincode::serialize(&transaction)
                         .expect("Fail to serialize transaction");
                     self.current_batch.push(serialize_cblock);
@@ -132,14 +121,5 @@ impl BatchMaker {
         let (_, addresses): (Vec<_>, _) = self.mempool_addresses.iter().cloned().unzip();
         let bytes = Bytes::from(serialized.clone());
         let _ = self.network.broadcast(addresses, bytes).await;
-
-        // Send the batch through the deliver channel for further processing.
-        // self.tx_message
-        //     .send(QuorumWaiterMessage {
-        //         batch: serialized,
-        //         handlers: names.into_iter().zip(handlers.into_iter()).collect(),
-        //     })
-        //     .await
-        //     .expect("Failed to deliver batch");
     }
 }

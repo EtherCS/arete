@@ -20,9 +20,7 @@ impl Processor {
         mut store: Store,
         // Input channel to receive batches.
         mut rx_batch: Receiver<SerializedBatchMessage>,
-        // Output channel to send out batches' digests.
-        // tx_digest: Sender<Digest>,
-        // ARETE: replace 'tx_digest: Sender<Digest>' with tx_CBlock
+        // Output channel to send out CBlock.
         tx_cblock: Sender<CBlock>,
     ) {
         tokio::spawn(async move {
@@ -33,7 +31,6 @@ impl Processor {
                     Ok(MempoolMessage::Batch(..)) => {}
                     Ok(MempoolMessage::BatchRequest(_missing, _requestor)) => {}
                     Ok(MempoolMessage::CBlock(tx)) => {
-                        // debug!("Mempool processor get a CBlock {:?}", tx);
                         // Hash the batch.
                         let digest =
                             Digest(Sha512::digest(&batch).as_slice()[..32].try_into().unwrap());
@@ -46,8 +43,6 @@ impl Processor {
                     Ok(MempoolMessage::CrossTransactionVote(..)) => {}
                     Err(e) => warn!("Serialization error: {}", e),
                 }
-
-                // tx_digest.send(digest).await.expect("Failed to send digest");
             }
         });
     }
