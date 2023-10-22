@@ -46,7 +46,6 @@ impl Consensus {
         shard_info: ShardInfo,
         signature_service: SignatureService,
         store: Store,
-        // rx_mempool: Receiver<Digest>,
         rx_cblock: Receiver<CBlock>,
         rx_ctx_vote: Receiver<CrossTransactionVote>,
         tx_mempool: Sender<ConsensusMempoolMessage>,
@@ -147,7 +146,6 @@ impl MessageHandler for ConsensusReceiverHandler {
             message @ ConsensusMessage::Propose(..) => {
                 // Reply with an ACK.
                 let _ = writer.send(Bytes::from("Ack")).await;
-
                 // Pass the message to the consensus core.
                 self.tx_consensus
                     .send(message)

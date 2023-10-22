@@ -24,12 +24,10 @@ pub struct Proposer {
     shard_info: ShardInfo,
     signature_service: SignatureService,
     cblock_batch_size: u64,
-    // rx_mempool: Receiver<Digest>,
     rx_cblock: Receiver<CBlock>,
     rx_message: Receiver<ProposerMessage>,
     rx_ctx_vote: Receiver<CrossTransactionVote>,
     tx_loopback: Sender<OBlock>,
-    // buffer: HashSet<Digest>,
     shard_cblocks: HashMap<u32, HashSet<CBlockMeta>>, // buffer for CBlocks
     vote_aggregation_trace: HashMap<u64, HashMap<Digest, u8>>, // <consensus_round, vote_results>
     aggregation_results: HashMap<u64, HashMap<Digest, u8>>, // vote results ready for making blocks
@@ -43,7 +41,6 @@ impl Proposer {
         shard_info: ShardInfo,
         signature_service: SignatureService,
         cblock_batch_size: u64,
-        // rx_mempool: Receiver<Digest>,
         rx_cblock: Receiver<CBlock>,
         rx_message: Receiver<ProposerMessage>,
         rx_ctx_vote: Receiver<CrossTransactionVote>,
@@ -77,8 +74,6 @@ impl Proposer {
     }
 
     async fn clean_aggregators(&mut self, commit_rounds: Vec<VoteResult>) {
-        // debug!("Clean vote aggregations {:?}", self.aggregation_results);
-        // debug!("Clean vote aggregation rounds {:?}", commit_rounds);
         for vote_result in commit_rounds {
             self.aggregation_results.remove(&vote_result.round);
         }
@@ -206,7 +201,6 @@ impl Proposer {
                 // ARETE: here, every node receive the transaction (CBlock) due to mempool's broadcast
                 // Update its local Map[shard_id, if_receive_CBlock]
                 Some(cblock) = self.rx_cblock.recv() => {
-                    // debug!("Consensus proposer receive CBlock {:?}", cblock);
                     let cblm = CBlockMeta::new(
                         cblock.shard_id,
                         cblock.author,

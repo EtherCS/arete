@@ -6,7 +6,6 @@ use std::net::SocketAddr;
 
 pub type Stake = u32;
 pub type EpochNumber = u128;
-// pub type ShardNumber = u32;
 
 #[derive(Serialize, Deserialize)]
 pub struct Parameters {
@@ -40,7 +39,6 @@ pub struct Authority {
     pub address: SocketAddr,
 }
 
-
 #[derive(Clone, Serialize, Deserialize)]
 pub struct Committee {
     pub authorities: HashMap<PublicKey, Authority>,
@@ -70,8 +68,6 @@ impl Committee {
     }
 
     pub fn quorum_threshold(&self) -> Stake {
-        // If N = 3f + 1 + k (0 <= k < 3)
-        // then (2 N + 3) / 3 = 2f + 1 + (2k + 2)/3 = 2f + 1 + k = N - f
         let total_votes: Stake = self.authorities.values().map(|x| x.stake).sum();
         2 * total_votes / 3 + 1
     }
