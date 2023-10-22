@@ -284,6 +284,7 @@ class ExecutorParameters:
         try:
             inputs += [json["consensus"]["certify_timeout_delay"]]
             inputs += [json["consensus"]["certify_sync_retry_delay"]]
+            inputs += [json["mempool"]["certify_cross_shard_ratio"]]
             inputs += [json["mempool"]["certify_gc_depth"]]
             inputs += [json["mempool"]["certify_sync_retry_delay"]]
             inputs += [json["mempool"]["certify_sync_retry_nodes"]]
@@ -292,8 +293,8 @@ class ExecutorParameters:
         except KeyError as e:
             raise ConfigError(f"Malformed parameters: missing key {e}")
 
-        if not all(isinstance(x, int) for x in inputs):
-            raise ConfigError("Invalid parameters type")
+        # if not all(isinstance(x, int) for x in inputs):
+        #     raise ConfigError("Invalid parameters type")
 
         self.certify_timeout_delay = json["consensus"]["certify_timeout_delay"]
         self.json = json

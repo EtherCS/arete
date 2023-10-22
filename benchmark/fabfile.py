@@ -94,6 +94,7 @@ def localShard(ctx):
             "certify_sync_retry_delay": 10_000,
         },
         "mempool": {
+            "certify_cross_shard_ratio": 0.2,
             "certify_gc_depth": 50,
             "certify_sync_retry_delay": 5_000,
             "certify_sync_retry_nodes": 3,
@@ -210,6 +211,7 @@ def remote(ctx):
             "certify_sync_retry_delay": 10_000,
         },
         "mempool": {
+            "certify_cross_shard_ratio": 0.2,
             "certify_gc_depth": 50,
             "certify_sync_retry_delay": 5_000,
             "certify_sync_retry_nodes": 3,
