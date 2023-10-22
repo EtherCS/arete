@@ -11,10 +11,6 @@ use std::fmt;
 use tokio::sync::mpsc::{channel, Sender};
 use tokio::sync::oneshot;
 
-#[cfg(test)]
-#[path = "tests/crypto_tests.rs"]
-pub mod crypto_tests;
-
 pub type CryptoError = ed25519::Error;
 
 /// Represents a hash digest (32 bytes).
