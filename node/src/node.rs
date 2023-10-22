@@ -131,19 +131,12 @@ impl Node {
                         cmsg.ordered_ctxs.extend(i.ctx_hashes);
                     }
                 } else {
-                    // debug!(
-                    //     "ARETE trace: oblock for shard {} in round {} get vote results {}",
-                    //     i.shard_id,
-                    //     _block.round,
-                    //     _block.aggregators.clone().len()
-                    // );
                     let temp_block_creator = BlockCreator::new(i.author, i.ebhash).await;
                     let mut map_ebhash = Vec::new();
                     map_ebhash.push(temp_block_creator);
                     let confim_msg = ConfirmMessage::new(
                         i.shard_id,
                         map_ebhash.clone(),
-                        // i.round,    // corresponding execution shard's round
                         _block.round,
                         i.ctx_hashes.clone(),
                         _block.aggregators.clone(),
@@ -159,17 +152,13 @@ impl Node {
                     .expect("fail to serialize the ConfirmMessage");
                 if let Some(_addrs) = self.shard_confirmation_addrs.get(&shard) {
                     sender.broadcast(_addrs.clone(), Into::into(message)).await;
-                    // debug!(
-                    //     "send a confirm message {:?} to the execution shard {}",
-                    //     confim_msg.clone(),
-                    //     shard
-                    // );
                 }
             }
             // For cross-shard transaction test.
             // Currently, we dont ask the ordering shard to maintain a table
             // for tracing relevant shards who are responsible for voting an ordering round
-            #[cfg(feature = "benchmark")]{
+            #[cfg(feature = "benchmark")]
+            {
                 let heartbeat_sig: Signature = _block.signature.clone();
                 let heartbeat_round: u64 = _block.round;
                 for heartbeat_shard in 0..2 {
@@ -186,15 +175,10 @@ impl Node {
                         .expect("fail to serialize the ConfirmMessage");
                     if let Some(_addrs) = self.shard_confirmation_addrs.get(&heartbeat_shard) {
                         sender.broadcast(_addrs.clone(), Into::into(message)).await;
-                        // debug!(
-                        //     "send a heartbeat confirm message {:?} to the execution shard {}",
-                        //     heartbeat_confirm_msg.clone(),
-                        //     heartbeat_shard
-                        // );
                     }
                 }
             }
-            info!("Node commits block {:?} successfully", _block); // {:?} means: display based on the Debug function
+            // info!("Node commits block {:?} successfully", _block); // {:?} means: display based on the Debug function
         }
     }
 }

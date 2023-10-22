@@ -112,7 +112,7 @@ impl Proposer {
             if let Some(first) = first_cblockmeta.iter().next() {
                 merge_cblockmeta.push(first.clone());
             }
-        } 
+        }
         for vec_cblockmeta in self.shard_cblocks.values() {
             merge_cblockmeta.extend(vec_cblockmeta.clone());
             // limit the size of a new OBlock, prevent timeout due to large data
@@ -120,19 +120,17 @@ impl Proposer {
                 break;
             }
         }
-        debug!("ARETE trace: aggregation_results size {}", self.aggregation_results.clone().len());
-        debug!("ARETE trace: merge_cblockmeta size {}", merge_cblockmeta.len());
         // Get vote results that have ready aggregated
         // ARETE TODO: current only consider execution shard 0 and shard 1
         let relevant_shards: Vec<u32> = vec![0, 1];
         let mut temp_aggregators = Vec::new();
         for (temp_round, _) in self.aggregation_results.clone() {
             // ARETE TODO: map cross-shard transaction digest to commit/abort
-            // Maybe use bitmap or other data compression technologies 
+            // Maybe use bitmap or other data compression technologies
             let temp_vote_result =
                 VoteResult::new(temp_round, relevant_shards.clone(), HashMap::new()).await;
             // let temp_vote_result =
-                // VoteResult::new(temp_round, relevant_shards.clone(), temp_vote_results.clone()).await;
+            // VoteResult::new(temp_round, relevant_shards.clone(), temp_vote_results.clone()).await;
             temp_aggregators.push(temp_vote_result);
         }
 
@@ -146,12 +144,6 @@ impl Proposer {
             self.signature_service.clone(),
         )
         .await;
-
-        // debug!(
-        //     "ARETE trace: for oblock {:?} add vote results {}",
-        //     block,
-        //     temp_aggregators.clone().len()
-        // );
 
         if !block.payload.is_empty() {
             info!("Created {}", block);
@@ -244,15 +236,12 @@ impl Proposer {
                                 clean_cbmeta.remove(cblock_meta);
                             }
                         }
-                        // debug!("Clean shard CBlockMeta");
                     },
                     ProposerMessage::Cleanup(_vote_results) => {
                         self.clean_aggregators(_vote_results).await;
-                        // debug!("Clean shard vote aggregation");
                     }
                 },
                 Some(ctx_vote) = self.rx_ctx_vote.recv() => {
-                    // debug!("ARETE trace: receive vote from shard {} for round {}", ctx_vote.shard_id, ctx_vote.order_round);
                     self.aggregate_execution(ctx_vote).await;
                 }
             }

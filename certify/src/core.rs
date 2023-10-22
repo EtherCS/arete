@@ -147,10 +147,6 @@ impl Core {
         let cross_tx_vote: CrossTransactionVote;
         if confirm_msg.shard_id != self.shard_info.id {
             // Respond this heartbeat confirmation message with vote
-            // debug!(
-            //     "ARETE trace: receive a heartbeat message in round {}",
-            //     confirm_msg.order_round
-            // );
             cross_tx_vote = CrossTransactionVote::new(
                 self.shard_info.id,
                 confirm_msg.order_round,
@@ -202,10 +198,6 @@ impl Core {
         }
         if confirm_msg.shard_id != self.shard_info.id {
             // Respond this heartbeat confirmation message with vote
-            // debug!(
-            //     "ARETE trace: receive a heartbeat message in round {}",
-            //     confirm_msg.order_round
-            // );
             self.vote(confirm_msg.clone()).await;
             return Ok(());
         }
