@@ -123,10 +123,9 @@ impl fmt::Debug for VoteResult {
 pub struct ConfirmMessage {
     pub shard_id: u32,
     pub block_hashes: Vec<BlockCreator>, // Corresponding EBlocks' hashes
-    // pub round: u64,           // corresponding execution shard's round
-    pub order_round: u64,          // consensus round in the ordering shard
-    pub ordered_ctxs: Vec<Digest>, // new cross-shard transactions
-    pub votes: Vec<VoteResult>,    // vote (execution results) of previous cross-shard transactions
+    pub order_round: u64,                // consensus round in the ordering shard
+    pub ordered_ctxs: Vec<Digest>,       // new cross-shard transactions
+    pub votes: Vec<VoteResult>, // vote (execution results) of previous cross-shard transactions
     pub signature: Signature,
 }
 
@@ -134,7 +133,6 @@ impl ConfirmMessage {
     pub async fn new(
         shard_id: u32,
         block_hashes: Vec<BlockCreator>,
-        // round: u64,
         order_round: u64,
         ordered_ctxs: Vec<Digest>,
         votes: Vec<VoteResult>,
@@ -143,15 +141,12 @@ impl ConfirmMessage {
         let confirm_message = Self {
             shard_id,
             block_hashes,
-            // round,
             order_round,
             ordered_ctxs,
             votes,
             signature,
         };
         confirm_message
-        // let signature = signature_service.request_signature(confirm_message.digest()).await;
-        // Self { confirm_message }
     }
 }
 
@@ -337,10 +332,8 @@ pub struct CBlock {
     pub author: PublicKey,
     pub round: Round,
     pub ebhash: Digest,
-    pub ctx_hashes: Vec<Digest>, // TODO cross-shard txs hash
-    // pub votes: HashMap<Digest, u8>,  // votes[ctx_hash] = 0, 1
+    pub ctx_hashes: Vec<Digest>,             // TODO cross-shard txs hash
     pub multisignatures: Vec<NodeSignature>, // signatures for availability
-                                             // pub signature: Signature,
 }
 
 impl CBlock {
@@ -350,9 +343,7 @@ impl CBlock {
         round: Round,
         ebhash: Digest,
         ctx_hashes: Vec<Digest>,
-        // votes: HashMap<Digest, u8>,
         multisignatures: Vec<NodeSignature>,
-        // signature: Signature,
     ) -> Self {
         let block = Self {
             shard_id,
@@ -360,9 +351,7 @@ impl CBlock {
             round,
             ebhash,
             ctx_hashes,
-            // votes,
             multisignatures,
-            // signature,
         };
         Self { ..block }
     }
@@ -380,13 +369,6 @@ impl Hash for CBlock {
         for x in &self.ctx_hashes {
             hasher.update(x);
         }
-        // for (x, y) in &self.votes {
-        //     let serialized_data = bincode::serialize(&(x, y)).expect("Serialization failed");
-        //     hasher.update(serialized_data);
-        // }
-        // for x in &self.multisignatures {
-        //     hasher.update(x.digest());
-        // }
         hasher.update(&self.ebhash);
         hasher.update(&self.shard_id.to_le_bytes());
         Digest(hasher.finalize().as_slice()[..32].try_into().unwrap())

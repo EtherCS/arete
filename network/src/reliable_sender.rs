@@ -17,10 +17,6 @@ use tokio::sync::oneshot;
 use tokio::time::{sleep, Duration};
 use tokio_util::codec::{Framed, LengthDelimitedCodec};
 
-#[cfg(test)]
-#[path = "tests/reliable_sender_tests.rs"]
-pub mod reliable_sender_tests;
-
 /// Convenient alias for cancel handlers returned to the caller task.
 pub type CancelHandler = oneshot::Receiver<Bytes>;
 

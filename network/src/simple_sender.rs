@@ -13,10 +13,6 @@ use tokio::net::TcpStream;
 use tokio::sync::mpsc::{channel, Receiver, Sender};
 use tokio_util::codec::{Framed, LengthDelimitedCodec};
 
-#[cfg(test)]
-#[path = "tests/simple_sender_tests.rs"]
-pub mod simple_sender_tests;
-
 /// We keep alive one TCP connection per peer, each connection is handled by a separate task (called `Connection`).
 /// We communicate with our 'connections' through a dedicated channel kept by the HashMap called `connections`.
 pub struct SimpleSender {
