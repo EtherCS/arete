@@ -1,35 +1,25 @@
-// use crate::config::ExecutionCommittee;
 use crate::consensus::{ConsensusMessage, Round};
 use crate::error::{ConsensusError, ConsensusResult};
 use crate::mempool::MempoolDriver;
 use async_recursion::async_recursion;
 use crypto::Digest;
 use crypto::Hash as _;
-// use crypto::{Digest, PublicKey};
 #[cfg(feature = "benchmark")]
 use log::info;
 use log::{debug, error, warn};
-// use network::SimpleSender;
 use std::collections::{HashMap, VecDeque};
 use store::Store;
 use tokio::sync::mpsc::{Receiver, Sender};
 use types::{ConfirmMessage, CrossTransactionVote, EBlock, ShardInfo};
 
 pub struct Core {
-    // name: PublicKey,
-    // committee: ExecutionCommittee,
     shard_info: ShardInfo,
     store: Store,
-    // signature_service: SignatureService,
-    // leader_elector: LeaderElector,
     mempool_driver: MempoolDriver,
-    // synchronizer: Synchronizer,
     rx_message: Receiver<ConsensusMessage>,
     rx_loopback: Receiver<EBlock>,
     tx_order_ctx: Sender<CrossTransactionVote>, // send executed vote results to vote_maker
-    // tx_certify: Sender<CertifyMessage>,
     round: Round,
-    // network: SimpleSender,
 }
 
 impl Core {
@@ -49,19 +39,13 @@ impl Core {
     ) {
         tokio::spawn(async move {
             Self {
-                // name,
-                // committee: committee.clone(),
                 shard_info: shard_info.clone(),
-                // signature_service,
                 store,
                 mempool_driver,
-                // synchronizer,
                 rx_message,
                 rx_loopback,
                 tx_order_ctx,
-                // tx_certify,
                 round: 1,
-                // network: SimpleSender::new(),
             }
             .run()
             .await
@@ -86,13 +70,8 @@ impl Core {
 
     #[async_recursion]
     async fn process_block(&mut self, block: &EBlock) -> ConsensusResult<()> {
-        debug!("Processing {:?}", block);
-
         // Store the block only if we have already processed all its ancestors.
         self.store_block(block).await;
-
-        // self.commit(block.clone()).await?;
-
         Ok(())
     }
 
@@ -108,22 +87,14 @@ impl Core {
                     let block: EBlock =
                         bincode::deserialize(&bytes).expect("Failed to deserialize EBlock");
                     self.store_block(&block).await;
-                    // self.commit(block.clone()).await?;
                 }
-                None => {
-                    // if let Err(e) = self.inner_channel.send(block.clone()).await {
-                    //     panic!("Failed to send request to synchronizer: {}", e);
-                    // }
-                    // Ok(None)
-                }
+                None => {}
             }
         }
         // Then, handle the ordered cross-shard transactions
         self.vote(confirm_msg.clone()).await;
 
         self.round = confirm_msg.order_round;
-        // Get shard id
-        // let _s_id = self.shard_info.id;
         // Print for performance calculation
         #[cfg(feature = "benchmark")]
         {
@@ -132,10 +103,6 @@ impl Core {
                     "Shard {} Committed EBlock in round {} -> {:?}",
                     self.shard_info.id, confirm_msg.order_round, block_digest
                 );
-                // info!(
-                //     "ARETE shard {} Committed -> {:?} in round {}",
-                //     self.shard_info.id, block_digest, confirm_msg.order_round
-                // );
             }
         }
 
@@ -178,7 +145,6 @@ impl Core {
         let confirm_digest = confirm_msg.clone().digest();
         if !self.store.read(confirm_digest.to_vec()).await?.is_none() {
             // we have already handle this round message
-            // self.vote(confirm_msg.clone()).await;
             return Ok(());
         }
         let value =
@@ -206,7 +172,6 @@ impl Core {
         if !self.mempool_driver.verify(confirm_msg.clone()).await? {
             debug!("Processing of {} suspended: missing some EBlock", digest);
             self.vote(confirm_msg.clone()).await;
-            // self.round = confirm_msg.order_round;
             return Ok(());
         }
         // Otherwise, have all EBlocks, and execute

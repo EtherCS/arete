@@ -1,8 +1,7 @@
 use std::time::Duration;
 
 use crate::config::{ExecutionCommittee, Stake};
-// use crate::processor::SerializedEBlockMessage;
-use crypto::{PublicKey, SignatureService, Hash};
+use crypto::{Hash, PublicKey, SignatureService};
 use futures::stream::futures_unordered::FuturesUnordered;
 use futures::stream::StreamExt as _;
 use network::CancelHandler;
@@ -10,7 +9,7 @@ use tokio::{
     sync::mpsc::{Receiver, Sender},
     time::sleep,
 };
-use types::{NodeSignature, CrossTransactionVote, CertifyMessage};
+use types::{CertifyMessage, CrossTransactionVote, NodeSignature};
 
 /// Extra batch dissemination time for the f last nodes (in ms).
 const DISSEMINATION_DEADLINE: u64 = 500;
@@ -41,8 +40,6 @@ pub struct QuorumWaiter {
     name: PublicKey,
     /// The signature service
     signature_service: SignatureService,
-    // /// The execution shard information
-    // shard_info: ShardInfo,
     /// The committee information.
     committee: ExecutionCommittee,
     /// The stake of this authority.
@@ -57,7 +54,6 @@ impl QuorumWaiter {
     /// Spawn a new QuorumWaiter.
     pub fn spawn(
         name: PublicKey,
-        // shard_info: ShardInfo,
         signature_service: SignatureService,
         committee: ExecutionCommittee,
         stake: Stake,
@@ -67,7 +63,6 @@ impl QuorumWaiter {
         tokio::spawn(async move {
             Self {
                 name,
-                // shard_info,
                 signature_service,
                 committee,
                 stake,
@@ -84,13 +79,11 @@ impl QuorumWaiter {
         let byte_certificate = wait_for.await.expect("error handler");
         let certificate: NodeSignature =
             bincode::deserialize(&byte_certificate).expect("fail to deserialize certificate");
-            VoteRespondMessage {
+        VoteRespondMessage {
             certificate: certificate,
             stake: deliver,
         }
     }
-
-    // async fn empty_buffer()
 
     /// Main loop.
     async fn run(&mut self) {
@@ -115,7 +108,7 @@ impl QuorumWaiter {
                     let signature = signature_service.request_signature(ctx_vote.digest()).await;
                     let node_signature = NodeSignature::new(self.name, signature).await;
                     // Wait for the first (1-f_L) nodes to send back a Signature. Then we consider the vote results
-                    // certified and we send it to the ordering shard 
+                    // certified and we send it to the ordering shard
                     let mut total_stake = self.stake;
                     let mut multisignatures: Vec<NodeSignature> = Vec::new();
                     multisignatures.push(node_signature);
@@ -139,7 +132,6 @@ impl QuorumWaiter {
 
                     // Give a bit of extra time to disseminate the batch to slower nodes rather than
                     // immediately dropping the handles.
-                    // TODO: We should allocate resource per peer (not in total).
                     if pending_counter >= DISSEMINATION_QUEUE_MAX {
                         pending.push(async move {
                             tokio::select! {

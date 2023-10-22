@@ -8,13 +8,7 @@ mod helper;
 mod mempool;
 mod proposer;
 mod quorum_waiter;
-// mod timer;
 mod vote_maker;
 
-// #[cfg(test)]
-// #[path = "tests/common.rs"]
-// mod common;
-
-pub use crate::config::{ExecutionCommittee, CertifyParameters};
+pub use crate::config::{CertifyParameters, ExecutionCommittee};
 pub use crate::consensus::Consensus;
-// pub use crate::messages::{QC, TC};

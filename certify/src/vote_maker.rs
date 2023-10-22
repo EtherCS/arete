@@ -1,16 +1,8 @@
 use crate::quorum_waiter::QuorumVoteMessage;
 use crate::{config::ExecutionCommittee, consensus::ConsensusMessage};
 use bytes::Bytes;
-// #[cfg(feature = "benchmark")]
-// use crypto::Digest;
 use crypto::PublicKey;
-// #[cfg(feature = "benchmark")]
-// use ed25519_dalek::Digest as _;
-// #[cfg(feature = "benchmark")]
-// use log::info;
 use network::ReliableSender;
-// #[cfg(feature = "benchmark")]
-// use std::convert::TryInto as _;
 use tokio::sync::mpsc::{Receiver, Sender};
 use types::CrossTransactionVote;
 
@@ -20,10 +12,6 @@ pub struct VoteMaker {
     name: PublicKey,
     /// The committee information.
     committee: ExecutionCommittee,
-    // /// The execution shard information
-    // shard_info: ShardInfo,
-    /// The signagure service
-    // signature_service: SignatureService,
     /// Channel receive vote results (CrossTransactionVote) from core
     rx_order_ctx: Receiver<CrossTransactionVote>,
     /// Output channel to deliver sealed vote results to the `QuorumWaiter`.
@@ -36,8 +24,6 @@ impl VoteMaker {
     pub fn spawn(
         name: PublicKey,
         committee: ExecutionCommittee,
-        // shard_info: ShardInfo,
-        // signature_service: SignatureService,
         rx_order_ctx: Receiver<CrossTransactionVote>,
         tx_message: Sender<QuorumVoteMessage>,
     ) {
@@ -45,8 +31,6 @@ impl VoteMaker {
             Self {
                 name,
                 committee,
-                // shard_info,
-                // signature_service,
                 rx_order_ctx,
                 tx_message,
                 network: ReliableSender::new(),
@@ -84,7 +68,8 @@ impl VoteMaker {
         let handlers = self.network.broadcast(consensus_addresses, bytes).await;
 
         // Send the batch through the deliver channel for further processing.
-        let vote_serialized = bincode::serialize(&ctx_vote).expect("Failed to serialize vote results");
+        let vote_serialized =
+            bincode::serialize(&ctx_vote).expect("Failed to serialize vote results");
         self.tx_message
             .send(QuorumVoteMessage {
                 vote: vote_serialized,

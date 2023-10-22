@@ -7,24 +7,20 @@ use network::SimpleSender;
 use store::Store;
 use tokio::sync::mpsc::Receiver;
 
-// #[cfg(test)]
-// #[path = "tests/helper_tests.rs"]
-// pub mod helper_tests;
-
 /// A task dedicated to help other authorities by replying to their sync requests.
 pub struct Helper {
-    /// The committee information.
     committee: ExecutionCommittee,
-    /// The persistent storage.
     store: Store,
-    /// Input channel to receive sync requests.
     rx_requests: Receiver<(Digest, PublicKey)>,
-    /// A network sender to reply to the sync requests.
     network: SimpleSender,
 }
 
 impl Helper {
-    pub fn spawn(committee: ExecutionCommittee, store: Store, rx_requests: Receiver<(Digest, PublicKey)>) {
+    pub fn spawn(
+        committee: ExecutionCommittee,
+        store: Store,
+        rx_requests: Receiver<(Digest, PublicKey)>,
+    ) {
         tokio::spawn(async move {
             Self {
                 committee,
@@ -39,8 +35,6 @@ impl Helper {
 
     async fn run(&mut self) {
         while let Some((digest, origin)) = self.rx_requests.recv().await {
-            // TODO [issue #58]: Do some accounting to prevent bad nodes from monopolizing our resources.
-
             // get the requestors address.
             let address = match self.committee.address(&origin) {
                 Some(x) => x,

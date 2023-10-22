@@ -6,7 +6,6 @@ use crate::helper::Helper;
 use crate::mempool::MempoolDriver;
 use crate::proposer::Proposer;
 use crate::quorum_waiter::QuorumWaiter;
-// use crate::synchronizer::Synchronizer;
 use crate::vote_maker::VoteMaker;
 use async_trait::async_trait;
 use bytes::Bytes;
@@ -19,11 +18,9 @@ use serde::{Deserialize, Serialize};
 use std::error::Error;
 use store::Store;
 use tokio::sync::mpsc::{channel, Receiver, Sender};
-use types::{CBlock, ConfirmMessage, EBlock, ShardInfo, CertifyMessage, CrossTransactionVote, NodeSignature};
-
-// #[cfg(test)]
-// #[path = "tests/consensus_tests.rs"]
-// pub mod consensus_tests;
+use types::{
+    CBlock, CertifyMessage, ConfirmMessage, CrossTransactionVote, EBlock, NodeSignature, ShardInfo,
+};
 
 /// The default channel capacity for each channel of the consensus.
 pub const CHANNEL_CAPACITY: usize = 1_000;
@@ -86,61 +83,34 @@ impl Consensus {
 
         info!("Liveness threshold is: {}", committee.liveness_threshold);
 
-        // Make the leader election module.
-        // let leader_elector = LeaderElector::new(committee.clone());
-
         // // Make the mempool driver.
         let mempool_driver = MempoolDriver::new(store.clone(), tx_mempool, tx_loopback.clone());
 
-        // // Make the synchronizer.
-        // let synchronizer = Synchronizer::new(
-        //     name,
-        //     committee.clone(),
-        //     store.clone(),
-        //     tx_loopback.clone(),
-        //     parameters.certify_sync_retry_delay,
-        // );
-
         // Spawn the consensus core.
         Core::spawn(
-            // name,
-            // committee.clone(),
             shard_info.clone(),
-            // signature_service.clone(),
             store.clone(),
             mempool_driver,
-            // synchronizer,
             rx_consensus,
             rx_loopback,
             tx_order_ctx,
-            // tx_certify.clone(),
         );
 
         // Spawn the vote_maker
-        VoteMaker::spawn(
-            name,
-            committee.clone(),
-            // shard_info.clone(),
-            // signature_service.clone(),
-            rx_order_ctx,
-            tx_vote_quorum_waiter,
-        );
+        VoteMaker::spawn(name, committee.clone(), rx_order_ctx, tx_vote_quorum_waiter);
 
         // Spawn the quorum_waiter
         QuorumWaiter::spawn(
             name,
-            // shard_info.clone(),
             signature_service.clone(),
             committee.clone(),
             committee.stake(&name),
             rx_vote_quorum_waiter,
             tx_certify.clone(),
         );
-        
+
         // Spawn the block proposer.
-        Proposer::spawn(
-            rx_mempool, tx_certify,
-        );
+        Proposer::spawn(rx_mempool, tx_certify);
 
         // Spawn the confirm executor.
         ConfirmExecutor::spawn(name, committee.clone(), rx_confirm, tx_consensus.clone());
@@ -177,7 +147,7 @@ impl MessageHandler for ConsensusReceiverHandler {
                 let signature = signature_service.request_signature(ctx_vote.digest()).await;
                 let node_signature = NodeSignature::new(self.name, signature).await;
                 let ctx_vote_serialized = bincode::serialize(&node_signature.clone())
-                .expect("Failed to serialize received ctx vote");
+                    .expect("Failed to serialize received ctx vote");
                 let ctx_vote_bytes = Bytes::from(ctx_vote_serialized.clone());
                 let _ = writer.send(ctx_vote_bytes).await;
             }
@@ -198,12 +168,6 @@ impl MessageHandler for ConsensusReceiverHandler {
                     .await
                     .expect("Failed to send confirm message to core")
             }
-            
-            // message => self
-            //     .tx_consensus
-            //     .send(message)
-            //     .await
-            //     .expect("Failed to consensus message"),
         }
         Ok(())
     }
