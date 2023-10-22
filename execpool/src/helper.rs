@@ -6,10 +6,6 @@ use network::SimpleSender;
 use store::Store;
 use tokio::sync::mpsc::Receiver;
 
-// #[cfg(test)]
-// #[path = "tests/helper_tests.rs"]
-// pub mod helper_tests;
-
 /// A task dedicated to help other authorities by replying to their batch requests.
 pub struct Helper {
     /// The committee information.
@@ -42,8 +38,6 @@ impl Helper {
 
     async fn run(&mut self) {
         while let Some((digest, origin)) = self.rx_request.recv().await {
-            // TODO [issue #7]: Do some accounting to prevent bad nodes from monopolizing our resources.
-
             // get the requestors address.
             let address = match self.committee.mempool_address(&origin) {
                 Some(x) => x,

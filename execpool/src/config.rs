@@ -6,6 +6,8 @@ use std::net::SocketAddr;
 
 #[derive(Deserialize, Serialize)]
 pub struct CertifyParameters {
+    /// The ratio of cross-shard transactions (For test)
+    pub certify_cross_shard_ratio: f32,
     /// The depth of the garbage collection (Denominated in number of rounds).
     pub certify_gc_depth: u64,
     /// The delay after which the synchronizer retries to send sync requests. Denominated in ms.
@@ -24,6 +26,7 @@ pub struct CertifyParameters {
 impl Default for CertifyParameters {
     fn default() -> Self {
         Self {
+            certify_cross_shard_ratio: 0.2,
             certify_gc_depth: 50,
             certify_sync_retry_delay: 5_000,
             certify_sync_retry_nodes: 3,
@@ -36,6 +39,7 @@ impl Default for CertifyParameters {
 impl CertifyParameters {
     pub fn log(&self) {
         // NOTE: These log entries are used to compute performance.
+        info!("Cross-shard transaction ratio set to {}", self.certify_cross_shard_ratio);
         info!("Garbage collection depth set to {} rounds", self.certify_gc_depth);
         info!("Sync retry delay set to {} ms", self.certify_sync_retry_delay);
         info!("Sync retry nodes set to {} nodes", self.certify_sync_retry_nodes);

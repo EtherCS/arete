@@ -16,8 +16,6 @@ impl Processor {
         mut store: Store,
         // Input channel to receive CBlock.
         mut rx_eblock: Receiver<EBlock>,
-        // Output channel to send out batches' digests.
-        // tx_to_certify_digest: Sender<CBlock>,
     ) {
         tokio::spawn(async move {
             // Receive cblock after certifying (get f+1 signatures)

@@ -22,9 +22,6 @@ use types::{CBlock, ConfirmMessage, EBlock, NodeSignature, ShardInfo, Transactio
 /// The default channel capacity for each channel of the mempool.
 pub const CHANNEL_CAPACITY: usize = 1_000;
 
-/// ARETE TODO: support resolve transaction to calculate the ratio of cross-shard txs
-pub const RATIO_OF_CTX: f32 = 0.3;
-
 /// The consensus round number.
 pub type Round = u64;
 
@@ -33,8 +30,6 @@ pub type Round = u64;
 pub enum MempoolMessage {
     EBlock(EBlock),
     EBlockRequest(Digest, /* origin */ PublicKey),
-    // Batch(Batch),
-    // BatchRequest(Vec<Digest>, /* origin */ PublicKey),
 }
 
 /// The messages sent by the consensus and the mempool.
@@ -154,7 +149,7 @@ impl Mempool {
             self.name,
             self.shard_info.clone(),
             self.signature_service.clone(),
-            RATIO_OF_CTX,
+            self.parameters.certify_cross_shard_ratio,
             self.parameters.certify_batch_size,
             self.parameters.certify_max_batch_delay,
             /* rx_transaction */ rx_batch_maker,
@@ -283,15 +278,6 @@ impl MessageHandler for ConfirmationMsgReceiverHandler {
             .send(confirm_msg.clone())
             .await
             .expect("Failed to send confirmation message");
-        // #[cfg(feature = "benchmark")]
-        // {
-            // info!("executor receives confirm msg {:?}", confirm_msg);
-
-            // info!(
-            //     "ARETE shard {} commit blocks for ordering round {}",
-            //     confirm_msg.shard_id, confirm_msg.order_round
-            // );
-        // }
         // Give the change to schedule other tasks.
         tokio::task::yield_now().await;
         Ok(())
