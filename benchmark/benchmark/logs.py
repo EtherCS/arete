@@ -314,6 +314,8 @@ class ShardLogParser:
         # Map all execution round to commit_timestamp
         self.arete_rounds_to_timestamp = self._update_arete_commit_time_results()
         
+        # self.end_time = max(self.shard_one_commits.values())
+        self.end_time = max(self.commits.values())
         self.sizes = {
             k: v for x in sizes for k, v in x.items() if k in self.commits
         }
@@ -602,7 +604,8 @@ class ShardLogParser:
     def _consensus_throughput(self):
         if not self.commits:
             return 0, 0, 0
-        start, end = min(self.proposals.values()), max(self.commits.values())
+        start = min(self.proposals.values())
+        end = self.end_time
         duration = end - start
         bytes = sum(self.sizes.values())
         bps = bytes / duration
@@ -659,7 +662,8 @@ class ShardLogParser:
     def _end_to_end_throughput(self):
         if not self.commits:
             return 0, 0, 0
-        start, end = min(self.start), max(self.commits.values())
+        start = min(self.start)
+        end = self.end_time
         duration = end - start
         bytes = sum(self.sizes.values())
         # consider cross-shard txs

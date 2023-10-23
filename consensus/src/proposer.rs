@@ -108,12 +108,23 @@ impl Proposer {
                 merge_cblockmeta.push(first.clone());
             }
         }
+        // limit the size of a new OBlock, prevent timeout due to large data
+        let batch_size_per_shard = self.cblock_batch_size as usize / self.shard_cblocks.len();
         for vec_cblockmeta in self.shard_cblocks.values() {
-            merge_cblockmeta.extend(vec_cblockmeta.clone());
-            // limit the size of a new OBlock, prevent timeout due to large data
-            if merge_cblockmeta.len() >= self.cblock_batch_size as usize {
-                break;
+            if vec_cblockmeta.len() >= batch_size_per_shard {
+                let temp_vec: HashSet<_> = vec_cblockmeta
+                    .iter()
+                    .map(|value| (value.clone()))
+                    .take(batch_size_per_shard)
+                    .collect();
+                merge_cblockmeta.extend(temp_vec);
+            } else {
+                merge_cblockmeta.extend(vec_cblockmeta.clone());
             }
+            // if merge_cblockmeta.len() >= self.cblock_batch_size as usize {
+            //     merge_cblockmeta = merge_cblockmeta[0..self.cblock_batch_size as usize].to_vec();
+            //     break;
+            // }
         }
         // Get vote results that have ready aggregated
         // ARETE TODO: current only consider execution shard 0 and shard 1

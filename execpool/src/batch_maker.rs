@@ -20,6 +20,9 @@ pub type Batch = Vec<Transaction>;
 // ARETE: TODO: if need round?
 pub const EXECUTION_ROUND: Round = 1;
 
+// Limit the number of cross-shard transactions per EBlock
+pub const CTX_NUM_PER_EBLOCK: usize = 10;
+
 /// Assemble clients transactions into batches.
 pub struct BatchMaker {
     /// The node
@@ -129,7 +132,7 @@ impl BatchMaker {
         // Serialize the batch.
         self.current_batch_size = 0;
         let batch: Vec<_> = self.current_batch.drain(..).collect();
-        let ctx_num = (batch.len() as f32 * self.ratio_cross_shard_txs).floor() as usize;
+        let ctx_num = CTX_NUM_PER_EBLOCK.min((batch.len() as f32 * self.ratio_cross_shard_txs).floor() as usize);
         let intratxs = &batch[ctx_num..batch.len()].to_vec();
         let crosstxs = &batch[0..ctx_num].to_vec();
         // ARETE: use Transactions to create a EBlock
