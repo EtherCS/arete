@@ -69,14 +69,14 @@ def localShard(ctx):
         "tx_size": 512,
         "cross_shard_ratio": 0.2,
         "duration": 120,
-        "liveness_threshold": 0.4,
+        "liveness_threshold": 0.38,
         "shard_faults": 0.0,
         "shard_num": 4,
-        "shard_sizes": 20,  # could be different shard size [4, 8, ...]
+        "shard_sizes": 22,  # could be different shard size [4, 8, ...]
     }
     node_params = {
         "consensus": {
-            "timeout_delay": 3_000,
+            "timeout_delay": 5_000,
             "sync_retry_delay": 10_000,
             "cblock_batch_size": 2000,
         },
@@ -90,7 +90,7 @@ def localShard(ctx):
     }
     executor_params = {
         "consensus": {
-            "certify_timeout_delay": 4_000,
+            "certify_timeout_delay": 5_000,
             "certify_sync_retry_delay": 10_000,
         },
         "mempool": {
