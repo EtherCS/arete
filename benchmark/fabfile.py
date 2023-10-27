@@ -189,7 +189,7 @@ def remote(ctx):
         "liveness_threshold": 0.4,
         "shard_faults": 0.0,
         "shard_num": 4,
-        "shard_sizes": 20, 
+        "shard_sizes": 22, 
     }
     node_params = {
         "consensus": {
