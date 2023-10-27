@@ -182,11 +182,11 @@ def remote(ctx):
     bench_params = {
         "faults": 0.0,
         "nodes": 45,
-        "rate": [2_000, 10_000],
+        "rate": 10_000,
         "tx_size": 512,
         "cross_shard_ratio": 0.2,
         "duration": 120,
-        "liveness_threshold": 0.4,
+        "liveness_threshold": 0.38,
         "shard_faults": 0.0,
         "shard_num": 4,
         "shard_sizes": 22, 
@@ -207,7 +207,7 @@ def remote(ctx):
     }
     executor_params = {
         "consensus": {
-            "certify_timeout_delay": 4_000,
+            "certify_timeout_delay": 5_000,
             "certify_sync_retry_delay": 10_000,
         },
         "mempool": {
