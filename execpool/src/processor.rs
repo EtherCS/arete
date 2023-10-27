@@ -20,11 +20,11 @@ impl Processor {
         tokio::spawn(async move {
             // Receive cblock after certifying (get f+1 signatures)
             while let Some(eblock) = rx_eblock.recv().await {
-                // Hash the cblock.
+                // Hash the eblock.
                 let digest = eblock.digest();
-                let value = bincode::serialize(&eblock).expect("Failed to serialize cblock");
+                let value = bincode::serialize(&eblock).expect("Failed to serialize eblock");
 
-                // Store the cblock.
+                // Store the eblock.
                 store.write(digest.to_vec(), value).await;
             }
         });
