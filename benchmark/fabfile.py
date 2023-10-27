@@ -64,7 +64,7 @@ def localShard(ctx):
     """Run benchmarks on localhost"""
     bench_params = {
         "faults": 0.0,
-        "nodes": 20,
+        "nodes": 45,
         "rate": 10_000,
         "tx_size": 512,
         "cross_shard_ratio": 0.2,
@@ -76,7 +76,7 @@ def localShard(ctx):
     }
     node_params = {
         "consensus": {
-            "timeout_delay": 5_000,
+            "timeout_delay": 3_000,
             "sync_retry_delay": 10_000,
             "cblock_batch_size": 2000,
         },
@@ -99,7 +99,7 @@ def localShard(ctx):
             "certify_sync_retry_delay": 5_000,
             "certify_sync_retry_nodes": 3,
             "certify_batch_size": 500_000,
-            "certify_max_batch_delay": 500,   # sending ratio to the ordering shard (ms)
+            "certify_max_batch_delay": 1000,   # sending ratio to the ordering shard (ms)
         },
     }
     try:
@@ -181,21 +181,21 @@ def remote(ctx):
     """Run benchmarks on AWS"""
     bench_params = {
         "faults": 0.0,
-        "nodes": 90,
+        "nodes": 45,
         "rate": 10_000,
         "tx_size": 512,
-        "cross_shard_ratio": 0.5,
-        "duration": 300,
+        "cross_shard_ratio": 0.2,
+        "duration": 120,
         "liveness_threshold": 0.4,
         "shard_faults": 0.0,
         "shard_num": 2,
-        "shard_sizes": 32, 
+        "shard_sizes": 20, 
     }
     node_params = {
         "consensus": {
-            "timeout_delay": 1_000,
+            "timeout_delay": 3_000,
             "sync_retry_delay": 10_000,
-            "cblock_batch_size": 500,
+            "cblock_batch_size": 2000,
         },
         "mempool": {
             "gc_depth": 50,
@@ -207,7 +207,7 @@ def remote(ctx):
     }
     executor_params = {
         "consensus": {
-            "certify_timeout_delay": 5_000,
+            "certify_timeout_delay": 4_000,
             "certify_sync_retry_delay": 10_000,
         },
         "mempool": {
@@ -215,8 +215,8 @@ def remote(ctx):
             "certify_gc_depth": 50,
             "certify_sync_retry_delay": 5_000,
             "certify_sync_retry_nodes": 3,
-            "certify_batch_size": 15_000,
-            "certify_max_batch_delay": 100,
+            "certify_batch_size": 500_000,
+            "certify_max_batch_delay": 1000,   # sending ratio to the ordering shard (ms)
         },
     }
     try:

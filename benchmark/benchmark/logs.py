@@ -322,10 +322,10 @@ class ShardLogParser:
         self.timeouts = max(timeouts)
 
         # Check whether clients missed their target rate.
-        if self.misses != 0:
-            Print.warn(
-                f'Clients missed their target rate {self.misses:,} time(s)'
-            )
+        # if self.misses != 0:
+        #     Print.warn(
+        #         f'Clients missed their target rate {self.misses:,} time(s)'
+        #     )
 
         # Check whether receive cross-shard comfirmation
         if len(self.vote_round_timestamp.values()) == 0:
