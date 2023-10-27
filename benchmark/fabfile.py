@@ -182,7 +182,7 @@ def remote(ctx):
     bench_params = {
         "faults": 0.0,
         "nodes": 45,
-        "rate": 10_000,
+        "rate": [2_000, 10_000],
         "tx_size": 512,
         "cross_shard_ratio": 0.2,
         "duration": 120,
@@ -193,7 +193,7 @@ def remote(ctx):
     }
     node_params = {
         "consensus": {
-            "timeout_delay": 3_000,
+            "timeout_delay": 5_000,
             "sync_retry_delay": 10_000,
             "cblock_batch_size": 2000,
         },
