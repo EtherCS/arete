@@ -485,22 +485,23 @@ class Bench:
             raise BenchError("Failed to update nodes", e)
 
         # Run benchmarks.
-        for n, shard_num, shard_sizes, node_instances, executor_instances, cross_shard_ratio in zip(
+        for n, shard_num, shard_sizes, node_instances, executor_instances, cross_shard_ratio, liveness_threshold in zip(
             bench_parameters.nodes,
             bench_parameters.shard_num,
             bench_parameters.shard_sizes,
             bench_parameters.node_instances,
             bench_parameters.executor_instances,
             bench_parameters.cross_shard_ratio,
+            bench_parameters.liveness_threshold,
         ):
             for r in zip(
                 bench_parameters.rate,
             ):
-                for liveness_threshold in zip(
-                    bench_parameters.liveness_threshold,
+                for order_fault in zip(
+                    bench_parameters.faults,
                 ):
                     Print.heading(
-                        f"\nRunning {n} nodes with {shard_num} shards * {shard_sizes} nodes (input rate: {r:,} tx/s) (liveness threshold: {liveness_threshold:,})"
+                        f"\nRunning {n} nodes with {shard_num} shards * {shard_sizes} nodes (input rate: {r:,} tx/s) (order faults: {order_fault:,})"
                     )
                     hosts = selected_hosts[:node_instances]
                     executor_hosts = selected_hosts[
@@ -532,7 +533,7 @@ class Bench:
                                 hosts=hosts,
                                 executor_hosts=executor_hosts,
                                 nodes=n,
-                                faults=bench_parameters.faults,
+                                faults=order_fault,
                                 rate=r,
                                 shard_num=shard_num,
                                 shard_sizes=shard_sizes,
@@ -547,13 +548,13 @@ class Bench:
                                 hosts=hosts,
                                 executor_hosts=executor_hosts,
                                 nodes=n,
-                                faults=bench_parameters.faults,
+                                faults=order_fault,
                                 execution_ratio=bench_parameters.shard_faults,
                                 shard_num=shard_num,
                                 shard_sizes=shard_sizes,
                             ).print(
                                 PathMaker.result_file(
-                                    executor_parameters.json["mempool"]["certify_batch_size"], bench_parameters.rate, bench_parameters.shard_faults, shard_num, shard_sizes, liveness_threshold
+                                    executor_parameters.json["mempool"]["certify_batch_size"], r, order_fault, shard_num, shard_sizes, liveness_threshold
                                 )
                             )
                         except (
