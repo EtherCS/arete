@@ -188,7 +188,7 @@ def remote(ctx):
         "duration": 120,
         "liveness_threshold": 0.4,
         "shard_faults": 0.0,
-        "shard_num": 2,
+        "shard_num": 4,
         "shard_sizes": 20, 
     }
     node_params = {
