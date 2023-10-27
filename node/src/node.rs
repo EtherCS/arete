@@ -10,7 +10,7 @@ use tokio::sync::mpsc::{channel, Receiver};
 use types::{ConfirmMessage, ShardInfo};
 use std::collections::HashMap;
 use std::net::SocketAddr;
-use network::SimpleSender;
+use network::ReliableSender;
 
 /// The default channel capacity for this module.
 pub const CHANNEL_CAPACITY: usize = 1_000;
@@ -93,7 +93,7 @@ impl Node {
     }
 
     pub async fn analyze_block(&mut self) {
-        let mut sender = SimpleSender::new();
+        let mut sender = ReliableSender::new();
         while let Some(_block) = self.commit.recv().await {
             for i in _block.payload.clone() {
                 let confim_msg = ConfirmMessage::new(

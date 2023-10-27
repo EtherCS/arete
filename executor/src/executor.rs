@@ -10,7 +10,7 @@ use std::collections::HashMap;
 use std::net::{SocketAddr, IpAddr, Ipv4Addr};
 use tokio::sync::mpsc::{channel, Receiver};
 use anyhow::Result;
-use network::SimpleSender;
+use network::ReliableSender;
 use types::CBlock;
 
 /// The default channel capacity for this module.
@@ -98,7 +98,7 @@ impl Executor {
     }
 
     pub async fn analyze_block(&mut self) -> Result<()> {
-        let mut sender = SimpleSender::new();
+        let mut sender = ReliableSender::new();
         while let Some(_block) = self.commit.recv().await {
             let certify_block = CBlock::new(
                 self.shard_id, 
