@@ -322,15 +322,19 @@ class ShardLogParser:
         self.timeouts = max(timeouts)
 
         # Check whether clients missed their target rate.
-        # if self.misses != 0:
-        #     Print.warn(
-        #         f'Clients missed their target rate {self.misses:,} time(s)'
-        #     )
+        if self.misses != 0:
+            Print.warn(
+                f'Clients missed their target rate {self.misses:,} time(s)'
+            )
 
+        # Check whether receive cross-shard comfirmation
+        if len(self.vote_round_timestamp.values()) == 0:
+            Print.warn('No cross-shard transactions')
+            
         # Check whether the executors timed out.
         # Note that executors are expected to time out once at the beginning.
-        # if self.timeouts > 2:
-        #     Print.warn(f'Executors timed out {self.timeouts:,} time(s)')
+        if self.timeouts > 2:
+            Print.warn(f'Executors timed out {self.timeouts:,} time(s)')
 
     def _merge_results(self, input):
         # Keep the earliest timestamp.
@@ -713,9 +717,6 @@ class ShardLogParser:
     
     def _test_end_to_end_intra_latency(self):
         latency = []
-        if len(self.vote_round_timestamp.values()) == 0:
-            Print.warn('cannot capture the confirmation of cross-shard transactions')
-            # return mean(latency) if latency else 0
         # end_time = max(self.vote_round_timestamp.values())
         for sent, received in zip(self.sent_samples, self.received_samples):
             for tx_id, batch_id in received.items():
