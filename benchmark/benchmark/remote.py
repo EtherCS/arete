@@ -485,80 +485,85 @@ class Bench:
             raise BenchError("Failed to update nodes", e)
 
         # Run benchmarks.
-        for n, shard_num, shard_sizes, r, node_instances, executor_instances, liveness_threshold, cross_shard_ratio in zip(
+        for n, shard_num, shard_sizes, node_instances, executor_instances, cross_shard_ratio, liveness_threshold in zip(
             bench_parameters.nodes,
             bench_parameters.shard_num,
             bench_parameters.shard_sizes,
-            bench_parameters.rate,
             bench_parameters.node_instances,
             bench_parameters.executor_instances,
-            bench_parameters.liveness_threshold,
             bench_parameters.cross_shard_ratio,
+            bench_parameters.liveness_threshold,
         ):
-            Print.heading(
-                f"\nRunning {n} nodes with {shard_num} shards * {shard_sizes} nodes (input rate: {r:,} tx/s)"
-            )
-            hosts = selected_hosts[:node_instances]
-            executor_hosts = selected_hosts[
-                node_instances : node_instances + executor_instances
-            ]
-
-            # Upload all configuration files.
-            try:
-                self._config(
-                    hosts=hosts,
-                    executor_hosts=executor_hosts,
-                    nodes=n,
-                    shard_num=shard_num,
-                    shard_sizes=shard_sizes,
-                    liveness_threshold=liveness_threshold,
-                    node_parameters=node_parameters,
-                    executor_parameters=executor_parameters,
-                )
-            except (subprocess.SubprocessError, GroupException) as e:
-                e = FabricError(e) if isinstance(e, GroupException) else e
-                Print.error(BenchError("Failed to configure nodes", e))
-                continue
-
-            # Run the benchmark.
-            for i in range(bench_parameters.runs):
-                Print.heading(f"Run {i+1}/{bench_parameters.runs}")
-                try:
-                    self._run_single(
-                        hosts=hosts,
-                        executor_hosts=executor_hosts,
-                        nodes=n,
-                        faults=bench_parameters.faults,
-                        rate=r,
-                        shard_num=shard_num,
-                        shard_sizes=shard_sizes,
-                        shard_faults=bench_parameters.shard_faults,
-                        bench_parameters=bench_parameters,
-                        node_parameters=node_parameters,
-                        executor_parameters=executor_parameters,
-                        cross_shard_ratio=cross_shard_ratio,
-                        debug=debug,
+            for r in zip(
+                bench_parameters.rate,
+            ):
+                for order_fault in zip(
+                    bench_parameters.faults,
+                ):
+                    Print.heading(
+                        f"\nRunning {n} nodes with {shard_num} shards * {shard_sizes} nodes (input rate: {r:,} tx/s) (order faults: {order_fault:,})"
                     )
-                    self._logs(
-                        hosts=hosts,
-                        executor_hosts=executor_hosts,
-                        nodes=n,
-                        faults=bench_parameters.faults,
-                        execution_ratio=bench_parameters.shard_faults,
-                        shard_num=shard_num,
-                        shard_sizes=shard_sizes,
-                    ).print(
-                        PathMaker.result_file(
-                            executor_parameters.json["mempool"]["certify_batch_size"], bench_parameters.rate, bench_parameters.shard_faults, shard_num, shard_sizes, liveness_threshold
+                    hosts = selected_hosts[:node_instances]
+                    executor_hosts = selected_hosts[
+                        node_instances : node_instances + executor_instances
+                    ]
+
+                    # Upload all configuration files.
+                    try:
+                        self._config(
+                            hosts=hosts,
+                            executor_hosts=executor_hosts,
+                            nodes=n,
+                            shard_num=shard_num,
+                            shard_sizes=shard_sizes,
+                            liveness_threshold=liveness_threshold,
+                            node_parameters=node_parameters,
+                            executor_parameters=executor_parameters,
                         )
-                    )
-                except (
-                    subprocess.SubprocessError,
-                    GroupException,
-                    ParseError,
-                ) as e:
-                    self.kill(hosts=hosts)
-                    if isinstance(e, GroupException):
-                        e = FabricError(e)
-                    Print.error(BenchError("Benchmark failed", e))
-                    continue
+                    except (subprocess.SubprocessError, GroupException) as e:
+                        e = FabricError(e) if isinstance(e, GroupException) else e
+                        Print.error(BenchError("Failed to configure nodes", e))
+                        continue
+
+                    # Run the benchmark.
+                    for i in range(bench_parameters.runs):
+                        Print.heading(f"Run {i+1}/{bench_parameters.runs}")
+                        try:
+                            self._run_single(
+                                hosts=hosts,
+                                executor_hosts=executor_hosts,
+                                nodes=n,
+                                faults=order_fault,
+                                rate=r,
+                                shard_num=shard_num,
+                                shard_sizes=shard_sizes,
+                                shard_faults=bench_parameters.shard_faults,
+                                bench_parameters=bench_parameters,
+                                node_parameters=node_parameters,
+                                executor_parameters=executor_parameters,
+                                cross_shard_ratio=cross_shard_ratio,
+                                debug=debug,
+                            )
+                            self._logs(
+                                hosts=hosts,
+                                executor_hosts=executor_hosts,
+                                nodes=n,
+                                faults=order_fault,
+                                execution_ratio=bench_parameters.shard_faults,
+                                shard_num=shard_num,
+                                shard_sizes=shard_sizes,
+                            ).print(
+                                PathMaker.result_file(
+                                    executor_parameters.json["mempool"]["certify_batch_size"], r, order_fault, shard_num, shard_sizes, liveness_threshold
+                                )
+                            )
+                        except (
+                            subprocess.SubprocessError,
+                            GroupException,
+                            ParseError,
+                        ) as e:
+                            self.kill(hosts=hosts)
+                            if isinstance(e, GroupException):
+                                e = FabricError(e)
+                            Print.error(BenchError("Benchmark failed", e))
+                            continue
