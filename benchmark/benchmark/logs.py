@@ -731,6 +731,8 @@ class ShardLogParser:
         end_to_end_tps, end_to_end_bps, duration = self._end_to_end_throughput()
         end_to_end_intra_latency = self._end_to_end_intra_latency() * 1000
         end_to_end_cross_latency = self._end_to_end_cross_latency() * 1000
+        if end_to_end_intra_latency >= end_to_end_cross_latency:
+            raise ParseError('Running time is too short to get cross-shard transactions committed')
         
         # arete_consensus_latency = self._avg_consensus_interval() * 1000
         # arete_consensus_tps, arete_consensus_bps, _ = self._arete_consensus_throughput()
