@@ -315,6 +315,8 @@ class ShardLogParser:
         self.arete_rounds_to_timestamp = self._update_arete_commit_time_results()
         
         # self.end_time = max(self.shard_one_commits.values())
+        if len(self.commits.values()) <= 0:
+            raise ParseError('Running time is too short to get transactions committed')
         self.end_time = max(self.commits.values())
         self.sizes = {
             k: v for x in sizes for k, v in x.items() if k in self.commits
