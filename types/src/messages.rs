@@ -359,6 +359,11 @@ impl CBlock {
     pub fn genesis() -> Self {
         CBlock::default()
     }
+
+    pub fn size(&self) -> usize {
+        let serialized = bincode::serialize(&self).expect("Failed to serialize CBlock");
+        serialized.len()
+    }
 }
 
 impl Hash for CBlock {

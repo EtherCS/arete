@@ -148,6 +148,7 @@ impl Node {
             }
             // Send confirmation message to the specific execution shard
             for (shard, confim_msg) in &confirm_msgs {
+                // info!("ARETE trace: start send confirm message to {} in round {}", shard, _block.round);
                 let message = bincode::serialize(&confim_msg.clone())
                     .expect("fail to serialize the ConfirmMessage");
                 if let Some(_addrs) = self.shard_confirmation_addrs.get(&shard) {

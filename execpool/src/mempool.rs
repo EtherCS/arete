@@ -271,6 +271,7 @@ struct ConfirmationMsgReceiverHandler {
 #[async_trait]
 impl MessageHandler for ConfirmationMsgReceiverHandler {
     async fn dispatch(&self, _writer: &mut Writer, message: Bytes) -> Result<(), Box<dyn Error>> {
+        
         // Send the transaction to the batch maker.
         let confirm_msg: ConfirmMessage =
             bincode::deserialize(&message).expect("Failed to deserialize confirmation message");
@@ -278,6 +279,9 @@ impl MessageHandler for ConfirmationMsgReceiverHandler {
             .send(confirm_msg.clone())
             .await
             .expect("Failed to send confirmation message");
+        
+        // info!("ARETE trace: receive confirm message in round {}", confirm_msg.order_round);
+        
         // Give the change to schedule other tasks.
         tokio::task::yield_now().await;
         Ok(())

@@ -6,6 +6,8 @@ use execpool::ExecutionMempoolMessage;
 use futures::stream::futures_unordered::FuturesUnordered;
 use futures::stream::StreamExt as _;
 use log::error;
+#[cfg(feature = "benchmark")]
+use log::info;
 use std::collections::HashMap;
 use store::Store;
 use tokio::sync::mpsc::{channel, Receiver, Sender};
@@ -60,6 +62,16 @@ impl MempoolDriver {
                     .send(PayloadWaiterMessage::Wait(block_creator.ebhash.clone()))
                     .await
                     .expect("Failed to send message to payload waiter");
+            } else {
+                #[cfg(feature = "benchmark")]
+                {
+                    // while let Some(block_digest) = _to_commit.pop_back() {
+                    info!(
+                        "Shard {} Committed EBlock in round {} -> {:?}",
+                        confirm_msg.shard_id, confirm_msg.order_round, block_creator.ebhash,
+                    );
+                    // }
+                }
             }
         }
         if missing {

@@ -109,7 +109,11 @@ impl Proposer {
             }
         }
         // limit the size of a new OBlock, prevent timeout due to large data
-        let batch_size_per_shard = self.cblock_batch_size as usize / self.shard_cblocks.len();
+        let mut batch_size_per_shard = 0;
+        if self.shard_cblocks.len() > 0 {
+            batch_size_per_shard = self.cblock_batch_size as usize / self.shard_cblocks.len();
+        }
+        
         for vec_cblockmeta in self.shard_cblocks.values() {
             if vec_cblockmeta.len() >= batch_size_per_shard {
                 let temp_vec: HashSet<_> = vec_cblockmeta

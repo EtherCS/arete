@@ -1,10 +1,11 @@
-use crate::config::ExecutionCommittee;
+use crate::{config::ExecutionCommittee, mempool::MempoolMessage};
 use bytes::Bytes;
 use crypto::{Digest, PublicKey};
 use log::{error, warn};
 use network::SimpleSender;
 use store::Store;
 use tokio::sync::mpsc::Receiver;
+use types::EBlock;
 
 /// A task dedicated to help other authorities by replying to their batch requests.
 pub struct Helper {
@@ -49,7 +50,14 @@ impl Helper {
 
             // Reply to the request (the best we can).
             match self.store.read(digest.to_vec()).await {
-                Ok(Some(data)) => self.network.send(address, Bytes::from(data)).await,
+                Ok(Some(data)) => {
+                    let eblock: EBlock =
+                        bincode::deserialize(&data).expect("failed to deseriablize eblock");
+                    let message = MempoolMessage::EBlock(eblock.clone());
+                    let serialized = bincode::serialize(&message)
+                        .expect("Failed to serialize our own MempoolMessage EBlock");
+                    self.network.send(address, Bytes::from(serialized)).await;
+                }
                 Ok(None) => (),
                 Err(e) => error!("{}", e),
             }
