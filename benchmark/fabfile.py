@@ -65,14 +65,14 @@ def localShard(ctx):
     bench_params = {
         "faults": 0.0,
         "nodes": 45,
-        "rate": 10_000,
+        "rate": 15_000,
         "tx_size": 512,
         "cross_shard_ratio": 0.2,
-        "duration": 120,
+        "duration": 60,
         "liveness_threshold": 0.3,
         "shard_faults": 0.0,
-        "shard_num": 2,
-        "shard_sizes": 20,  # could be different shard size [4, 8, ...]
+        "shard_num": 7,
+        "shard_sizes": 22,  # could be different shard size [4, 8, ...]
     }
     node_params = {
         "consensus": {
@@ -96,7 +96,7 @@ def localShard(ctx):
             "certify_gc_depth": 50,
             "certify_sync_retry_delay": 5_000,
             "certify_sync_retry_nodes": 3,
-            "certify_batch_size": 500_000,
+            "certify_batch_size": 300_000,
             "certify_max_batch_delay": 1000,
         },
     }
