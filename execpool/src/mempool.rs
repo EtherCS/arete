@@ -30,6 +30,7 @@ pub type Round = u64;
 pub enum MempoolMessage {
     EBlock(EBlock),
     EBlockRequest(Digest, /* origin */ PublicKey),
+    SyncEBlock(EBlock),
 }
 
 /// The messages sent by the consensus and the mempool.
@@ -271,7 +272,6 @@ struct ConfirmationMsgReceiverHandler {
 #[async_trait]
 impl MessageHandler for ConfirmationMsgReceiverHandler {
     async fn dispatch(&self, _writer: &mut Writer, message: Bytes) -> Result<(), Box<dyn Error>> {
-        
         // Send the transaction to the batch maker.
         let confirm_msg: ConfirmMessage =
             bincode::deserialize(&message).expect("Failed to deserialize confirmation message");
@@ -279,9 +279,9 @@ impl MessageHandler for ConfirmationMsgReceiverHandler {
             .send(confirm_msg.clone())
             .await
             .expect("Failed to send confirmation message");
-        
+
         // info!("ARETE trace: receive confirm message in round {}", confirm_msg.order_round);
-        
+
         // Give the change to schedule other tasks.
         tokio::task::yield_now().await;
         Ok(())
@@ -345,7 +345,15 @@ impl MessageHandler for MempoolReceiverHandler {
                     .expect("Failed to send batch request");
                 let _ = writer.send(Bytes::from("Ack")).await;
             }
-            Err(e) => warn!("Serialization error: {}", e),
+            Ok(MempoolMessage::SyncEBlock(eblock)) => {
+                self.tx_processor
+                    .send(eblock.clone())
+                    .await
+                    .expect("Failed to send EBlock to store");
+            }
+            Err(e) => {
+                warn!("Serialization error: {}", e)
+            }
         }
         Ok(())
     }

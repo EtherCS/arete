@@ -53,7 +53,7 @@ impl Helper {
                 Ok(Some(data)) => {
                     let eblock: EBlock =
                         bincode::deserialize(&data).expect("failed to deseriablize eblock");
-                    let message = MempoolMessage::EBlock(eblock.clone());
+                    let message = MempoolMessage::SyncEBlock(eblock.clone());
                     let serialized = bincode::serialize(&message)
                         .expect("Failed to serialize our own MempoolMessage EBlock");
                     self.network.send(address, Bytes::from(serialized)).await;

@@ -79,16 +79,10 @@ impl Core {
     async fn process_confirm(&mut self, confirm_msg: ConfirmMessage) -> ConsensusResult<()> {
         let mut _to_commit: VecDeque<Digest> = VecDeque::new();
         // First handle the ordered intra-shard transactions
-        for block_creator in confirm_msg.block_hashes.clone() {
-            match self.store.read(block_creator.ebhash.to_vec()).await? {
-                Some(bytes) => {
-                    #[cfg(feature = "benchmark")]
-                    _to_commit.push_front(block_creator.ebhash);
-                    let block: EBlock =
-                        bincode::deserialize(&bytes).expect("Failed to deserialize EBlock");
-                    self.store_block(&block).await;
-                }
-                None => {}
+        #[cfg(feature = "benchmark")]
+        {
+            for block_creator in confirm_msg.block_hashes.clone() {
+                _to_commit.push_front(block_creator.ebhash);
             }
         }
         // Then, handle the ordered cross-shard transactions
