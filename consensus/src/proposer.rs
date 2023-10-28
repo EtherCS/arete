@@ -8,9 +8,9 @@ use futures::stream::StreamExt as _;
 use log::{debug, info};
 use network::{CancelHandler, ReliableSender};
 use std::collections::HashMap;
+use std::convert::TryFrom;
 use tokio::sync::mpsc::{Receiver, Sender};
 use types::{CBlock, CBlockMeta, ShardInfo};
-use std::convert::TryFrom;
 
 #[derive(Debug)]
 pub enum ProposerMessage {
@@ -165,7 +165,6 @@ impl Proposer {
                 // ARETE: here, every node receive the transaction (CBlock) due to mempool's broadcast
                 // Update its local Map[shard_id, if_receive_CBlock]
                 Some(cblock) = self.rx_cblock.recv() => {
-                    // debug!("Consensus proposer receive CBlock {:?}", cblock);
                     if !self.max_shard_rounds.contains_key(&cblock.shard_id) {
                         // debug!("Receive the first or a larger CBlock from shard {}, new round {}", cblock.shard_id, cblock.round);
                         let cblm = CBlockMeta::new(
@@ -178,7 +177,6 @@ impl Proposer {
                     }
                     else if let Some(tp_round) = self.max_shard_rounds.get(&cblock.shard_id).copied() {
                         if tp_round < cblock.round {
-                            // debug!("Receive the first or a larger CBlock from shard {}, new round {}", cblock.shard_id, cblock.round);
                             let cblm = CBlockMeta::new(
                                 cblock.shard_id,
                                 cblock.round,

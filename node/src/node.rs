@@ -1,16 +1,16 @@
 use crate::config::Export as _;
 use crate::config::{Committee, ConfigError, Parameters, Secret};
-use consensus::{OBlock, Consensus};
+use consensus::{Consensus, OBlock};
 use crypto::SignatureService;
-use log::{info, debug};
+use log::info;
 use mempool::Mempool;
+use network::SimpleSender;
 use rand::seq::IteratorRandom;
+use std::collections::HashMap;
+use std::net::SocketAddr;
 use store::Store;
 use tokio::sync::mpsc::{channel, Receiver};
 use types::{ConfirmMessage, ShardInfo};
-use std::collections::HashMap;
-use std::net::SocketAddr;
-use network::ReliableSender;
 
 /// The default channel capacity for this module.
 pub const CHANNEL_CAPACITY: usize = 1_000;
@@ -47,7 +47,10 @@ impl Node {
                 shard_confirmation_addrs.insert(shard_id, *_confirm_addr);
             }
         }
-        info!("Node chooses ordering shard address {:?}", shard_confirmation_addrs);
+        info!(
+            "Node chooses ordering shard address {:?}",
+            shard_confirmation_addrs
+        );
 
         // Load default parameters if none are specified.
         let parameters = match parameters {
@@ -85,7 +88,11 @@ impl Node {
         );
 
         info!("Node {} successfully booted", name);
-        Ok(Self { commit: rx_commit, shard_info: committee.shard, shard_confirmation_addrs: shard_confirmation_addrs })
+        Ok(Self {
+            commit: rx_commit,
+            shard_info: committee.shard,
+            shard_confirmation_addrs: shard_confirmation_addrs,
+        })
     }
 
     pub fn print_key_file(filename: &str) -> Result<(), ConfigError> {
@@ -93,26 +100,28 @@ impl Node {
     }
 
     pub async fn analyze_block(&mut self) {
-        let mut sender = ReliableSender::new();
+        let mut sender = SimpleSender::new();
         while let Some(_block) = self.commit.recv().await {
             for i in _block.payload.clone() {
                 let confim_msg = ConfirmMessage::new(
                     i.shard_id,
-                    i.hash, 
-                    i.round,    // corresponding execution shard's round
-                    _block.round, 
-                    _block.get_digests(), 
-                    _block.signature.clone()).await;
-    
+                    i.hash,
+                    i.round, // corresponding execution shard's round
+                    _block.round,
+                    _block.get_digests(),
+                    _block.signature.clone(),
+                )
+                .await;
+
                 let message = bincode::serialize(&confim_msg.clone())
                     .expect("fail to serialize the ConfirmMessage");
                 if let Some(_addr) = self.shard_confirmation_addrs.get(&i.shard_id).copied() {
                     sender.send(_addr, Into::into(message)).await;
-                    debug!("send a confirm message {:?} to the execution shard {}", confim_msg.clone(), i.shard_id);
+                    // debug!("send a confirm message {:?} to the execution shard {}", confim_msg.clone(), i.shard_id);
                 }
             }
-            
-            info!("Node commits block {:?} successfully", _block); // {:?} means: display based on the Debug function
+
+            // info!("Node commits block {:?} successfully", _block); // {:?} means: display based on the Debug function
         }
     }
 }
