@@ -418,14 +418,14 @@ class Bench:
         execution_faults = floor(shard_sizes * execution_ratio)
         
         # Download log files.
-        host_nodes = self._split_hosts(hosts, nodes)
-        progress = progress_bar(host_nodes, prefix="Downloading node logs:")
-        for i, host in enumerate(progress):
-            # There is no logs for fault nodes
-            if i >= nodes-order_faults:
-                break
-            c = Connection(host[0], user="ubuntu", connect_kwargs=self.connect)
-            c.get(PathMaker.node_log_file(i), local=PathMaker.node_log_file(i))
+        # host_nodes = self._split_hosts(hosts, nodes)
+        # progress = progress_bar(host_nodes, prefix="Downloading node logs:")
+        # for i, host in enumerate(progress):
+        #     # There is no logs for fault nodes
+        #     if i >= nodes-order_faults:
+        #         break
+        #     c = Connection(host[0], user="ubuntu", connect_kwargs=self.connect)
+        #     c.get(PathMaker.node_log_file(i), local=PathMaker.node_log_file(i))
 
         executor_nodes = self._split_hosts(executor_hosts, shard_num * shard_sizes)
         progress = progress_bar(
