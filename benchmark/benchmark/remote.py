@@ -497,11 +497,11 @@ class Bench:
             for r in zip(
                 bench_parameters.rate,
             ):
-                for order_fault in zip(
-                    bench_parameters.faults,
+                for shard_fault in zip(
+                    bench_parameters.shard_faults,
                 ):
                     Print.heading(
-                        f"\nRunning {n} nodes with {shard_num} shards * {shard_sizes} nodes (input rate: {r:,} tx/s) (order faults: {order_fault:,})"
+                        f"\nRunning {n} nodes with {shard_num} shards * {shard_sizes} nodes (input rate: {r:,} tx/s) (faults: {shard_fault:,})"
                     )
                     hosts = selected_hosts[:node_instances]
                     executor_hosts = selected_hosts[
@@ -533,11 +533,11 @@ class Bench:
                                 hosts=hosts,
                                 executor_hosts=executor_hosts,
                                 nodes=n,
-                                faults=order_fault,
+                                faults=shard_fault,
                                 rate=r,
                                 shard_num=shard_num,
                                 shard_sizes=shard_sizes,
-                                shard_faults=bench_parameters.shard_faults,
+                                shard_faults=shard_fault,
                                 bench_parameters=bench_parameters,
                                 node_parameters=node_parameters,
                                 executor_parameters=executor_parameters,
@@ -548,13 +548,13 @@ class Bench:
                                 hosts=hosts,
                                 executor_hosts=executor_hosts,
                                 nodes=n,
-                                faults=order_fault,
-                                execution_ratio=bench_parameters.shard_faults,
+                                faults=shard_fault,
+                                execution_ratio=shard_fault,
                                 shard_num=shard_num,
                                 shard_sizes=shard_sizes,
                             ).print(
                                 PathMaker.result_file(
-                                    executor_parameters.json["mempool"]["certify_batch_size"], r, order_fault, shard_num, shard_sizes, liveness_threshold
+                                    executor_parameters.json["mempool"]["certify_batch_size"], r, shard_fault, shard_num, shard_sizes, liveness_threshold
                                 )
                             )
                         except (

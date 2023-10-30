@@ -312,7 +312,9 @@ class BenchParameters:
             nodes = nodes if isinstance(nodes, list) else [nodes]
             if not nodes or any(x <= 1 for x in nodes):
                 raise ConfigError("Missing or invalid number of nodes")
-
+            shard_faults = float(json["shard_faults"])
+            shard_faults = shard_faults if isinstance(shard_faults, list) else [shard_faults]
+            
             rate = json["rate"]
             rate = rate if isinstance(rate, list) else [rate]
             if not rate:
@@ -322,7 +324,7 @@ class BenchParameters:
             self.rate = [int(x) for x in rate]
             self.tx_size = int(json["tx_size"])
             self.faults = float(json["faults"])
-            self.shard_faults = float(json["shard_faults"])
+            self.shard_faults = [float(x) for x in shard_faults]
             self.duration = int(json["duration"])
             self.runs = int(json["runs"]) if "runs" in json else 1
             
