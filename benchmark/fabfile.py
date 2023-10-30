@@ -190,6 +190,7 @@ def remote(ctx):
         "shard_faults": 0.0,
         "shard_num": 3,
         "shard_sizes": 13, 
+        "runs": 2,
     }
     node_params = {
         "consensus": {
