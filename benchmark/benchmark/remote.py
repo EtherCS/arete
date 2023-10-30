@@ -494,12 +494,8 @@ class Bench:
             bench_parameters.cross_shard_ratio,
             bench_parameters.liveness_threshold,
         ):
-            for r in zip(
-                bench_parameters.rate,
-            ):
-                for shard_fault in zip(
-                    bench_parameters.shard_faults,
-                ):
+            for r in bench_parameters.rate:
+                for shard_fault in bench_parameters.shard_faults:
                     Print.heading(
                         f"\nRunning {n} nodes with {shard_num} shards * {shard_sizes} nodes (input rate: {r:,} tx/s) (faults: {shard_fault:,})"
                     )
