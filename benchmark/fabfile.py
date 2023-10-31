@@ -68,7 +68,7 @@ def localShard(ctx):
         "rate": 30_000,
         "tx_size": 512,
         "cross_shard_ratio": 0.2,
-        "duration": 180,
+        "duration": 120,
         "liveness_threshold": 0.3,
         "shard_faults": 0.0,
         "shard_num": 3,

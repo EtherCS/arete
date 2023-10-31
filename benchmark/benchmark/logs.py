@@ -311,6 +311,13 @@ class ShardLogParser:
         # Map all execution round to commit_timestamp
         self.arete_rounds_to_timestamp = self._update_arete_commit_time_results()
         
+        # calculate concurrent throughput
+        self.concurrent_start_time = min(self.start)
+        self.concurrent_commits = self._get_concurrent_results([x.items() for x in commits], self.concurrent_start_time)
+        self.concurrent_sizes = {
+            k: v for x in sizes for k, v in x.items() if k in self.concurrent_commits
+        }
+        
         self.sizes = {
             k: v for x in sizes for k, v in x.items() if k in self.commits
         }
@@ -333,6 +340,15 @@ class ShardLogParser:
         for x in input:
             for k, v in x:
                 if not k in merged or merged[k] > v:
+                    merged[k] = v
+        return merged
+    
+    def _get_concurrent_results(self, input, start):
+        # Keep the earliest timestamp.
+        merged = {}
+        for x in input:
+            for k, v in x:
+                if start < v and (not k in merged or merged[k] > v):
                     merged[k] = v
         return merged
     
@@ -606,9 +622,10 @@ class ShardLogParser:
     def _end_to_end_throughput(self):
         if not self.commits:
             return 0, 0, 0
-        start, end = min(self.start), max(self.commits.values())
+        start = self.concurrent_start_time
+        end = max(self.commits.values())
         duration = end - start
-        bytes = sum(self.sizes.values())
+        bytes = sum(self.concurrent_sizes.values())
         # consider cross-shard txs
         # 1 cross-shard tx = 2 sub-intra-shard txs
         bps = bytes / duration
@@ -775,8 +792,8 @@ class ShardLogParser:
             '\n'
             ' + RESULTS:\n'
             f' Benchmark Sharding:\n'
-            f' Consensus TPS: {round(consensus_tps):,} tx/s\n'
-            f' Consensus BPS: {round(consensus_bps):,} B/s\n'
+            # f' Consensus TPS: {round(consensus_tps):,} tx/s\n'
+            # f' Consensus BPS: {round(consensus_bps):,} B/s\n'
             f' End-to-end TPS: {round(end_to_end_tps):,} tx/s\n'
             f' End-to-end BPS: {round(end_to_end_bps):,} B/s\n'
             f' End-to-end intra latency: {round(end_to_end_intra_latency):,} ms\n'
