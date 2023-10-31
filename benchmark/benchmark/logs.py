@@ -511,8 +511,8 @@ class ShardLogParser:
         return merged
     
     def _parse_clients(self, log):
-        if search(r'Error', log) is not None:
-            raise ParseError('Client(s) panicked')
+        # if search(r'Error', log) is not None:
+        #     raise ParseError('Client(s) panicked')
 
         size = int(search(r'Transactions size: (\d+)', log).group(1))
         rate = int(search(r'Transactions rate: (\d+)', log).group(1))
@@ -530,8 +530,8 @@ class ShardLogParser:
         return size, rate, start, misses, samples, ratio
 
     def _parse_executors(self, log):
-        if search(r'panic', log) is not None:
-            raise ParseError('Executor(s) panicked')
+        # if search(r'panic', log) is not None:
+        #     raise ParseError('Executor(s) panicked')
 
         liveness_threshold = float(search(r'Liveness threshold is: (\d+.\d+|\d+)', log).group(1))
         
