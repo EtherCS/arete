@@ -181,15 +181,15 @@ def remote(ctx):
     """Run benchmarks on AWS"""
     bench_params = {
         "faults": 0.0,
-        "nodes": 117,
-        "rate": [15000, 10000, 5000, 2000, 1000],
+        "nodes": 4,
+        "rate": [15000, 10000],
         "tx_size": 512,
         "cross_shard_ratio": 0.2,
-        "duration": 300,
+        "duration": 60,
         "liveness_threshold": 0.4,
         "shard_faults": 0.0,
-        "shard_num": 16,
-        "shard_sizes": 31, 
+        "shard_num": 2,
+        "shard_sizes": 5, 
         "runs": 1,
     }
     node_params = {

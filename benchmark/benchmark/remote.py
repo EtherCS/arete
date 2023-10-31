@@ -310,7 +310,7 @@ class Bench:
 
         order_faults = floor(nodes * faults)
         execution_faults = floor(shard_sizes * shard_faults)
-        # Run the executors.
+        # Read the executors.
         executor_nodes = self._split_hosts(executor_hosts, shard_num * shard_sizes)
         all_shard_nodes, all_key_files, all_dbs, all_executor_logs = {}, {}, {}, {}
         for shard_id in range(shard_num):
@@ -341,18 +341,19 @@ class Bench:
         node_logs = [PathMaker.node_log_file(i) for i in range(len(host_nodes))]
         
         # run executior
-        for shard_id in range(shard_num):
-            for host, key_file, db, log_file in zip(
-                all_shard_nodes[shard_id], all_key_files[shard_id], all_dbs[shard_id], all_executor_logs[shard_id]
-            ):
+        for executor_id in range(len(all_key_files[0])):
+            for shard_id in range(shard_num):
+            # for host, key_file, db, log_file in zip(
+            #     all_shard_nodes[shard_id], all_key_files[shard_id], all_dbs[shard_id], all_executor_logs[shard_id]
+            # ):
                 cmd = CommandMaker.run_executor(
-                    key_file,
+                    all_key_files[shard_id][executor_id],
                     PathMaker.shard_committee_file(shard_id),
-                    db,
+                    all_dbs[shard_id][executor_id],
                     PathMaker.shard_parameters_file(shard_id),
                     debug=debug,
                 )
-                self._background_run(host[0], cmd, log_file)
+                self._background_run(all_shard_nodes[shard_id][0], cmd, all_executor_logs[shard_id][executor_id])
         
         # client read
         all_client_shard_nodes, all_client_rate_share, all_client_front_addr, all_client_logs = {}, {}, {}, {}
@@ -396,18 +397,19 @@ class Bench:
         # Run the clients (they will wait for the nodes to be ready).
         # Filter all faulty nodes from the client addresses (or they will wait
         # for the faulty nodes to be online).
-        for shard_id in range(shard_num):
-            timeout = executor_parameters.certify_timeout_delay
-            for host, addr, log_file in zip(all_client_shard_nodes[shard_id], all_client_front_addr[shard_id], all_client_logs[shard_id]):
+        for client_id in range(len(all_client_logs[0])):
+            for shard_id in range(shard_num):
+                timeout = executor_parameters.certify_timeout_delay
+            # for host, addr, log_file in zip(all_client_shard_nodes[shard_id], all_client_front_addr[shard_id], all_client_logs[shard_id]):
                 cmd = CommandMaker.run_client(
-                    addr,
+                    all_client_front_addr[shard_id][client_id],
                     bench_parameters.tx_size,
                     all_client_rate_share[shard_id],
                     shard_id,
                     timeout,
                     cross_shard_ratio,
                 )
-                self._background_run(host[0], cmd, log_file)
+                self._background_run(all_client_shard_nodes[shard_id][0], cmd, all_client_logs[shard_id][client_id])
 
         # Wait for all transactions to be processed.
         duration = bench_parameters.duration
