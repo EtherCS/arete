@@ -182,7 +182,7 @@ def remote(ctx):
     bench_params = {
         "faults": 0.0,
         "nodes": 117,
-        "rate": [1000, 2000, 3000, 5000, 10000, 15000, 20000],
+        "rate": [20000, 15000, 10000, 5000, 2000, 1000],
         "tx_size": 512,
         "cross_shard_ratio": 0.2,
         "duration": 120,
