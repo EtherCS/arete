@@ -318,6 +318,15 @@ class ShardLogParser:
         if len(self.commits.values()) <= 0:
             raise ParseError('Running time is too short to get transactions committed')
         self.end_time = max(self.commits.values())
+        
+        # start counting when all shards are ready
+        # To get peak throughput
+        self.concurrent_start_time = max(self.start)
+        self.concurrent_commits = self._get_concurrent_results([x.items() for x in commits], self.concurrent_start_time)
+        self.concurrent_sizes = {
+            k: v for x in sizes for k, v in x.items() if k in self.concurrent_commits
+        }
+        
         self.sizes = {
             k: v for x in sizes for k, v in x.items() if k in self.commits
         }
@@ -344,6 +353,15 @@ class ShardLogParser:
         for x in input:
             for k, v in x:
                 if not k in merged or merged[k] > v:
+                    merged[k] = v
+        return merged
+    
+    def _get_concurrent_results(self, input, start_time):
+        # Keep the earliest timestamp.
+        merged = {}
+        for x in input:
+            for k, v in x:
+                if start_time < v and (not k in merged or merged[k] > v):
                     merged[k] = v
         return merged
     
@@ -668,10 +686,10 @@ class ShardLogParser:
     def _end_to_end_throughput(self):
         if not self.commits:
             return 0, 0, 0
-        start = min(self.start)
+        start = self.concurrent_start_time
         end = self.end_time
         duration = end - start
-        bytes = sum(self.sizes.values())
+        bytes = sum(self.concurrent_sizes.values())
         # consider cross-shard txs
         # 1 cross-shard tx = 2 sub-intra-shard txs
         bps = bytes / duration
@@ -864,8 +882,8 @@ class ShardLogParser:
             f' Cross-shard ratio: {self.ratio[0]:,} \n'
             f' Execution time: {round(duration):,} s\n'
             '\n'
-            f' Consensus timeout delay: {consensus_timeout_delay:,} ms\n'
-            f' Consensus sync retry delay: {consensus_sync_retry_delay:,} ms\n'
+            # f' Consensus timeout delay: {consensus_timeout_delay:,} ms\n'
+            # f' Consensus sync retry delay: {consensus_sync_retry_delay:,} ms\n'
             f' Mempool sync retry delay: {mempool_sync_retry_delay:,} ms\n'
             f' Mempool sync retry nodes: {mempool_sync_retry_nodes:,} nodes\n'
             f' Mempool batch size: {mempool_batch_size:,} B\n'

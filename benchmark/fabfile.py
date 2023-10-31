@@ -65,7 +65,7 @@ def localShard(ctx):
     bench_params = {
         "faults": 0.0,
         "nodes": 21,
-        "rate": 30_000,
+        "rate": 20_000,
         "tx_size": 512,
         "cross_shard_ratio": 0.2,
         "duration": 60,
