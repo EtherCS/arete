@@ -843,8 +843,8 @@ class ShardLogParser:
 
     def result(self):
         # consensus_latency = self._consensus_latency() * 1000
-        consensus_tps, consensus_bps, _ = self._consensus_throughput()
-        end_to_end_tps, end_to_end_bps, duration = self._end_to_end_throughput()
+        consensus_tps, consensus_bps, duration = self._consensus_throughput()
+        end_to_end_tps, end_to_end_bps, _ = self._end_to_end_throughput()
         # end_to_end_intra_latency = self._end_to_end_intra_latency() * 1000
         # end_to_end_cross_latency = self._end_to_end_cross_latency() * 1000
         end_to_end_intra_latency = self._test_end_to_end_intra_latency() * 1000
@@ -882,8 +882,8 @@ class ShardLogParser:
             f' Cross-shard ratio: {self.ratio[0]:,} \n'
             f' Execution time: {round(duration):,} s\n'
             '\n'
-            # f' Consensus timeout delay: {consensus_timeout_delay:,} ms\n'
-            # f' Consensus sync retry delay: {consensus_sync_retry_delay:,} ms\n'
+            f' Consensus timeout delay: {consensus_timeout_delay:,} ms\n'
+            f' Consensus sync retry delay: {consensus_sync_retry_delay:,} ms\n'
             f' Mempool sync retry delay: {mempool_sync_retry_delay:,} ms\n'
             f' Mempool sync retry nodes: {mempool_sync_retry_nodes:,} nodes\n'
             f' Mempool batch size: {mempool_batch_size:,} B\n'
