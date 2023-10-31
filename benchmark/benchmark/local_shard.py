@@ -185,7 +185,6 @@ class LocalBenchShard:
                         #nodes=addresses
                     )
                     self._background_run(cmd, log_file)
-                sleep(15)
                     
             # Wait for all transactions to be processed.
             Print.info(f'Running benchmark ({self.duration} sec)...')
