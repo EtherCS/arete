@@ -341,7 +341,7 @@ class Bench:
                 self._background_run(host[0], cmd, log_file)
 
         # Wait for the nodes to synchronize
-        sleep(2 * executor_parameters.certify_timeout_delay / 1000)
+        # sleep(2 * executor_parameters.certify_timeout_delay / 1000)
 
         # Run the nodes.
         host_nodes = self._split_hosts(hosts, nodes - order_faults)
@@ -397,8 +397,8 @@ class Bench:
         duration = bench_parameters.duration
         for _ in progress_bar(range(20), prefix=f"Running benchmark ({duration} sec):"):
             sleep(ceil(duration / 20))
-        self.kill(hosts=hosts, delete_logs=False)
-        self.kill(hosts=executor_hosts, delete_logs=False)
+        # self.kill(hosts=hosts, delete_logs=False)
+        # self.kill(hosts=executor_hosts, delete_logs=False)
 
     def _logs(
         self,
