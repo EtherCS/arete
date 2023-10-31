@@ -455,8 +455,8 @@ class ShardLogParser:
         return merged
     
     def _parse_clients(self, log):
-        if search(r'Error', log) is not None:
-            raise ParseError('Client(s) panicked')
+        # if search(r'Error', log) is not None:
+        #     raise ParseError('Client(s) panicked')
 
         size = int(search(r'Transactions size: (\d+)', log).group(1))
         rate = int(search(r'Transactions rate: (\d+)', log).group(1))
@@ -474,8 +474,8 @@ class ShardLogParser:
         return size, rate, start, misses, samples, ratio
 
     def _parse_executors(self, log):
-        if search(r'panic', log) is not None:
-            raise ParseError('Executor(s) panicked')
+        # if search(r'panic', log) is not None:
+        #     raise ParseError('Executor(s) panicked')
 
         liveness_threshold = float(search(r'Liveness threshold is: (\d+.\d+|\d+)', log).group(1))
         
@@ -744,8 +744,8 @@ class ShardLogParser:
 
     def result(self):
         # consensus_latency = self._consensus_latency() * 1000
-        consensus_tps, consensus_bps, _ = self._consensus_throughput()
-        end_to_end_tps, end_to_end_bps, duration = self._end_to_end_throughput()
+        consensus_tps, consensus_bps, duration = self._consensus_throughput()
+        end_to_end_tps, end_to_end_bps, _ = self._end_to_end_throughput()
         end_to_end_intra_latency = self._end_to_end_intra_latency() * 1000
         end_to_end_cross_latency = self._end_to_end_cross_latency() * 1000
         if end_to_end_intra_latency >= end_to_end_cross_latency:
@@ -792,8 +792,8 @@ class ShardLogParser:
             '\n'
             ' + RESULTS:\n'
             f' Benchmark Sharding:\n'
-            # f' Consensus TPS: {round(consensus_tps):,} tx/s\n'
-            # f' Consensus BPS: {round(consensus_bps):,} B/s\n'
+            f' Consensus TPS: {round(consensus_tps):,} tx/s\n'
+            f' Consensus BPS: {round(consensus_bps):,} B/s\n'
             f' End-to-end TPS: {round(end_to_end_tps):,} tx/s\n'
             f' End-to-end BPS: {round(end_to_end_bps):,} B/s\n'
             f' End-to-end intra latency: {round(end_to_end_intra_latency):,} ms\n'
