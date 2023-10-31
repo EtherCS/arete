@@ -316,7 +316,7 @@ class BenchParameters:
             if not rate:
                 raise ConfigError("Missing input rate")
 
-            shard_faults = float(json["shard_faults"])
+            shard_faults = json["shard_faults"]
             shard_faults = shard_faults if isinstance(shard_faults, list) else [shard_faults]
             
             self.nodes = [int(x) for x in nodes]

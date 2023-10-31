@@ -310,8 +310,9 @@ class Bench:
 
         order_faults = floor(nodes * faults)
         execution_faults = floor(shard_sizes * shard_faults)
-        # Run the executors.
+        # Read the executors.
         executor_nodes = self._split_hosts(executor_hosts, shard_num * shard_sizes)
+        all_shard_nodes, all_key_files, all_dbs, all_executor_logs = {}, {}, {}, {}
         for shard_id in range(shard_num):
             shard_nodes = executor_nodes[
                 shard_id * shard_sizes : (shard_id + 1) * shard_sizes - execution_faults
@@ -328,26 +329,57 @@ class Bench:
                 PathMaker.shard_executor_log_file(shard_id, i)
                 for i in range(len(shard_nodes))
             ]
-            for host, key_file, db, log_file in zip(
-                shard_nodes, key_files, dbs, executor_logs
-            ):
-                cmd = CommandMaker.run_executor(
-                    key_file,
-                    PathMaker.shard_committee_file(shard_id),
-                    db,
-                    PathMaker.shard_parameters_file(shard_id),
-                    debug=debug,
-                )
-                self._background_run(host[0], cmd, log_file)
-
-        # Wait for the nodes to synchronize
-        sleep(2 * executor_parameters.certify_timeout_delay / 1000)
-
-        # Run the nodes.
+            all_shard_nodes[shard_id] = shard_nodes
+            all_key_files[shard_id] = key_files
+            all_dbs[shard_id] = dbs
+            all_executor_logs[shard_id] = executor_logs
+            
+        # Read the nodes.
         host_nodes = self._split_hosts(hosts, nodes - order_faults)
         key_files = [PathMaker.key_file(i) for i in range(len(host_nodes))]
         dbs = [PathMaker.db_path(i) for i in range(len(host_nodes))]
         node_logs = [PathMaker.node_log_file(i) for i in range(len(host_nodes))]
+        
+        # run executior
+        for executor_id in range(len(all_key_files[0])):
+            for shard_id in range(shard_num):
+            # for host, key_file, db, log_file in zip(
+            #     all_shard_nodes[shard_id], all_key_files[shard_id], all_dbs[shard_id], all_executor_logs[shard_id]
+            # ):
+                cmd = CommandMaker.run_executor(
+                    all_key_files[shard_id][executor_id],
+                    PathMaker.shard_committee_file(shard_id),
+                    all_dbs[shard_id][executor_id],
+                    PathMaker.shard_parameters_file(shard_id),
+                    debug=debug,
+                )
+                self._background_run(all_shard_nodes[shard_id][executor_id][0], cmd, all_executor_logs[shard_id][executor_id])
+        
+        # client read
+        all_client_shard_nodes, all_client_rate_share, all_client_front_addr, all_client_logs = {}, {}, {}, {}
+        for shard_id in range(shard_num):
+            shard_nodes = executor_nodes[
+                shard_id * shard_sizes : (shard_id + 1) * shard_sizes - execution_faults
+            ]
+
+            committee = ExecutionCommittee.load(
+                PathMaker.shard_committee_file(shard_id)
+            )
+            # Run the clients (they will wait for the executors to be ready).
+            # addresses = committee.front
+            front_addr = [f"{x}:{self.settings.front_port + i}" for x, i in shard_nodes]
+            rate_share = ceil(rate / committee.size())
+            # timeout = executor_parameters.certify_timeout_delay
+            client_logs = [
+                PathMaker.shard_client_log_file(shard_id, i)
+                for i in range(len(shard_nodes))
+            ]
+            all_client_shard_nodes[shard_id] = shard_nodes
+            all_client_rate_share[shard_id] = rate_share
+            all_client_front_addr[shard_id] = front_addr
+            all_client_logs[shard_id] = client_logs
+            
+        # run nodes
         for host, key_file, db, log_file in zip(host_nodes, key_files, dbs, node_logs):
             cmd = CommandMaker.run_node(
                 key_file,
@@ -365,33 +397,19 @@ class Bench:
         # Run the clients (they will wait for the nodes to be ready).
         # Filter all faulty nodes from the client addresses (or they will wait
         # for the faulty nodes to be online).
-        for shard_id in range(shard_num):
-            shard_nodes = executor_nodes[
-                shard_id * shard_sizes : (shard_id + 1) * shard_sizes - execution_faults
-            ]
-
-            committee = ExecutionCommittee.load(
-                PathMaker.shard_committee_file(shard_id)
-            )
-            # Run the clients (they will wait for the executors to be ready).
-            # addresses = committee.front
-            front_addr = [f"{x}:{self.settings.front_port + i}" for x, i in shard_nodes]
-            rate_share = ceil(rate / committee.size())
-            timeout = executor_parameters.certify_timeout_delay
-            client_logs = [
-                PathMaker.shard_client_log_file(shard_id, i)
-                for i in range(len(shard_nodes))
-            ]
-            for host, addr, log_file in zip(shard_nodes, front_addr, client_logs):
+        for client_id in range(len(all_client_logs[0])):
+            for shard_id in range(shard_num):
+                timeout = executor_parameters.certify_timeout_delay
+            # for host, addr, log_file in zip(all_client_shard_nodes[shard_id], all_client_front_addr[shard_id], all_client_logs[shard_id]):
                 cmd = CommandMaker.run_client(
-                    addr,
+                    all_client_front_addr[shard_id][client_id],
                     bench_parameters.tx_size,
-                    rate_share,
+                    all_client_rate_share[shard_id],
                     shard_id,
                     timeout,
                     cross_shard_ratio,
                 )
-                self._background_run(host[0], cmd, log_file)
+                self._background_run(all_client_shard_nodes[shard_id][executor_id][0], cmd, all_client_logs[shard_id][client_id])
 
         # Wait for all transactions to be processed.
         duration = bench_parameters.duration
@@ -494,32 +512,32 @@ class Bench:
             bench_parameters.cross_shard_ratio,
             bench_parameters.liveness_threshold,
         ):
+            hosts = selected_hosts[:node_instances]
+            executor_hosts = selected_hosts[
+                node_instances : node_instances + executor_instances
+            ]
+
+            # Upload all configuration files.
+            try:
+                self._config(
+                    hosts=hosts,
+                    executor_hosts=executor_hosts,
+                    nodes=n,
+                    shard_num=shard_num,
+                    shard_sizes=shard_sizes,
+                    liveness_threshold=liveness_threshold,
+                    node_parameters=node_parameters,
+                    executor_parameters=executor_parameters,
+                )
+            except (subprocess.SubprocessError, GroupException) as e:
+                e = FabricError(e) if isinstance(e, GroupException) else e
+                Print.error(BenchError("Failed to configure nodes", e))
+                continue
             for r in bench_parameters.rate:
                 for shard_fault in bench_parameters.shard_faults:
                     Print.heading(
                         f"\nRunning {n} nodes with {shard_num} shards * {shard_sizes} nodes (input rate: {r:,} tx/s) (faults: {shard_fault:,})"
                     )
-                    hosts = selected_hosts[:node_instances]
-                    executor_hosts = selected_hosts[
-                        node_instances : node_instances + executor_instances
-                    ]
-
-                    # Upload all configuration files.
-                    try:
-                        self._config(
-                            hosts=hosts,
-                            executor_hosts=executor_hosts,
-                            nodes=n,
-                            shard_num=shard_num,
-                            shard_sizes=shard_sizes,
-                            liveness_threshold=liveness_threshold,
-                            node_parameters=node_parameters,
-                            executor_parameters=executor_parameters,
-                        )
-                    except (subprocess.SubprocessError, GroupException) as e:
-                        e = FabricError(e) if isinstance(e, GroupException) else e
-                        Print.error(BenchError("Failed to configure nodes", e))
-                        continue
 
                     # Run the benchmark.
                     for i in range(bench_parameters.runs):
