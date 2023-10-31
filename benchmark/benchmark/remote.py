@@ -497,7 +497,7 @@ class Bench:
             for r in bench_parameters.rate:
                 for shard_fault in bench_parameters.shard_faults:
                     Print.heading(
-                        f"\nRunning {n} nodes with {shard_num}, shards * {shard_sizes}, nodes (input rate: {r:,} tx/s), hard fault: {shard_fault}"
+                        f"\nRunning {n} nodes with {shard_num} shards * {shard_sizes} nodes (input rate: {r:,} tx/s) (faults: {shard_fault:,})"
                     )
                     hosts = selected_hosts[:node_instances]
                     executor_hosts = selected_hosts[
@@ -563,3 +563,4 @@ class Bench:
                                 e = FabricError(e)
                             Print.error(BenchError("Benchmark failed", e))
                             continue
+            
