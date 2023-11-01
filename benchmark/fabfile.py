@@ -113,9 +113,9 @@ def localShard(ctx):
         Print.error(e)
         
 @task
-def parseLog(ctx, nodes = 4, orderFaults = 0.0, executionRatio=0.0, shardNum = 2, shardSizes=3, batchSize=50000, rate=10000, fl=0.3):
+def parseLog(ctx, path = "./logs", nodes = 4, orderFaults = 0.0, executionRatio=0.0, shardNum = 2, shardSizes=3, batchSize=50000, rate=10000, fl=0.3):
     ShardLogParser.process_shard(
-        f"./logs", order_size=nodes, order_faults_ratio=orderFaults, execution_size=shardSizes, execution_faults_ratio=executionRatio, shardNum=shardNum
+        path, order_size=nodes, order_faults_ratio=orderFaults, execution_size=shardSizes, execution_faults_ratio=executionRatio, shardNum=shardNum
         ).print(
             PathMaker.result_file(
                 batchSize, rate, executionRatio, shardNum, shardSizes, fl
@@ -181,20 +181,20 @@ def remote(ctx):
     """Run benchmarks on AWS"""
     bench_params = {
         "faults": 0.0,
-        "nodes": 117,
-        "rate": [8000, 5000, 2000, 1000, 500],
+        "nodes": 81,
+        "rate": [20000, 10000, 5000, 2000, 1000, 500],
         "tx_size": 512,
         "cross_shard_ratio": 0.2,
         "duration": 180,
-        "liveness_threshold": 0.4,
+        "liveness_threshold": 0.43,
         "shard_faults": 0.0,
-        "shard_num": 16,
-        "shard_sizes": 31, 
-        "runs": 1,
+        "shard_num": 20,
+        "shard_sizes": 24, 
+        "runs": 2,
     }
     node_params = {
         "consensus": {
-            "timeout_delay": 3_000,
+            "timeout_delay": 5_000,
             "sync_retry_delay": 10_000,
             "cblock_batch_size": 3000,
         },
