@@ -686,10 +686,12 @@ class ShardLogParser:
     def _end_to_end_throughput(self):
         if not self.commits:
             return 0, 0, 0
-        start = self.concurrent_start_time
+        # start = self.concurrent_start_time
+        start = min(self.start)
         end = self.end_time
         duration = end - start
-        bytes = sum(self.concurrent_sizes.values())
+        # bytes = sum(self.concurrent_sizes.values())
+        bytes = sum(self.sizes.values())
         # consider cross-shard txs
         # 1 cross-shard tx = 2 sub-intra-shard txs
         bps = bytes / duration

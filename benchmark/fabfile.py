@@ -181,20 +181,20 @@ def remote(ctx):
     """Run benchmarks on AWS"""
     bench_params = {
         "faults": 0.0,
-        "nodes": 81,
-        "rate": [20000, 10000, 5000, 2000, 1000, 500],
+        "nodes": 21,
+        "rate": [20000],
         "tx_size": 512,
         "cross_shard_ratio": 0.2,
-        "duration": 180,
-        "liveness_threshold": 0.43,
+        "duration": 600,
+        "liveness_threshold": 0.41,
         "shard_faults": 0.0,
-        "shard_num": 20,
-        "shard_sizes": 24, 
+        "shard_num": 3,
+        "shard_sizes": 13, 
         "runs": 2,
     }
     node_params = {
         "consensus": {
-            "timeout_delay": 5_000,
+            "timeout_delay": 3_000,
             "sync_retry_delay": 10_000,
             "cblock_batch_size": 3000,
         },
@@ -208,7 +208,7 @@ def remote(ctx):
     }
     executor_params = {
         "consensus": {
-            "certify_timeout_delay": 5_000,
+            "certify_timeout_delay": 3_000,
             "certify_sync_retry_delay": 10_000,
         },
         "mempool": {
