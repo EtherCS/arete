@@ -111,9 +111,9 @@ def localShard(ctx):
         Print.error(e)
         
 @task
-def parseLog(ctx, nodes = 4, orderFaults = 0.0, executionRatio=0.0, shardNum = 2, shardSizes=3, batchSize=50000, rate=10000, fl=0.3):
+def parseLog(ctx, path = "./logs", nodes = 4, orderFaults = 0.0, executionRatio=0.0, shardNum = 2, shardSizes=3, batchSize=50000, rate=10000, fl=0.3):
     ShardLogParser.process_shard(
-        f"./logs", order_size=nodes, order_faults_ratio=orderFaults, execution_size=shardSizes, execution_faults_ratio=executionRatio, shardNum=shardNum
+        path, order_size=nodes, order_faults_ratio=orderFaults, execution_size=shardSizes, execution_faults_ratio=executionRatio, shardNum=shardNum
         ).print(
             PathMaker.result_file(
                 batchSize, rate, executionRatio, shardNum, shardSizes, fl
@@ -188,7 +188,7 @@ def remote(ctx):
         "shard_faults": 0.0,
         "shard_num": 7,
         "shard_sizes": 63, 
-        "runs": 1,
+        "runs": 2,
     }
     node_params = {
         "consensus": {
