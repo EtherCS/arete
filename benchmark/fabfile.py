@@ -65,7 +65,7 @@ def localShard(ctx):
     bench_params = {
         "faults": 0.0,
         "nodes": 21,
-        "rate": 30_000,
+        "rate": 20_000,
         "tx_size": 512,
         "cross_shard_ratio": 0.2,
         "duration": 60,
@@ -113,9 +113,9 @@ def localShard(ctx):
         Print.error(e)
         
 @task
-def parseLog(ctx, nodes = 4, orderFaults = 0.0, executionRatio=0.0, shardNum = 2, shardSizes=3, batchSize=50000, rate=10000, fl=0.3):
+def parseLog(ctx, path = "./logs", nodes = 4, orderFaults = 0.0, executionRatio=0.0, shardNum = 2, shardSizes=3, batchSize=50000, rate=10000, fl=0.3):
     ShardLogParser.process_shard(
-        f"./logs", order_size=nodes, order_faults_ratio=orderFaults, execution_size=shardSizes, execution_faults_ratio=executionRatio, shardNum=shardNum
+        path, order_size=nodes, order_faults_ratio=orderFaults, execution_size=shardSizes, execution_faults_ratio=executionRatio, shardNum=shardNum
         ).print(
             PathMaker.result_file(
                 batchSize, rate, executionRatio, shardNum, shardSizes, fl
@@ -181,22 +181,22 @@ def remote(ctx):
     """Run benchmarks on AWS"""
     bench_params = {
         "faults": 0.0,
-        "nodes": 117,
-        "rate": [2000, 3000, 5000, 10000, 15000, 20000],
+        "nodes": 21,
+        "rate": [20000],
         "tx_size": 512,
         "cross_shard_ratio": 0.2,
-        "duration": 120,
-        "liveness_threshold": 0.4,
+        "duration": 600,
+        "liveness_threshold": 0.41,
         "shard_faults": 0.0,
-        "shard_num": 16,
-        "shard_sizes": 31, 
-        "runs": 1,
+        "shard_num": 3,
+        "shard_sizes": 13, 
+        "runs": 2,
     }
     node_params = {
         "consensus": {
-            "timeout_delay": 5_000,
+            "timeout_delay": 3_000,
             "sync_retry_delay": 10_000,
-            "cblock_batch_size": 4000,
+            "cblock_batch_size": 3000,
         },
         "mempool": {
             "gc_depth": 50,
@@ -208,7 +208,7 @@ def remote(ctx):
     }
     executor_params = {
         "consensus": {
-            "certify_timeout_delay": 5_000,
+            "certify_timeout_delay": 3_000,
             "certify_sync_retry_delay": 10_000,
         },
         "mempool": {

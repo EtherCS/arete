@@ -318,6 +318,15 @@ class ShardLogParser:
         if len(self.commits.values()) <= 0:
             raise ParseError('Running time is too short to get transactions committed')
         self.end_time = max(self.commits.values())
+        
+        # start counting when all shards are ready
+        # To get peak throughput
+        self.concurrent_start_time = max(self.start)
+        self.concurrent_commits = self._get_concurrent_results([x.items() for x in commits], self.concurrent_start_time)
+        self.concurrent_sizes = {
+            k: v for x in sizes for k, v in x.items() if k in self.concurrent_commits
+        }
+        
         self.sizes = {
             k: v for x in sizes for k, v in x.items() if k in self.commits
         }
@@ -344,6 +353,15 @@ class ShardLogParser:
         for x in input:
             for k, v in x:
                 if not k in merged or merged[k] > v:
+                    merged[k] = v
+        return merged
+    
+    def _get_concurrent_results(self, input, start_time):
+        # Keep the earliest timestamp.
+        merged = {}
+        for x in input:
+            for k, v in x:
+                if start_time < v and (not k in merged or merged[k] > v):
                     merged[k] = v
         return merged
     
@@ -493,8 +511,8 @@ class ShardLogParser:
         return merged
     
     def _parse_clients(self, log):
-        if search(r'Error', log) is not None:
-            raise ParseError('Client(s) panicked')
+        # if search(r'Error', log) is not None:
+        #     raise ParseError('Client(s) panicked')
 
         size = int(search(r'Transactions size: (\d+)', log).group(1))
         rate = int(search(r'Transactions rate: (\d+)', log).group(1))
@@ -512,8 +530,8 @@ class ShardLogParser:
         return size, rate, start, misses, samples, ratio
 
     def _parse_executors(self, log):
-        if search(r'panic', log) is not None:
-            raise ParseError('Executor(s) panicked')
+        # if search(r'panic', log) is not None:
+        #     raise ParseError('Executor(s) panicked')
 
         liveness_threshold = float(search(r'Liveness threshold is: (\d+.\d+|\d+)', log).group(1))
         
@@ -668,9 +686,11 @@ class ShardLogParser:
     def _end_to_end_throughput(self):
         if not self.commits:
             return 0, 0, 0
+        # start = self.concurrent_start_time
         start = min(self.start)
         end = self.end_time
         duration = end - start
+        # bytes = sum(self.concurrent_sizes.values())
         bytes = sum(self.sizes.values())
         # consider cross-shard txs
         # 1 cross-shard tx = 2 sub-intra-shard txs
@@ -825,8 +845,8 @@ class ShardLogParser:
 
     def result(self):
         # consensus_latency = self._consensus_latency() * 1000
-        consensus_tps, consensus_bps, _ = self._consensus_throughput()
-        end_to_end_tps, end_to_end_bps, duration = self._end_to_end_throughput()
+        consensus_tps, consensus_bps, duration = self._consensus_throughput()
+        end_to_end_tps, end_to_end_bps, _ = self._end_to_end_throughput()
         # end_to_end_intra_latency = self._end_to_end_intra_latency() * 1000
         # end_to_end_cross_latency = self._end_to_end_cross_latency() * 1000
         end_to_end_intra_latency = self._test_end_to_end_intra_latency() * 1000

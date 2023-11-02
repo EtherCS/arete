@@ -64,10 +64,11 @@ class LocalBenchShard:
             order_faults = floor(nodes * self.faults)
             
             shardSize, rate = self.shard_sizes[0], self.rate[0]
+            shard_faults = self.shard_faults[0]
             shardNum = self.shard_num[0]
             liveness_threshold = self.liveness_threshold[0]
             cross_shard_ratio = self.cross_shard_ratio[0]
-            execution_faults = floor(shardSize * self.shard_faults)
+            execution_faults = floor(shardSize * shard_faults)
             total_executors = shardSize * shardNum
 
             # Cleanup all files.
@@ -192,7 +193,7 @@ class LocalBenchShard:
 
             # Parse logs and return the parser.
             Print.info('Parsing logs...')
-            return ShardLogParser.process_shard(f'./logs', order_size=nodes, order_faults_ratio=self.faults, execution_size=shardSize, execution_faults_ratio=self.shard_faults, shardNum=shardNum)
+            return ShardLogParser.process_shard(f'./logs', order_size=nodes, order_faults_ratio=self.faults, execution_size=shardSize, execution_faults_ratio=shard_faults, shardNum=shardNum)
 
         except (subprocess.SubprocessError, ParseError) as e:
             self._kill_executors()
