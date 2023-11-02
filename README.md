@@ -55,7 +55,7 @@ This command may take a long time the first time you run it (compiling rust code
 ```
 
 ## Comparison Sharding
-See [branch](https://github.com/EtherCS/arete/tree/benchmark)
+See [branch](https://github.com/EtherCS/arete/tree/sota)
 
 ## AWS test
 See [this wiki document](https://github.com/EtherCS/arete/wiki/AWS-Benchmark).
