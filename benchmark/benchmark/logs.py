@@ -340,7 +340,7 @@ class ShardLogParser:
 
         # Check whether receive cross-shard comfirmation
         if len(self.vote_round_timestamp.values()) == 0:
-            Print.warn('No cross-shard transactions')
+            Print.warn('No cross-shard transactions is confirm, try more execution time or reduce node amount')
             
         # Check whether the executors timed out.
         # Note that executors are expected to time out once at the beginning.
