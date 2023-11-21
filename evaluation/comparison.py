@@ -89,12 +89,12 @@ def main(n, k, s_t):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument("--n", type=int, help="Total number of nodes")
-    parser.add_argument("--k", type=int, help="Security parameter")
+    parser.add_argument("--l", type=int, help="Security parameter")
     parser.add_argument("--s", type=int, help="The total byzantine ratio (0, 100)")
     
     args = parser.parse_args()
     
     # Compute values for n total parties and k bit security
-    main(args.n, args.k, args.s)
+    main(args.n, args.l, args.s)
     
     
