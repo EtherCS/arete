@@ -1,5 +1,5 @@
 # ARETE
-Blockchain Sharding Made Practical. This implementation is based on [Alberto's Hotstuff codebase](https://github.com/asonnino/hotstuff).
+An implementation for the paper: *Sharding SMR with Optimal-size Shards for Highly Scalable Blockchains*. The consensus protocol is based on the [Hotstuff codebase](https://github.com/asonnino/hotstuff) implemented by Alberto Sonnino.
 
 ## Quick Start
 
@@ -18,7 +18,7 @@ You also need to install Clang (required by rocksdb) and [tmux](https://linuxize
 fab localShard
 ```
 
-This command may take a long time the first time you run it (compiling rust code in `release` mode may be slow) and you can customize a number of benchmark parameters in `fabfile.py`. When the benchmark terminates, it displays a summary of the execution similarly to the one below.
+This command may take a long time the first time you run it (compiling rust code in `release` mode may be slow) and you can customize a number of benchmark parameters in `fabfile.py/localShard`. When the benchmark terminates, it displays a summary of the execution similarly to the one below (under a local server with 48 CPU cores, 128 GB of RAM, and a 10 TB SSD).
 
 ```text
 -----------------------------------------
@@ -34,7 +34,7 @@ This command may take a long time the first time you run it (compiling rust code
  Input rate per shard: 2,000 tx/s
  Transaction size: 512 B
  Cross-shard ratio: 0.2 
- Execution time: 53 s
+ Execution time: 54 s
 
  Consensus timeout delay: 3,000 ms
  Consensus sync retry delay: 10,000 ms
@@ -45,12 +45,12 @@ This command may take a long time the first time you run it (compiling rust code
 
  + RESULTS:
  ARETE:
- Consensus TPS: 5,387 tx/s
- Consensus BPS: 2,758,371 B/s
- End-to-end TPS: 5,319 tx/s
- End-to-end BPS: 2,723,350 B/s
- End-to-end intra latency: 1,288 ms
- End-to-end cross latency: 1,487 ms
+ Consensus TPS: 5,384 tx/s
+ Consensus BPS: 2,756,707 B/s
+ End-to-end TPS: 5,325 tx/s
+ End-to-end BPS: 2,726,242 B/s
+ End-to-end intra latency: 508 ms
+ End-to-end cross latency: 740 ms
 -----------------------------------------
 ```
 
