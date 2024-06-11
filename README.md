@@ -1,5 +1,8 @@
-# ARETE
-Blockchain Sharding Made Practical. This implementation is based on [Alberto's Hotstuff codebase](https://github.com/asonnino/hotstuff).
+# A General Sharding Protocol
+This branch implements a general blockchain sharding protocol as the comparison of Arete.
+
+## Features
+The general sharding protocol supports flexibly setting different system parameters, including the shard size, the number of shards, the ratio of cross-shard transactions, the security threshold, etc. (see  [localShard function](https://github.com/EtherCS/arete/blob/sota/benchmark/fabfile.py#L63)). It also supports the performance evaluation of the sharding system under crashed attacks.
 
 ## Quick Start
 
@@ -18,39 +21,39 @@ You also need to install Clang (required by rocksdb) and [tmux](https://linuxize
 fab localShard
 ```
 
-This command may take a long time the first time you run it (compiling rust code in `release` mode may be slow) and you can customize a number of benchmark parameters in `fabfile.py`. When the benchmark terminates, it displays a summary of the execution similarly to the one below.
+This command may take a long time the first time you run it (compiling rust code in `release` mode may be slow) and you can customize a number of benchmark parameters in `fabfile.py`. When the benchmark terminates, it displays a summary of the execution similarly to the one below (under a local server with 48 CPU cores, 128 GB of RAM, and a 10 TB SSD).
 
 ```text
 -----------------------------------------
  SUMMARY:
 -----------------------------------------
  + CONFIG:
- Ordering shard size: 90 nodes
+ Ordering shard size: 10 nodes
  Ordering shard fault ratio: 0.0 
- Execution shard number: 4 shards
- Execution shard size: 20 nodes
- Execution shard fault ratio: 0.0 
- Liveness threshold: 0.4 
+ Execution shard number: 3 shards
+ Execution shard size: 4 nodes
+ Execution shard fault ratio: [0.0] 
+ Liveness threshold: 0.3 
  Input rate per shard: 2,000 tx/s
  Transaction size: 512 B
  Cross-shard ratio: 0.2 
- Execution time: 114 s
+ Execution time: 112 s
 
  Consensus timeout delay: 4,000 ms
  Consensus sync retry delay: 10,000 ms
  Mempool sync retry delay: 5,000 ms
  Mempool sync retry nodes: 3 nodes
- Mempool batch size: 15,000 B
- Mempool max batch delay: 10 ms
+ Mempool batch size: 500,000 B
+ Mempool max batch delay: 1,000 ms
 
  + RESULTS:
  Benchmark Sharding:
- Consensus TPS: 6,576 tx/s
- Consensus BPS: 3,366,806 B/s
- End-to-end TPS: 6,562 tx/s
- End-to-end BPS: 3,359,972 B/s
- End-to-end intra latency: 3,457 ms
- End-to-end cross latency: 61,301 ms
+ Consensus TPS: 5,405 tx/s
+ Consensus BPS: 2,767,272 B/s
+ End-to-end TPS: 5,377 tx/s
+ End-to-end BPS: 2,752,874 B/s
+ End-to-end intra latency: 491 ms
+ End-to-end cross latency: 7,159 ms
 -----------------------------------------
 ```
 
