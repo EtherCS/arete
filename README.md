@@ -1,5 +1,5 @@
 # ARETE
-An implementation for the paper: *Sharding SMR with Optimal-size Shards for Highly Scalable Blockchains*. The consensus protocol is based on the [Hotstuff codebase](https://github.com/asonnino/hotstuff) implemented by Alberto Sonnino.
+An implementation for the paper: *Sharding SMR with Optimal-size Shards for Highly Scalable Blockchains*.
 
 ## Quick Start
 
@@ -7,8 +7,8 @@ ARETE is written in Rust, but all benchmarking scripts are written in Python and
 To deploy and benchmark a testbed of 4 nodes on your local machine, clone the repo and install the python dependencies:
 
 ```bash
-git clone https://github.com/EtherCS/arete.git
-cd arete/benchmark
+down the anonymous project
+cd [this repo name]/benchmark
 pip install -r requirements.txt
 ```
 
@@ -54,8 +54,5 @@ This command may take a long time the first time you run it (compiling rust code
 -----------------------------------------
 ```
 
-## Comparison Sharding
-See [branch](https://github.com/EtherCS/arete/tree/sota)
-
 ## AWS test
-See [this wiki document](https://github.com/EtherCS/arete/wiki/AWS-Benchmark).
+Please refer to the tutorial provided by [Hotstuff AWS Evaluation](https://github.com/asonnino/hotstuff/wiki/AWS-Benchmarks), which explains how to benchmark the codebase and read benchmarks' results. It also provides a step-by-step tutorial to run benchmarks on [Amazon Web Services (AWS)](https://aws.amazon.com) accross multiple data centers (WAN).
