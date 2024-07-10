@@ -1,9 +1,9 @@
 # ARETE
-An implementation for the paper: *Sharding SMR with Optimal-size Shards for Highly Scalable Blockchains*.
+An implementation for Arete.
 
 ## Quick Start
 
-ARETE is written in Rust, but all benchmarking scripts are written in Python and run with [Fabric](http://www.fabfile.org/).
+Arete is written in Rust, but all benchmarking scripts are written in Python and run with [Fabric](http://www.fabfile.org/).
 To deploy and benchmark a testbed of 4 nodes on your local machine, clone the repo and install the python dependencies:
 
 ```bash
