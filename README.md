@@ -4,7 +4,7 @@ An implementation for Arete.
 ## Quick Start
 
 Arete is written in Rust, but all benchmarking scripts are written in Python and run with [Fabric](http://www.fabfile.org/).
-To deploy and benchmark a testbed of 3 processing shards with three nodes in each on your local machine, clone the repo and install the python dependencies:
+To deploy and benchmark a testbed of 3 processing shards with 4 nodes in each on your local machine, clone the repo and install the python dependencies:
 
 ```bash
 down the anonymous project
