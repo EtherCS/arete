@@ -3,7 +3,8 @@ This is the implementation for the paper *Optimal Sharding for Scalable Blockcha
 
 ## Quick Start
 
-Arete is written in Rust, but all benchmarking scripts are written in Python and run with [Fabric](http://www.fabfile.org/). To deploy and benchmark a testbed on your local machine, clone the repo and install the python dependencies:
+Arete is written in Rust, but all benchmarking scripts are written in Python and run with [Fabric](http://www.fabfile.org/).
+To deploy and benchmark a testbed of 4 nodes on your local machine, clone the repo and install the python dependencies:
 
 ```bash
 git clone https://github.com/EtherCS/arete.git
@@ -11,7 +12,7 @@ cd benchmark
 pip install -r requirements.txt
 ```
 
-You also need to install Clang (required by rocksdb) and [tmux](https://linuxize.com/post/getting-started-with-tmux/#installing-tmux) (which runs all nodes and clients in the background). Finally, run a local benchmark using fabric under `./benchmark`:
+You also need to install Clang (required by rocksdb) and [tmux](https://linuxize.com/post/getting-started-with-tmux/#installing-tmux) (which runs all nodes and clients in the background). Finally, run a local benchmark using fabric under `./benchmark` with the following command:
 
 ```bash
 fab localShard
