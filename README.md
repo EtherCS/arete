@@ -1,14 +1,16 @@
 # ARETE
-Blockchain Sharding Made Practical. This implementation is based on [Alberto's Hotstuff codebase](https://github.com/asonnino/hotstuff).
+This branch implemented [RIVET](https://arxiv.org/pdf/2007.14521) based on [Arete's codebase](https://github.com/EtherCS/arete). 
 
 ## Quick Start
 
-ARETE is written in Rust, but all benchmarking scripts are written in Python and run with [Fabric](http://www.fabfile.org/).
+This branch is written in Rust, but all benchmarking scripts are written in Python and run with [Fabric](http://www.fabfile.org/).
 To deploy and benchmark a testbed of 4 nodes on your local machine, clone the repo and install the python dependencies:
 
 ```bash
 git clone https://github.com/EtherCS/arete.git
-cd arete/benchmark
+cd arete
+git fetch --all
+cd benchmark
 pip install -r requirements.txt
 ```
 
