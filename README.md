@@ -74,6 +74,9 @@ When the benchmark terminates, it displays a summary of the execution similarly 
 ## Sharding benchmark
 We also implemented a [general sharding protocol](https://github.com/EtherCS/arete/tree/sota) based on our codebase. We designed many interfaces for you to easily develop your own sharding protocol upon it. You can also use it as a sharding benchmark in your own experiments, where you can customize the testing parameters in [*localshard*](https://github.com/EtherCS/arete/blob/sota/benchmark/fabfile.py#L63) function (parameters are similar to Arete but here every shard runs the consensus protocol).
 
+## Comparison: RIVET
+We also implemented [RIVET](https://arxiv.org/pdf/2007.14521) based on our codebase for comparison. See [branch](https://github.com/EtherCS/arete/tree/rivet).
+
 ## AWS test
 AWS tests can be easily conducted with our scripts. Please refer to the tutorial [Arete AWS Evaluation](https://github.com/EtherCS/arete/wiki/AWS-Benchmark), which explains how to benchmark the codebase and read benchmarks' results. It also provides a step-by-step tutorial to run benchmarks on [Amazon Web Services (AWS)](https://aws.amazon.com) accross multiple data centers (WAN).
 
