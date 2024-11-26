@@ -49,6 +49,9 @@ pub struct BatchMaker {
     current_batch_size: usize,
     /// A network sender to broadcast the batches to the other mempools.
     network: ReliableSender,
+    /// The worker_sender is the one coordinating the certify state
+    /// we use it for test only because we won't implement view-change for worker shards
+    pub worker_sender: u32,
 }
 
 impl BatchMaker {
@@ -62,6 +65,7 @@ impl BatchMaker {
         rx_transaction: Receiver<Transaction>,
         tx_message: Sender<QuorumWaiterMessage>,
         mempool_addresses: Vec<(PublicKey, SocketAddr)>,
+        worker_sender: u32,
     ) {
         tokio::spawn(async move {
             Self {
@@ -77,6 +81,7 @@ impl BatchMaker {
                 current_batch: Batch::with_capacity(batch_size * 2),
                 current_batch_size: 0,
                 network: ReliableSender::new(),
+                worker_sender,
             }
             .run()
             .await;
@@ -92,21 +97,25 @@ impl BatchMaker {
             tokio::select! {
                 // Assemble client transactions into batches of preset size.
                 Some(transaction) = self.rx_transaction.recv() => {
-                    self.current_batch_size += transaction.len();
-                    self.current_batch.push(transaction);
-                    if self.current_batch_size >= self.batch_size {
-                        self.seal().await;
-                        timer.as_mut().reset(Instant::now() + Duration::from_millis(self.max_batch_delay));
+                    if self.worker_sender == 1{
+                        self.current_batch_size += transaction.len();
+                        self.current_batch.push(transaction);
+                        if self.current_batch_size >= self.batch_size {
+                            self.seal().await;
+                            timer.as_mut().reset(Instant::now() + Duration::from_millis(self.max_batch_delay));
+                        }
                     }
                 },
 
                 // If the timer triggers, seal the batch even if it contains few transactions.
                 () = &mut timer => {
-                    if !self.current_batch.is_empty() {
-                        self.seal().await;
+                    if self.worker_sender == 1 {
+                        if !self.current_batch.is_empty() {
+                            self.seal().await;
+                        }
+                        // Control the sending rate to the ordering shard
+                        timer.as_mut().reset(Instant::now() + Duration::from_millis(self.max_batch_delay));
                     }
-                    // Control the sending rate to the ordering shard
-                    timer.as_mut().reset(Instant::now() + Duration::from_millis(self.max_batch_delay));
                 }
             }
 

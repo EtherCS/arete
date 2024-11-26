@@ -116,7 +116,7 @@ fn deploy_testbed(executors: u16) -> Result<Vec<JoinHandle<()>>, Box<dyn std::er
                 let front = format!("127.0.0.1:{}", 25_000 + i).parse().unwrap();
                 let mempool = format!("127.0.0.1:{}", 25_100 + i).parse().unwrap();
                 let confirmation = format!("127.0.0.1:{}", 25_100 + i).parse().unwrap();
-                (name, stake, front, mempool, confirmation)
+                (name, stake, front, mempool, confirmation, 1)
             })
             .collect(),
         epoch,

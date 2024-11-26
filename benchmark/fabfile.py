@@ -65,11 +65,11 @@ def localShard(ctx):
     bench_params = {
         "faults": 0.0,
         "nodes": 10,
-        "rate": 2_000,
+        "rate": 6_000,  # this is input rate for each shard
         "tx_size": 512,
         "cross_shard_ratio": 0.2,
         "duration": 60,
-        "liveness_threshold": 0.41,
+        "liveness_threshold": 0.49,
         "shard_faults": 0.0,
         "shard_num": 3,
         "shard_sizes": 4,  # could be different shard size [4, 8, ...]

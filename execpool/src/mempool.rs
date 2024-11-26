@@ -143,6 +143,13 @@ impl Mempool {
             /* handler */ TxReceiverHandler { tx_batch_maker },
         );
 
+        let mut worker_sender = 0;
+        if let Some(authority) = self.committee.authorities.get(&self.name) {
+            worker_sender = authority.worker_sender;
+        } else {
+            warn!("Our public key is not in the committee");
+        }
+
         // The transactions are sent to the `BatchMaker` that assembles them into batches. It then broadcasts
         // (in a reliable manner) the batches to all other mempools that share the same `id` as us. Finally,
         // it gathers the 'cancel handlers' of the messages and send them to the `QuorumWaiter`.
@@ -157,6 +164,7 @@ impl Mempool {
             /* tx_message */ tx_quorum_waiter,
             /* mempool_addresses */
             self.committee.broadcast_addresses(&self.name),
+            worker_sender,
         );
 
         // The `QuorumWaiter` waits for (1-f_L) authorities to acknowledge reception of the batch. It then forwards

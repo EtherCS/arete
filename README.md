@@ -32,8 +32,8 @@ This command may take a long time the first time you run it (compiling rust code
  Execution shard number: 3 shards
  Execution shard size: 4 nodes
  Execution shard fault ratio: 0.0 
- Liveness threshold: 0.41 
- Input rate per shard: 2,000 tx/s
+ Liveness threshold: 0.49 
+ Input rate per shard: 6,000 tx/s
  Transaction size: 512 B
  Cross-shard ratio: 0.2 
  Execution time: 53 s
@@ -47,12 +47,12 @@ This command may take a long time the first time you run it (compiling rust code
 
  + RESULTS:
  ARETE:
- Consensus TPS: 5,387 tx/s
- Consensus BPS: 2,758,371 B/s
- End-to-end TPS: 5,319 tx/s
- End-to-end BPS: 2,723,350 B/s
- End-to-end intra latency: 1,288 ms
- End-to-end cross latency: 1,487 ms
+ Consensus TPS: 4,071 tx/s
+ Consensus BPS: 2,084,604 B/s
+ End-to-end TPS: 4,021 tx/s
+ End-to-end BPS: 2,058,652 B/s
+ End-to-end intra latency: 803 ms
+ End-to-end cross latency: 1,375 ms
 -----------------------------------------
 ```
 

@@ -120,6 +120,7 @@ impl Node {
 
     pub async fn analyze_block(&mut self) {
         let mut sender = SimpleSender::new();
+        info!("shard info (id) {}", self.shard_info.id);
         while let Some(_block) = self.commit.recv().await {
             let mut confirm_msgs: HashMap<u32, ConfirmMessage> = HashMap::new();
             for i in _block.payload.clone() {

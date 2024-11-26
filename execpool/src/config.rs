@@ -61,6 +61,9 @@ pub struct Authority {
     pub mempool_address: SocketAddr,
     /// Address to confirmation messages from the ordering shard.
     pub confirmation_address: SocketAddr,
+    /// The worker_sender is the one coordinating the certify state
+    /// we use it for test only because we won't implement view-change for worker shards
+    pub worker_sender: u32,
 }
 
 #[derive(Clone, Deserialize, Serialize)]
@@ -71,16 +74,17 @@ pub struct ExecutionCommittee {
 }
 
 impl ExecutionCommittee {
-    pub fn new(info: Vec<(PublicKey, Stake, SocketAddr, SocketAddr, SocketAddr)>, epoch: EpochNumber, liveness_threshold: f32) -> Self {
+    pub fn new(info: Vec<(PublicKey, Stake, SocketAddr, SocketAddr, SocketAddr, u32)>, epoch: EpochNumber, liveness_threshold: f32) -> Self {
         Self {
             authorities: info
                 .into_iter()
-                .map(|(name, stake, transactions_address, mempool_address, confirmation_address)| {
+                .map(|(name, stake, transactions_address, mempool_address, confirmation_address, worker_sender)| {
                     let authority = Authority {
                         stake,
                         transactions_address,
                         mempool_address,
                         confirmation_address,
+                        worker_sender,
                     };
                     (name, authority)
                 })

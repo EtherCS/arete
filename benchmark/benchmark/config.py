@@ -169,6 +169,7 @@ class ExecutionCommittee:
 
     def _build_mempool(self):
         node = {}
+        is_first = 1
         for n, f, m, c in zip(self.names, self.front, self.mempool, self.confirmation):
             node[n] = {
                 "name": n,
@@ -176,7 +177,9 @@ class ExecutionCommittee:
                 "transactions_address": f,
                 "mempool_address": m,
                 "confirmation_address": c,
+                "worker_sender": is_first,
             }
+            is_first = 0
         return {"authorities": node, "epoch": 1, "liveness_threshold": self.liveness_threshold}
 
     def print(self, filename):
