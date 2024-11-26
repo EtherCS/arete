@@ -353,7 +353,8 @@ class Bench:
             # Run the clients (they will wait for the executors to be ready).
             # addresses = committee.front
             front_addr = [f"{x}:{self.settings.front_port + i}" for x, i in shard_nodes]
-            rate_share = ceil(rate / committee.size())
+            # rate_share = ceil(rate / committee.size())
+            rate_share = rate   # we dont share rate in RIVET since it is leader-based
             # timeout = executor_parameters.certify_timeout_delay
             client_logs = [
                 PathMaker.shard_client_log_file(shard_id, i)

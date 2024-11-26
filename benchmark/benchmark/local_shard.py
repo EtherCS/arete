@@ -171,7 +171,8 @@ class LocalBenchShard:
                 # Do not boot faulty nodes.
                 run_executors = shardSize - execution_faults
                 addresses = committee.front
-                rate_share = ceil(rate / run_executors)
+                # rate_share = ceil(rate / run_executors)
+                rate_share = rate   # we dont share rate in RIVET since it is leader-based
                 timeout = self.executor_parameters.certify_timeout_delay
                 client_logs = [PathMaker.shard_client_log_file(shardId, i) for i in range(run_executors)]
                 for addr, log_file in zip(addresses, client_logs):

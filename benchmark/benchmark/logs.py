@@ -879,7 +879,8 @@ class ShardLogParser:
             f' Execution shard fault ratio: {self.execution_faults_ratio} \n'
             f' Liveness threshold: {self.liveness_threshold[0]:,} \n'
             # f' Committee size: {int(self.execution_size/self.shard_num)} nodes\n'
-            f' Input rate per shard: {ceil(sum(self.rate)/self.shard_num):,} tx/s\n'
+            # f' Input rate per shard: {ceil(sum(self.rate)/self.shard_num):,} tx/s\n'
+            f' Input rate per shard: {ceil(sum(self.rate)/self.execution_size/self.shard_num):,} tx/s\n' # RIVET dont share rate
             f' Transaction size: {self.size[0]:,} B\n'
             f' Cross-shard ratio: {self.ratio[0]:,} \n'
             f' Execution time: {round(duration):,} s\n'
