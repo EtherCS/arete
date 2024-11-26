@@ -62,6 +62,8 @@ def main(n, k, s_t):
     s_n = s_t
     print("{:<{width}}".format("Beacon/Order", width=value_width) + "{:<{width}}".format(str(s_n)+"%", width=value_width) + "{:<{width}}".format("33.3%", width=value_width) + "{:<{width}}".format("33.3%", width=value_width) + "{:<{width}}".format(minCSize(n, n*Fraction(s_n, 100), Fraction(1, 3), k), width=value_width) + "{:<{width}}".format("1-2^("+str(k)+")", width=value_width))
     
+    print("{:<{width}}".format("Rivet/worker", width=value_width) + "{:<{width}}".format(str(s_n)+"%", width=value_width) + "{:<{width}}".format("49%", width=value_width) + "{:<{width}}".format("49%", width=value_width) + "{:<{width}}".format(minCSize(n, n*Fraction(s_n, 100), Fraction(49, 100), k), width=value_width) + "{:<{width}}".format("1-2^("+str(k)+")", width=value_width))
+    
     # GEARBOX
     crps = range(0 , 34 , 1)
     print(" ")
