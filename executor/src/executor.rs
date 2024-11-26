@@ -120,6 +120,8 @@ impl Executor {
 
     pub async fn send_certificate_message(&mut self) -> Result<()> {
         let mut sender = SimpleSender::new();
+        info!("shard id: {:?}", self.shard_id);
+        info!("one ordering shard address: {:?}", self.ordering_addrs[0]);
         while let Some(_cmsg) = self.certify.recv().await {
             let message = bincode::serialize(&_cmsg.clone()).expect("fail to serialize the CBlock");
             // TODO: random or broadcast?
