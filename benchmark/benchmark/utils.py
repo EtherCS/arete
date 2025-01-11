@@ -97,7 +97,7 @@ class PathMaker:
     def result_file(batch_size, input_rate, order_faults, shard_num, shard_sizes, liveness_threshold):
         return join(
             PathMaker.results_path(), 
-            f'bench-{batch_size}-{input_rate}-{order_faults}-{shard_num}-{shard_sizes}-{liveness_threshold}.txt'
+            f'rivet-{batch_size}-{input_rate}-{order_faults}-{shard_num}-{shard_sizes}-{liveness_threshold}.txt'
         )
 
     @staticmethod
