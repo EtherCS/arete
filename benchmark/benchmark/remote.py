@@ -452,7 +452,7 @@ class Bench:
         for i, host in enumerate(progress):
             # There is no logs for fault nodes
             if (i % shard_sizes) >= shard_sizes-execution_faults:
-                break
+                continue
             c = Connection(host[0], user="ubuntu", connect_kwargs=self.connect)
             c.get(
                 PathMaker.shard_executor_log_file(i // shard_sizes, i % shard_sizes),
