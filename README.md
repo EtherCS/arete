@@ -83,10 +83,14 @@ AWS tests can be easily conducted with our scripts. Please refer to the tutorial
 ## Acknowledgment
 Our prototype is built on [Alberto's Hotstuff Codebase](https://github.com/asonnino/hotstuff). We thank Alberto Sonnino for his invaluable codes. If you have any questions, please feel free to contact antfinancialyujian@gmail.com. If you think this paper and repository contributes to your work, feel free to cite our paper:
 ```text
-@article{zhang2024sharding,
-  title={Optimal Sharding for Scalable Blockchains with Deconstructed SMR},
-  author={Zhang, Jianting and Luo, Zhongtang and Ramesh, Raghavendra and Kate, Aniket},
-  journal={arXiv preprint arXiv:2406.08252},
-  year={2024}
+@article{zhangoptimal,
+author = {Zhang, Jianting and Luo, Zhongtang and Ramesh, Raghavendra and Kate, Aniket},
+title = {Optimal Sharding for Scalable Blockchains with Deconstructed SMR},
+year = {2025},
+publisher = {VLDB Endowment},
+volume = {18},
+number = {7},
+pages = {2198–2211},
+numpages = {14}
 }
 ```
